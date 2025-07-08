@@ -4,20 +4,17 @@ import { useAuthStore } from '../store/authStore'
 
 const Auth = () => {
   const navigate = useNavigate()
-  const [isLogin, setIsLogin] = useState(true)
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
-    password: '',
-    company: ''
+    password: ''
   })
 
-  const { login, register, isLoading, error, clearError, isAuthenticated } = useAuthStore()
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore()
 
-  // Clear error when switching between login/register
+  // Clear error when component mounts
   useEffect(() => {
     clearError()
-  }, [isLogin])
+  }, [])
 
   // Redirect to platform when authenticated
   useEffect(() => {
@@ -30,11 +27,7 @@ const Auth = () => {
     e.preventDefault()
 
     try {
-      if (isLogin) {
-        await login(formData.email, formData.password)
-      } else {
-        await register(formData.name, formData.email, formData.password, formData.company)
-      }
+      await login(formData.email, formData.password)
     } catch (error) {
       console.error('Auth error:', error)
     }
@@ -47,12 +40,6 @@ const Auth = () => {
     })
   }
 
-  const toggleMode = () => {
-    setIsLogin(!isLogin)
-    setFormData({ name: '', email: '', password: '', company: '' })
-    clearError()
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#18cb96] to-[#15b885] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
@@ -62,7 +49,7 @@ const Auth = () => {
             <span className="text-[#18cb96]">Scale</span>Hubs
           </h1>
           <p className="text-gray-600 mt-2">
-            {isLogin ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta empresarial'}
+            Inicia sesión en tu cuenta
           </p>
         </div>
 
@@ -75,42 +62,6 @@ const Auth = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {!isLogin && (
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-[#373643] mb-2">
-                Nombre completo
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required={!isLogin}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                placeholder="Tu nombre completo"
-              />
-            </div>
-          )}
-
-          {!isLogin && (
-            <div>
-              <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
-                Empresa
-              </label>
-              <input
-                type="text"
-                id="company"
-                name="company"
-                value={formData.company}
-                onChange={handleInputChange}
-                required={!isLogin}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                placeholder="Nombre de tu empresa"
-              />
-            </div>
-          )}
-
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-2">
               Email
@@ -144,13 +95,16 @@ const Auth = () => {
           </div>
 
           {/* Demo credentials hint */}
-          {isLogin && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-blue-700 text-xs">
-                <strong>Demo:</strong> demo@scalehubs.com / password
-              </p>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-700 text-xs mb-2">
+              <strong>Usuarios de prueba:</strong>
+            </p>
+            <div className="space-y-1 text-xs text-blue-600">
+              <p><strong>Admin:</strong> admin@scalehubs.com / password</p>
+              <p><strong>Cliente 1:</strong> juan@empresa1.com / password</p>
+              <p><strong>Cliente 2:</strong> maria@empresa2.com / password</p>
             </div>
-          )}
+          </div>
 
           <button
             type="submit"
@@ -163,26 +117,13 @@ const Auth = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                {isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'}
+                Iniciando sesión...
               </span>
             ) : (
-              isLogin ? 'Iniciar sesión' : 'Crear cuenta'
+              'Iniciar sesión'
             )}
           </button>
         </form>
-
-        {/* Toggle between login and register */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            {isLogin ? '¿No tienes una cuenta?' : '¿Ya tienes una cuenta?'}
-            <button
-              onClick={toggleMode}
-              className="ml-1 text-[#18cb96] hover:text-[#15b885] font-medium"
-            >
-              {isLogin ? 'Regístrate aquí' : 'Inicia sesión aquí'}
-            </button>
-          </p>
-        </div>
 
         {/* Features */}
         <div className="mt-8 pt-6 border-t border-gray-200">

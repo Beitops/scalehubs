@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useAuthStore } from '../store/authStore'
+import { useLeadsStore } from '../store/leadsStore'
 
 interface Lead {
   id: number
@@ -6,18 +8,25 @@ interface Lead {
   name: string
   phone: string
   platform: string
+  company: string
 }
 
 const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
+  const { user } = useAuthStore()
+  const { getLeadsByCompany, getAllLeads } = useLeadsStore()
 
-  const leads: Lead[] = [
-    { id: 1, date: '2024-01-15', name: 'María González', phone: '+34 612 345 678', platform: 'Instagram' },
-    { id: 2, date: '2024-01-15', name: 'Carlos Ruiz', phone: '+34 623 456 789', platform: 'Facebook' },
-    { id: 3, date: '2024-01-14', name: 'Ana Martínez', phone: '+34 634 567 890', platform: 'LinkedIn' },
-    { id: 4, date: '2024-01-14', name: 'Luis Pérez', phone: '+34 645 678 901', platform: 'Instagram' },
-  ]
+  // Obtener leads según el rol del usuario
+  const getLeads = (): Lead[] => {
+    if (user?.role === 'admin') {
+      return getAllLeads()
+    } else {
+      return getLeadsByCompany(user?.company || '')
+    }
+  }
+
+  const leads = getLeads()
 
   const filteredLeads = leads.filter(lead => {
     const matchesDate = !dateFilter || lead.date === dateFilter
@@ -34,7 +43,19 @@ const Leads = () => {
       {/* Header */}
       <div className="mb-6 lg:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Gestión de Leads</h1>
-        <p className="text-gray-600 mt-2 text-sm sm:text-base">Administra y visualiza todos los leads generados en redes sociales</p>
+        <p className="text-gray-600 mt-2 text-sm sm:text-base">
+          {user?.role === 'admin' 
+            ? 'Administra y visualiza todos los leads generados en redes sociales' 
+            : `Leads asignados a ${user?.company}`
+          }
+        </p>
+        {user?.role === 'admin' && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-700 text-xs">
+              👑 <strong>Modo Administrador:</strong> Visualizando todos los leads del sistema
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Filters and Export */}
@@ -97,6 +118,9 @@ const Leads = () => {
               <div className="space-y-1 text-xs text-gray-600">
                 <p><span className="font-medium">Teléfono:</span> {lead.phone}</p>
                 <p><span className="font-medium">Fecha:</span> {new Date(lead.date).toLocaleDateString('es-ES')}</p>
+                {user?.role === 'admin' && (
+                  <p><span className="font-medium">Empresa:</span> {lead.company}</p>
+                )}
               </div>
               <div className="flex gap-2 mt-3">
                 <button className="text-[#18cb96] hover:text-[#15b885] text-xs font-medium">
@@ -127,6 +151,11 @@ const Leads = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                   Plataforma
                 </th>
+                {user?.role === 'admin' && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Empresa
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                   Acciones
                 </th>
@@ -149,6 +178,11 @@ const Leads = () => {
                       {lead.platform}
                     </span>
                   </td>
+                  {user?.role === 'admin' && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+                      {lead.company}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button className="text-[#18cb96] hover:text-[#15b885] mr-3">
                       Ver
@@ -168,6 +202,9 @@ const Leads = () => {
           <div className="flex items-center justify-between">
             <div className="text-xs sm:text-sm text-gray-700">
               Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{leads.length}</span> leads
+              {user?.role === 'client' && (
+                <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
+              )}
             </div>
           </div>
         </div>

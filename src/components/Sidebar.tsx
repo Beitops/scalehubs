@@ -4,6 +4,7 @@ interface User {
   name: string
   email: string
   company: string
+  role: 'admin' | 'client'
 }
 
 interface SidebarProps {
@@ -77,6 +78,9 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout }:
             <p className="text-sm font-medium text-[#373643] truncate">{user?.name || 'Usuario'}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email || 'usuario@empresa.com'}</p>
             <p className="text-xs text-gray-400 truncate">{user?.company || 'Empresa'}</p>
+            <p className="text-xs text-[#18cb96] font-medium capitalize">
+              {user?.role === 'admin' ? '👑 Administrador' : '👤 Cliente'}
+            </p>
           </div>
         </div>
         
