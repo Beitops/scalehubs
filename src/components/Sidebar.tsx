@@ -14,9 +14,10 @@ interface SidebarProps {
   sidebarOpen?: boolean
   user?: User | null
   onLogout?: () => void
+  onAddUser?: () => void
 }
 
-const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout }: SidebarProps) => {
+const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, onAddUser }: SidebarProps) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'leads', label: 'Leads', icon: '👥' },
@@ -25,9 +26,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout }:
   const handleMenuClick = (section: string) => {
     setCurrentSection(section)
     // Close sidebar on mobile after menu selection
-
-      onClose()
-
+    onClose()
   }
 
   return (
@@ -67,6 +66,19 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout }:
           ))}
         </ul>
       </nav>
+
+      {/* Add User Button (Admin Only) */}
+      {user?.role === 'admin' && onAddUser && (
+        <div className="px-4 mb-4">
+          <button
+            onClick={onAddUser}
+            className="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors bg-[#18cb96] text-white hover:bg-[#15b885]"
+          >
+            <span className="mr-3 text-lg text-yellow-300">➕</span>
+            <span className="font-medium">Añadir usuarios</span>
+          </button>
+        </div>
+      )}
 
       {/* User Info */}
       <div className="p-4 border-t border-gray-200">
