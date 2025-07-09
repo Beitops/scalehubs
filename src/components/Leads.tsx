@@ -9,26 +9,28 @@ interface Lead {
   phone: string
   platform: string
   company: string
+  status: string
 }
 
 const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showReturnModal, setShowReturnModal] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [exportDateRange, setExportDateRange] = useState({
     startDate: '',
     endDate: ''
   })
   const { user } = useAuthStore()
-  const { getLeadsByCompany, getAllLeads } = useLeadsStore()
+  const { getLeadsByCompany, getAllLeads, updateLeadStatus } = useLeadsStore()
 
   // Obtener leads según el rol del usuario
   const getLeads = (): Lead[] => {
-    if (user?.role === 'admin') {
-      return getAllLeads()
-    } else {
-      return getLeadsByCompany(user?.company || '')
-    }
+    const allLeads = user?.role === 'admin' ? getAllLeads() : getLeadsByCompany(user?.company || '')
+    
+    // Filtrar leads que no estén en devolución
+    return allLeads.filter(lead => lead.status !== 'devolucion')
   }
 
   const leads = getLeads()
@@ -105,6 +107,19 @@ const Leads = () => {
       ...exportDateRange,
       [e.target.name]: e.target.value
     })
+  }
+
+  const handleReturnLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowReturnModal(true)
+  }
+
+  const handleConfirmReturn = () => {
+    if (selectedLead) {
+      updateLeadStatus(selectedLead.id, 'devolucion')
+      setShowReturnModal(false)
+      setSelectedLead(null)
+    }
   }
 
   return (
@@ -193,12 +208,14 @@ const Leads = () => {
                   )}
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button className="text-[#18cb96] hover:text-[#15b885] text-xs font-medium">
-                    Ver
-                  </button>
-                  <button className="text-[#18cb96] hover:text-[#15b885] text-xs font-medium">
-                    Editar
-                  </button>
+                  {user?.role !== 'admin' && (
+                    <button 
+                      onClick={() => handleReturnLead(lead)}
+                      className="text-red-400 hover:text-red-600 text-xs font-medium transition-colors"
+                    >
+                      Devolver
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -226,9 +243,11 @@ const Leads = () => {
                       Empresa
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  {user?.role !== 'admin' && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                      Devoluciones
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -253,14 +272,16 @@ const Leads = () => {
                         {lead.company}
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-[#18cb96] hover:text-[#15b885] mr-3">
-                        Ver
-                      </button>
-                      <button className="text-[#18cb96] hover:text-[#15b885]">
-                        Editar
-                      </button>
-                    </td>
+                    {user?.role !== 'admin' && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button 
+                          onClick={() => handleReturnLead(lead)}
+                          className="text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          Devolver
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -366,6 +387,70 @@ const Leads = () => {
                   className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Exportar ({leadsToExport.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Modal overlay */}
+      {showReturnModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowReturnModal(false)}
+        />
+      )}
+
+      {/* Return Confirmation Modal */}
+      {showReturnModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#373643]">Confirmar Devolución</h2>
+              <button
+                onClick={() => setShowReturnModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-[#373643] mb-2">
+                  ¿Estás seguro de que quieres devolver este lead?
+                </p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+                  <p className="text-yellow-800 text-xs">
+                    ⚠️ <strong>Importante:</strong> Después de confirmar, deberás ir a la sección "Devoluciones" para finalizar el trámite de devolución.
+                  </p>
+                </div>
+                {selectedLead && (
+                  <div className="text-xs text-gray-600 mt-3">
+                    <p><strong>Nombre:</strong> {selectedLead.name}</p>
+                    <p><strong>Teléfono:</strong> {selectedLead.phone}</p>
+                    <p><strong>Plataforma:</strong> {selectedLead.platform}</p>
+                    <p><strong>Fecha:</strong> {new Date(selectedLead.date).toLocaleDateString('es-ES')}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowReturnModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmReturn}
+                  className="flex-1 px-4 py-2 bg-red-400 text-white rounded-lg hover:bg-red-500 transition-colors"
+                >
+                  Confirmar Devolución
                 </button>
               </div>
             </div>

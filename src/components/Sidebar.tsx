@@ -21,6 +21,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'leads', label: 'Leads', icon: '👥' },
+    { id: 'devoluciones', label: 'Devoluciones', icon: '📦' },
   ]
 
   const handleMenuClick = (section: string) => {

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Sidebar from './Sidebar'
 import Dashboard from './Dashboard'
 import Leads from './Leads'
+import Devoluciones from './Devoluciones'
 import { useAuthStore } from '../store/authStore'
 
 const Platform = () => {
@@ -24,6 +25,8 @@ const Platform = () => {
         return <Dashboard />
       case 'leads':
         return <Leads />
+      case 'devoluciones':
+        return <Devoluciones />
       default:
         return <Dashboard />
     }
