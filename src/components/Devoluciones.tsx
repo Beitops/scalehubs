@@ -32,10 +32,13 @@ const Devoluciones = () => {
 
   // Obtener leads en devolución según el rol del usuario
   const getLeadsInDevolucion = (): Lead[] => {
-    const allLeads = user?.role === 'admin' ? getAllLeads() : getLeadsByCompany(user?.company || '')
+    // Los administradores no ven leads con status 'devolucion', solo los clientes
+    if (user?.role === 'admin') return []
+    
+    const companyLeads = getLeadsByCompany(user?.company || '')
     
     // Filtrar solo leads en devolución
-    return allLeads.filter(lead => lead.status === 'devolucion')
+    return companyLeads.filter(lead => lead.status === 'devolucion')
   }
 
   // Obtener leads en tramite de devolución (solo para admin)
@@ -129,19 +132,21 @@ const Devoluciones = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[#373643]">Devoluciones Pendientes</h2>
-                <p className="text-sm text-gray-600">
-                  {leadsInDevolucion.length} lead{leadsInDevolucion.length !== 1 ? 's' : ''} en proceso de devolución
-                </p>
-              </div>
-              <div className="text-3xl font-bold text-red-500">
-                {leadsInDevolucion.length}
+          {user?.role !== 'admin' && (
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#373643]">Devoluciones Pendientes</h2>
+                  <p className="text-sm text-gray-600">
+                    {leadsInDevolucion.length} lead{leadsInDevolucion.length !== 1 ? 's' : ''} en proceso de devolución
+                  </p>
+                </div>
+                <div className="text-3xl font-bold text-red-500">
+                  {leadsInDevolucion.length}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {user?.role === 'admin' && (
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
@@ -160,8 +165,8 @@ const Devoluciones = () => {
           )}
         </div>
 
-        {/* Devoluciones Pendientes Section */}
-        {leadsInDevolucion.length > 0 && (
+        {/* Devoluciones Pendientes Section (Solo para clientes) */}
+        {user?.role === 'client' && leadsInDevolucion.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-[#373643]">Devoluciones Pendientes</h2>
@@ -214,11 +219,7 @@ const Devoluciones = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                       Plataforma
                     </th>
-                    {user?.role === 'admin' && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                        Empresa
-                      </th>
-                    )}
+
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                       Estado
                     </th>
@@ -244,11 +245,7 @@ const Devoluciones = () => {
                           {lead.platform}
                         </span>
                       </td>
-                      {user?.role === 'admin' && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                          {lead.company}
-                        </td>
-                      )}
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-red-400">
                           En Devolución
