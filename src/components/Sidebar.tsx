@@ -75,7 +75,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
             onClick={onAddUser}
             className="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors bg-[#18cb96] text-white hover:bg-[#15b885]"
           >
-            <span className="mr-3 text-lg text-yellow-300">➕</span>
+            <span className="mr-3 text-3xl text-white">+</span>
             <span className="font-medium">Añadir usuarios</span>
           </button>
         </div>
