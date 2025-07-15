@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Auth from './components/Auth'
+import Register from './components/Register'
 import Platform from './components/Platform'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -9,6 +10,9 @@ function App() {
       <Routes>
         {/* Auth route */}
         <Route path="/auth" element={<Auth />} />
+        
+        {/* Set password route (for invited users) */}
+        <Route path="/set-password" element={<Register />} />
         
         {/* Protected platform routes */}
         <Route 

@@ -15,6 +15,7 @@ interface AuthState {
     isLoading: boolean
     error: string | null
     login: (email: string, password: string) => Promise<void>
+    signup: (email: string, password: string, userData: any) => Promise<void>
     logout: () => void
     clearError: () => void
 }
@@ -77,6 +78,45 @@ export const useAuthStore = create<AuthState>()(
                         set({
                             isLoading: false,
                             error: error instanceof Error ? error.message : 'Error al iniciar sesión'
+                        })
+                    }
+                },
+
+                signup: async (email: string, password: string, userData: any) => {
+                    set({ isLoading: true, error: null })
+
+                    try {
+                        // Simulate API call
+                        await new Promise(resolve => setTimeout(resolve, 1000))
+
+                        // Verificar si el email ya existe
+                        const existingUser = mockUsers.find(u => u.email === email)
+                        if (existingUser) {
+                            throw new Error('El email ya está registrado')
+                        }
+
+                        // Crear nuevo usuario
+                        const newUser: User = {
+                            id: (mockUsers.length + 1).toString(),
+                            name: userData.name,
+                            email: email,
+                            company: userData.company,
+                            role: 'client'
+                        }
+
+                        // En un caso real, aquí se guardaría en la base de datos
+                        // mockUsers.push(newUser)
+
+                        set({
+                            user: newUser,
+                            isAuthenticated: true,
+                            isLoading: false,
+                            error: null
+                        })
+                    } catch (error) {
+                        set({
+                            isLoading: false,
+                            error: error instanceof Error ? error.message : 'Error al crear la cuenta'
                         })
                     }
                 },
