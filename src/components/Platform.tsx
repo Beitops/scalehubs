@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import Dashboard from './Dashboard'
 import Leads from './Leads'
 import Devoluciones from './Devoluciones'
+import Empresas from './Empresas'
 import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
@@ -32,6 +33,8 @@ const Platform = () => {
         return <Leads />
       case 'devoluciones':
         return <Devoluciones />
+      case 'empresas':
+        return <Empresas />
       default:
         return <Dashboard />
     }

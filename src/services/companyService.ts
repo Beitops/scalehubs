@@ -4,7 +4,7 @@ import type { FrontendEmpresa, DatabaseEmpresa } from '../types/database'
 export interface Company {
   id: number
   cif: string
-  name: string
+  nombre: string
   email_contacto?: string | null
   volumen_diario: number
   prioridad: number
@@ -48,7 +48,7 @@ export const companyService = {
         .from('empresas')
         .select('*')
         .order('nombre')
-
+      console.log('🔄 getCompanies data:', data)
       if (error) {
         console.error('Error getting companies:', error)
         return []
@@ -72,7 +72,7 @@ export const companyService = {
         .from('empresas')
         .insert({
           cif: company.cif,
-          nombre: company.name,
+          nombre: company.nombre,
           email_contacto: company.email_contacto,
           volumen_diario: company.volumen_diario,
           prioridad: company.prioridad,

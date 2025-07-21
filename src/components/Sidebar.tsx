@@ -21,11 +21,22 @@ interface SidebarProps {
 
 const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, onAddUser }: SidebarProps) => {
   
-  const menuItems = [
+  // Menú base para todos los usuarios
+  const baseMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'leads', label: 'Leads', icon: '👥' },
     { id: 'devoluciones', label: 'Devoluciones', icon: '📦' },
   ]
+
+  // Menú adicional solo para admins
+  const adminMenuItems = [
+    { id: 'empresas', label: 'Empresas', icon: '🏢' },
+  ]
+
+  // Combinar menús según el rol del usuario
+  const menuItems = user?.role === 'admin' 
+    ? [...baseMenuItems, ...adminMenuItems]
+    : baseMenuItems
 
   const handleMenuClick = (section: string) => {
     setCurrentSection(section)
