@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
+import { supabase } from '../lib/supabase'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -9,22 +10,100 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     name: '',
-    company: ''
+    company: '' // CIF de la empresa (para enviar al backend)
+  })
+  const [userMetadata, setUserMetadata] = useState({
+    name: '',
+    companyName: '', // Nombre de la empresa para mostrar
+    role: 'client' as 'admin' | 'client'
   })
   const [passwordError, setPasswordError] = useState('')
   const [isValidHash, setIsValidHash] = useState(false)
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true)
 
   const { signup, isLoading, error, clearError, isAuthenticated } = useAuthStore()
 
-  // Verificar si hay hash en la URL (requerido para acceso)
-   useEffect(() => {
+  // Verificar si hay hash en la URL y obtener metadata
+  useEffect(() => {
     const hash = window.location.hash
     if (!hash || hash === '') {
       navigate('/')
       return
     }
-    setIsValidHash(true)
-    clearError()
+    
+    const getSessionAndMetadata = async () => {
+      try {
+        setIsLoadingMetadata(true)
+        
+        // Obtener sesión y metadata desde la URL
+        const { data, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Error getting session:', error)
+          navigate('/')
+          return
+        }
+
+        if (data.session?.user) {
+          // Verificar si el usuario ya está autenticado
+          navigate('/')
+          return
+        }
+
+        // Obtener metadata del usuario invitado
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !user) {
+          console.error('Error getting user:', userError)
+          navigate('/')
+          return
+        }
+
+        // Extraer datos del metadata
+        const metadata = user.user_metadata || {}
+        const name = metadata.name || ''
+        const companyCif = metadata.company || ''
+        const role = metadata.role || 'client'
+
+        // Obtener el nombre de la empresa por CIF
+        let companyName = ''
+        if (companyCif) {
+          const { data: empresa, error: empresaError } = await supabase
+            .from('empresas')
+            .select('nombre')
+            .eq('cif', companyCif)
+            .single()
+          
+          if (!empresaError && empresa) {
+            companyName = empresa.nombre
+          }
+        }
+
+        // Actualizar estado con los datos obtenidos
+        setUserMetadata({
+          name,
+          companyName,
+          role
+        })
+
+        setFormData(prev => ({
+          ...prev,
+          name,
+          company: companyCif,
+          email: user.email || ''
+        }))
+
+        setIsValidHash(true)
+        clearError()
+      } catch (error) {
+        console.error('Error in getSessionAndMetadata:', error)
+        navigate('/')
+      } finally {
+        setIsLoadingMetadata(false)
+      }
+    }
+    
+    getSessionAndMetadata()
   }, [navigate, clearError])
 
   // Redirect to platform when authenticated
@@ -59,7 +138,8 @@ const Register = () => {
     try {
       await signup(formData.email, formData.password, {
         name: formData.name,
-        company: formData.company
+        company: formData.company,
+        role: userMetadata.role
       })
     } catch (error) {
       console.error('Register error:', error)
@@ -67,21 +147,29 @@ const Register = () => {
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-    
-    // Limpiar error de contraseña cuando el usuario empiece a escribir
+    // Solo permitir cambios en password y confirmPassword
     if (e.target.name === 'password' || e.target.name === 'confirmPassword') {
+      setFormData({
+        ...formData,
+        [e.target.name]: e.target.value
+      })
       setPasswordError('')
     }
   }
 
-  // Si no hay hash válido, no mostrar nada (será redirigido)
-   if (!isValidHash) {
-    return null
-  } 
+  // Si no hay hash válido o está cargando metadata, no mostrar nada
+  if (!isValidHash || isLoadingMetadata) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#18cb96] to-[#15b885] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#18cb96] mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando información de invitación...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#18cb96] to-[#15b885] flex items-center justify-center p-4">
@@ -117,50 +205,56 @@ const Register = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-[#373643] mb-2">
-              Nombre completo *
+              Nombre completo
             </label>
             <input
               type="text"
               id="name"
               name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              value={userMetadata.name}
+              disabled
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
               placeholder="Tu nombre completo"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Este dato fue proporcionado en tu invitación
+            </p>
           </div>
 
           <div>
             <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
-              Empresa *
+              Empresa
             </label>
             <input
               type="text"
               id="company"
               name="company"
-              value={formData.company}
-              onChange={handleInputChange}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-              placeholder="Nombre de tu empresa"
+              value={userMetadata.companyName}
+              disabled
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              placeholder="Nombre de la empresa"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Empresa asignada en tu invitación
+            </p>
           </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-2">
-              Email *
+              Email
             </label>
             <input
               type="email"
               id="email"
               name="email"
               value={formData.email}
-              onChange={handleInputChange}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              disabled
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
               placeholder="tu@email.com"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Email de tu invitación
+            </p>
           </div>
 
           <div>

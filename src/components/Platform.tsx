@@ -1,20 +1,25 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Dashboard from './Dashboard'
 import Leads from './Leads'
 import Devoluciones from './Devoluciones'
 import { useAuthStore } from '../store/authStore'
+import { userService } from '../services/userService'
+import type { NewUserData } from '../services/userService'
 
 const Platform = () => {
   const [currentSection, setCurrentSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [showErrorMessage, setShowErrorMessage] = useState(false)
   const [messageVisible, setMessageVisible] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState('')
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    company: '',
+    cif: '', // Cambiado de 'company' a 'cif'
     role: 'client' as 'admin' | 'client'
   })
   const { user, logout } = useAuthStore()
@@ -32,33 +37,59 @@ const Platform = () => {
     }
   }
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    setIsLoading(true)
+    setShowSuccessMessage(false)
+    setShowErrorMessage(false)
 
-    // Simular creación de usuario
-    console.log('Nuevo usuario:', newUser)
+    try {
+      // Preparar datos del usuario
+      const userData: NewUserData = {
+        name: newUser.name,
+        email: newUser.email,
+        company: newUser.cif, // Mapear 'cif' a 'company' para el servicio
+        role: newUser.role
+      }
 
-    // Cerrar modal y sidebar (en móvil)
-    setShowAddUserModal(false)
-    setSidebarOpen(false)
+      // Enviar solicitud al backend
+      const response = await userService.registerUser(userData)
 
-    // Mostrar mensaje con animación
-    setShowSuccessMessage(true)
-    setTimeout(() => setMessageVisible(true), 100)
+      // Mostrar mensaje de éxito
+      setMessage('Usuario invitado con éxito. Se ha enviado un email de registro.')
+      setShowSuccessMessage(true)
+      setTimeout(() => setMessageVisible(true), 100)
 
-    // Limpiar formulario
-    setNewUser({
-      name: '',
-      email: '',
-      company: '',
-      role: 'client'
-    })
+      // Cerrar modal y sidebar (en móvil)
+      setShowAddUserModal(false)
+      setSidebarOpen(false)
 
-    // Ocultar mensaje después de 3 segundos
-    setTimeout(() => {
-      setMessageVisible(false)
-      setTimeout(() => setShowSuccessMessage(false), 300)
-    }, 3000)
+      // Limpiar formulario
+      setNewUser({
+        name: '',
+        email: '',
+        cif: '', // Cambiado de 'company' a 'cif'
+        role: 'client'
+      })
+
+    } catch (error) {
+      // Mostrar mensaje de error
+      setMessage(error instanceof Error ? error.message : 'Error al invitar usuario')
+      setShowErrorMessage(true)
+      setTimeout(() => setMessageVisible(true), 100)
+    } finally {
+      setIsLoading(false)
+      
+      // Ocultar mensaje después de 4 segundos
+      setTimeout(() => {
+        setMessageVisible(false)
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+          setShowErrorMessage(false)
+        }, 300)
+      }, 4000)
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -186,18 +217,18 @@ const Platform = () => {
               </div>
 
               <div>
-                <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
-                  Empresa
+                <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
+                  CIF de la empresa
                 </label>
                 <input
                   type="text"
-                  id="company"
-                  name="company"
-                  value={newUser.company}
+                  id="cif"
+                  name="cif"
+                  value={newUser.cif}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                  placeholder="Nombre de la empresa"
+                  placeholder="Ej: B12345678"
                 />
               </div>
 
@@ -228,9 +259,20 @@ const Platform = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors"
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Crear Usuario
+                  {isLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Enviando...
+                    </span>
+                  ) : (
+                    'Crear Usuario'
+                  )}
                 </button>
               </div>
             </form>
@@ -244,7 +286,18 @@ const Platform = () => {
           }`}>
           <div className="flex items-center">
             <span className="mr-2">✅</span>
-            <span>Usuario creado con éxito</span>
+            <span>{message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {showErrorMessage && (
+        <div className={`fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-[9999] transition-all duration-300 ease-in-out transform ${messageVisible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+          }`}>
+          <div className="flex items-center">
+            <span className="mr-2">❌</span>
+            <span>{message}</span>
           </div>
         </div>
       )}

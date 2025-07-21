@@ -1,9 +1,11 @@
 
+import CompanyName from './CompanyName'
+
 interface User {
   id: string
   name: string
   email: string
-  company: string
+  company: string // CIF de la empresa
   role: 'admin' | 'client'
 }
 
@@ -18,6 +20,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, onAddUser }: SidebarProps) => {
+  
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'leads', label: 'Leads', icon: '👥' },
@@ -90,7 +93,9 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
           <div className="ml-3 flex-1 min-w-0">
             <p className="text-sm font-medium text-[#373643] truncate">{user?.name || 'Usuario'}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email || 'usuario@empresa.com'}</p>
-            <p className="text-xs text-gray-400 truncate">{user?.company || 'Empresa'}</p>
+            <p className="text-xs text-gray-400 truncate">
+              <CompanyName cif={user?.company} fallback="Empresa" />
+            </p>
             <p className="text-xs text-[#18cb96] font-medium capitalize">
               {user?.role === 'admin' ? '👑 Administrador' : '👤 Cliente'}
             </p>

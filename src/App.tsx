@@ -1,10 +1,18 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Auth from './components/Auth'
 import Register from './components/Register'
 import Platform from './components/Platform'
 import ProtectedRoute from './components/ProtectedRoute'
+import { useAuthStore } from './store/authStore'
 
 function App() {
+  const { checkAuth } = useAuthStore()
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
   return (
     <Router>
       <Routes>
