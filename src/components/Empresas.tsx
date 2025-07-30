@@ -57,7 +57,7 @@ const Empresas = () => {
 
     if (nameFilter) {
       filtered = filtered.filter(company => 
-        company.name.toLowerCase().includes(nameFilter.toLowerCase())
+        company.nombre.toLowerCase().includes(nameFilter.toLowerCase())
       )
     }
 
