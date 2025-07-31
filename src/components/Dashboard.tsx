@@ -2,30 +2,22 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 
 const Dashboard = () => {
-  const { user } = useAuthStore()
-  const { getLeadsByCompany, getAllLeads } = useLeadsStore()
+  const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
+  const { leads, loading } = useLeadsStore()
 
-  // Obtener leads según el rol del usuario
-  const getLeads = () => {
-    if (user?.role === 'admin') {
-      return getAllLeads()
-    } else {
-      return getLeadsByCompany(user?.company || '')
-    }
-  }
-
-  const leads = getLeads()
+  // Filtrar leads que no estén en devolución
+  const activeLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
 
   // Calcular estadísticas basadas en los leads reales
-  const totalLeads = leads.length
-  const leadsThisMonth = leads.filter(lead => {
-    const leadDate = new Date(lead.date)
+  const totalLeads = activeLeads.length
+  const leadsThisMonth = activeLeads.filter(lead => {
+    const leadDate = new Date(lead.fecha_entrada)
     const now = new Date()
     return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear()
   }).length
 
-  const platformDistribution = leads.reduce((acc, lead) => {
-    acc[lead.platform] = (acc[lead.platform] || 0) + 1
+  const platformDistribution = activeLeads.reduce((acc, lead) => {
+    acc[lead.plataforma] = (acc[lead.plataforma] || 0) + 1
     return acc
   }, {} as Record<string, number>)
 
@@ -65,9 +57,18 @@ const Dashboard = () => {
   ]
 
   // Obtener leads recientes (últimos 4)
-  const recentLeads = leads
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const recentLeads = activeLeads
+    .sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
     .slice(0, 4)
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
+        <span className="ml-3 text-gray-600">Cargando dashboard...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -77,7 +78,7 @@ const Dashboard = () => {
         <p className="text-gray-600 mt-2 text-sm sm:text-base">
           {user?.role === 'admin' 
             ? 'Bienvenido a ScaleHubs - Resumen general del sistema' 
-            : `Bienvenido a ScaleHubs - Resumen de ${user?.company}`
+            : `Bienvenido a ScaleHubs - Resumen de ${userEmpresaNombre || user?.company || 'tu empresa'}`
           }
         </p>
         {user?.role === 'admin' && (
@@ -121,20 +122,20 @@ const Dashboard = () => {
           <h2 className="text-lg sm:text-xl font-semibold text-[#373643] mb-4">Leads Recientes</h2>
           {recentLeads.length > 0 ? (
             <div className="space-y-3">
-              {recentLeads.map((lead, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              {recentLeads.map((lead) => (
+                <div key={lead.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-[#373643] text-sm sm:text-base truncate">{lead.name}</p>
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{lead.phone}</p>
+                    <p className="font-medium text-[#373643] text-sm sm:text-base truncate">{lead.nombre_cliente}</p>
+                    <p className="text-xs sm:text-sm text-gray-600 truncate">{lead.telefono}</p>
                     {user?.role === 'admin' && (
-                      <p className="text-xs text-gray-500 truncate">{lead.company}</p>
+                      <p className="text-xs text-gray-500 truncate">{lead.empresa_nombre || '-'}</p>
                     )}
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
                     <span className="inline-block px-2 py-1 text-xs font-medium bg-[#18cb96] text-white rounded-full">
-                      {lead.platform}
+                      {lead.plataforma}
                     </span>
-                    <p className="text-xs text-gray-500 mt-1">{new Date(lead.date).toLocaleDateString('es-ES')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>
                 </div>
               ))}

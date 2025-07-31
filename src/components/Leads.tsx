@@ -1,16 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
-
-interface Lead {
-  id: number
-  date: string
-  name: string
-  phone: string
-  platform: string
-  company: string
-  status: string
-}
+import type { Lead } from '../services/leadsService'
 
 const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
@@ -22,40 +13,50 @@ const Leads = () => {
     startDate: '',
     endDate: ''
   })
-  const { user } = useAuthStore()
-  const { getLeadsByCompany, getAllLeads, updateLeadStatus } = useLeadsStore()
+  const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
+  const { 
+    leads, 
+    loading, 
+    error, 
+    refreshLeads, 
+    updateLeadStatus, 
+    getLeadsInDateRange 
+  } = useLeadsStore()
 
-  // Obtener leads según el rol del usuario
-  const getLeads = (): Lead[] => {
-    const allLeads = user?.role === 'admin' ? getAllLeads() : getLeadsByCompany(user?.company || '')
-    
-    // Filtrar leads que no estén en devolución
-    return allLeads.filter(lead => lead.status !== 'devolucion')
-  }
+  // Filtrar leads que no estén en devolución
+  const activeLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
 
-  const leads = getLeads()
-
-  const filteredLeads = leads.filter(lead => {
-    const matchesDate = !dateFilter || lead.date === dateFilter
-    const matchesPhone = !phoneFilter || lead.phone.includes(phoneFilter)
+  const filteredLeads = activeLeads.filter(lead => {
+    const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
+    const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
     return matchesDate && matchesPhone
   })
 
   // Calcular leads en el rango de fechas para exportación
-  const getLeadsInDateRange = () => {
-    if (!exportDateRange.startDate || !exportDateRange.endDate) return []
-    
-    return leads.filter(lead => {
-      const leadDate = new Date(lead.date)
-      const startDate = new Date(exportDateRange.startDate)
-      const endDate = new Date(exportDateRange.endDate)
-      
-      // Incluir ambos días especificados
-      return leadDate >= startDate && leadDate <= endDate
-    })
-  }
+  const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
 
-  const leadsToExport = getLeadsInDateRange()
+  useEffect(() => {
+    const fetchLeadsInRange = async () => {
+      if (exportDateRange.startDate && exportDateRange.endDate) {
+        try {
+          const empresaId = user?.role !== 'admin' ? userEmpresaId : undefined
+          const leadsInRange = await getLeadsInDateRange(
+            exportDateRange.startDate, 
+            exportDateRange.endDate, 
+            empresaId || undefined
+          )
+          setLeadsToExport(leadsInRange)
+        } catch (error) {
+          console.error('Error fetching leads in date range:', error)
+          setLeadsToExport([])
+        }
+      } else {
+        setLeadsToExport([])
+      }
+    }
+
+    fetchLeadsInRange()
+  }, [exportDateRange, getLeadsInDateRange, user, userEmpresaId])
 
   const handleExport = () => {
     setShowExportModal(true)
@@ -74,13 +75,13 @@ const Leads = () => {
       headers.join(','),
       ...leadsToExport.map(lead => {
         const row = [
-          lead.date,
-          `"${lead.name}"`,
-          lead.phone,
-          lead.platform
+          new Date(lead.fecha_entrada).toLocaleDateString('es-ES'),
+          `"${lead.nombre_cliente}"`,
+          lead.telefono,
+          lead.plataforma
         ]
         if (user?.role === 'admin') {
-          row.push(`"${lead.company}"`)
+          row.push(`"${lead.empresa_nombre || ''}"`)
         }
         return row.join(',')
       })
@@ -114,12 +115,38 @@ const Leads = () => {
     setShowReturnModal(true)
   }
 
-  const handleConfirmReturn = () => {
+  const handleConfirmReturn = async () => {
     if (selectedLead) {
-      updateLeadStatus(selectedLead.id, 'devolucion')
-      setShowReturnModal(false)
-      setSelectedLead(null)
+      try {
+        await updateLeadStatus(selectedLead.id, 'devolucion')
+        setShowReturnModal(false)
+        setSelectedLead(null)
+        
+        // Recargar leads para actualizar la vista
+        await refreshLeads()
+      } catch (error) {
+        console.error('Error updating lead status:', error)
+      }
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
+        <span className="ml-3 text-gray-600">Cargando leads...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">Error: {error}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -131,7 +158,7 @@ const Leads = () => {
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
             {user?.role === 'admin' 
               ? 'Administra y visualiza todos los leads generados en redes sociales' 
-              : `Leads asignados a ${user?.company}`
+              : `Leads asignados a ${userEmpresaNombre || user?.company || 'tu empresa'}`
             }
           </p>
           {user?.role === 'admin' && (
@@ -195,16 +222,16 @@ const Leads = () => {
             {filteredLeads.map((lead) => (
               <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-[#373643] text-sm">{lead.name}</h3>
+                  <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                    {lead.platform}
+                    {lead.plataforma}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-gray-600">
-                  <p><span className="font-medium">Teléfono:</span> {lead.phone}</p>
-                  <p><span className="font-medium">Fecha:</span> {new Date(lead.date).toLocaleDateString('es-ES')}</p>
+                  <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
+                  <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   {user?.role === 'admin' && (
-                    <p><span className="font-medium">Empresa:</span> {lead.company}</p>
+                    <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
                   )}
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -254,22 +281,22 @@ const Leads = () => {
                 {filteredLeads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                      {new Date(lead.date).toLocaleDateString('es-ES')}
+                      {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[#373643]">{lead.name}</div>
+                      <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                      {lead.phone}
+                      {lead.telefono}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                        {lead.platform}
+                        {lead.plataforma}
                       </span>
                     </td>
                     {user?.role === 'admin' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                        {lead.company}
+                        {lead.empresa_nombre || '-'}
                       </td>
                     )}
                     {user?.role !== 'admin' && (
@@ -292,7 +319,7 @@ const Leads = () => {
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{leads.length}</span> leads
+                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{activeLeads.length}</span> leads
                 {user?.role === 'client' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
@@ -430,10 +457,10 @@ const Leads = () => {
                 </div>
                 {selectedLead && (
                   <div className="text-xs text-gray-600 mt-3">
-                    <p><strong>Nombre:</strong> {selectedLead.name}</p>
-                    <p><strong>Teléfono:</strong> {selectedLead.phone}</p>
-                    <p><strong>Plataforma:</strong> {selectedLead.platform}</p>
-                    <p><strong>Fecha:</strong> {new Date(selectedLead.date).toLocaleDateString('es-ES')}</p>
+                    <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
+                    <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
+                    <p><strong>Plataforma:</strong> {selectedLead.plataforma}</p>
+                    <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>
                 )}
               </div>

@@ -5,14 +5,22 @@ import Register from './components/Register'
 import Platform from './components/Platform'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuthStore } from './store/authStore'
+import { useLeadsStore } from './store/leadsStore'
 
 function App() {
-  const { checkAuth } = useAuthStore()
+  const { checkAuth, isAuthenticated, user } = useAuthStore()
+  const { loadInitialLeads } = useLeadsStore()
 
   useEffect(() => {
     checkAuth()
-    
   }, [checkAuth])
+
+  // Cargar leads cuando el usuario esté autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadInitialLeads()
+    }
+  }, [isAuthenticated, user, loadInitialLeads])
 
   return (
     <Router>

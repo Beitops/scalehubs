@@ -10,11 +10,14 @@ interface AuthState {
     isAuthenticated: boolean
     isLoading: boolean
     error: string | null
+    userEmpresaId: number | null
+    userEmpresaNombre: string
     login: (email: string, password: string) => Promise<void>
     signup: (email: string, password: string, userData: any) => Promise<void>
     logout: () => void
     clearError: () => void
     checkAuth: () => Promise<void>
+    getUserEmpresaInfo: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -25,6 +28,38 @@ export const useAuthStore = create<AuthState>()(
                 isAuthenticated: false,
                 isLoading: false,
                 error: null,
+                userEmpresaId: null,
+                userEmpresaNombre: '',
+
+                getUserEmpresaInfo: async () => {
+                    const { user } = get()
+                    if (!user?.id) return
+
+                    try {
+                        const { data: profile, error: profileError } = await supabase
+                            .from('profiles')
+                            .select('empresa_id')
+                            .eq('user_id', user.id)
+                            .single()
+
+                        if (!profileError && profile?.empresa_id) {
+                            set({ userEmpresaId: profile.empresa_id })
+
+                            // Obtener nombre de la empresa
+                            const { data: empresa, error: empresaError } = await supabase
+                                .from('empresas')
+                                .select('nombre')
+                                .eq('id', profile.empresa_id)
+                                .single()
+
+                            if (!empresaError && empresa) {
+                                set({ userEmpresaNombre: empresa.nombre })
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error getting user empresa info:', error)
+                    }
+                },
 
                 login: async (email: string, password: string) => {
                     set({ isLoading: true, error: null })
@@ -85,6 +120,9 @@ export const useAuthStore = create<AuthState>()(
                             isLoading: false,
                             error: null
                         })
+
+                        // Obtener información de la empresa después del login
+                        await get().getUserEmpresaInfo()
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -163,6 +201,9 @@ export const useAuthStore = create<AuthState>()(
                             isLoading: false,
                             error: null
                         })
+
+                        // Obtener información de la empresa después del signup
+                        await get().getUserEmpresaInfo()
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -187,7 +228,9 @@ export const useAuthStore = create<AuthState>()(
                             user: null,
                             isAuthenticated: false,
                             isLoading: false,
-                            error: null
+                            error: null,
+                            userEmpresaId: null,
+                            userEmpresaNombre: ''
                         })
                     }
                 },
@@ -247,6 +290,9 @@ export const useAuthStore = create<AuthState>()(
                                 isAuthenticated: true,
                                 isLoading: false
                             })
+
+                            // Obtener información de la empresa después del checkAuth
+                            await get().getUserEmpresaInfo()
                         } else {
                             set({
                                 user: null,
