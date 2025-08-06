@@ -1,6 +1,6 @@
 export const API_ROUTES = {
     LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
+    REGISTER: '/invite-user',
     SET_PASSWORD: '/auth/set-password',
   };
   

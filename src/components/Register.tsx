@@ -10,24 +10,25 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     name: '',
-    company: '' // CIF de la empresa (para enviar al backend)
+    company: ''
   })
   const [userMetadata, setUserMetadata] = useState({
     name: '',
-    companyName: '', // Nombre de la empresa para mostrar
+    companyName: '',
     role: 'client' as 'admin' | 'client'
   })
   const [passwordError, setPasswordError] = useState('')
   const [isValidHash, setIsValidHash] = useState(false)
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true)
 
-  const { signup, isLoading, error, clearError, isAuthenticated } = useAuthStore()
+  const { signup, isLoading, error, clearError } = useAuthStore()
 
   // Verificar si hay hash en la URL y obtener metadata
   useEffect(() => {
     const hash = window.location.hash
     if (!hash || hash === '') {
-      navigate('/')
+      console.log('No hash found in URL')
+      navigate('/auth')
       return
     }
     
@@ -35,43 +36,64 @@ const Register = () => {
       try {
         setIsLoadingMetadata(true)
         
-        // Obtener sesión y metadata desde la URL
-        const { data, error } = await supabase.auth.getSession()
+        // Capturar los parámetros de la URL
+        const urlParams = new URLSearchParams(hash.substring(1))
+        const accessToken = urlParams.get('access_token')
+        const refreshToken = urlParams.get('refresh_token')
         
-        if (error) {
-          console.error('Error getting session:', error)
-          navigate('/')
+        if (!accessToken || !refreshToken) {
+          console.log('No access token or refresh token found in URL')
+          navigate('/auth')
           return
         }
 
-        if (data.session?.user) {
-          // Verificar si el usuario ya está autenticado
-          navigate('/')
+        // Usar refresh token para hacer refresh session
+        const { data, error } = await supabase.auth.refreshSession({
+          refresh_token: refreshToken
+        })
+        
+        if (error) {
+          console.error('Error refreshing session:', error)
+          navigate('/auth')
+          return
+        }
+
+        if (!data.session) {
+          console.log('No session created from refresh token')
+          navigate('/auth')
           return
         }
 
         // Obtener metadata del usuario invitado
         const { data: { user }, error: userError } = await supabase.auth.getUser()
+        console.log(`user: ${user?.id}`)
         
         if (userError || !user) {
           console.error('Error getting user:', userError)
-          navigate('/')
+          navigate('/auth')
           return
         }
 
-        // Extraer datos del metadata
-        const metadata = user.user_metadata || {}
-        const name = metadata.name || ''
-        const companyCif = metadata.company || ''
-        const role = metadata.role || 'client'
+        // Consultar la tabla profiles para obtener los datos del usuario
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
 
-        // Obtener el nombre de la empresa por CIF
+        if (profileError) {
+          console.error('Error getting profile:', profileError)
+          navigate('/auth')
+          return
+        }
+
+        // Obtener el nombre de la empresa por empresa_id
         let companyName = ''
-        if (companyCif) {
+        if (profile.empresa_id) {
           const { data: empresa, error: empresaError } = await supabase
             .from('empresas')
-            .select('nombre')
-            .eq('cif', companyCif)
+            .select('nombre, cif')
+            .eq('id', profile.empresa_id)
             .single()
           
           if (!empresaError && empresa) {
@@ -79,17 +101,24 @@ const Register = () => {
           }
         }
 
-        // Actualizar estado con los datos obtenidos
+        // Validar que tenemos los datos mínimos necesarios
+        if (!profile.nombre || !user.email) {
+          console.error('Missing required profile data')
+          navigate('/auth')
+          return
+        }
+
+        // Actualizar estado con los datos obtenidos de profiles
         setUserMetadata({
-          name,
+          name: profile.nombre,
           companyName,
-          role
+          role: profile.es_admin ? 'admin' : 'client'
         })
 
         setFormData(prev => ({
           ...prev,
-          name,
-          company: companyCif,
+          name: profile.nombre,
+          company: profile.empresa_id?.toString() || '',
           email: user.email || ''
         }))
 
@@ -97,7 +126,7 @@ const Register = () => {
         clearError()
       } catch (error) {
         console.error('Error in getSessionAndMetadata:', error)
-        navigate('/')
+        navigate('/auth')
       } finally {
         setIsLoadingMetadata(false)
       }
@@ -105,13 +134,6 @@ const Register = () => {
     
     getSessionAndMetadata()
   }, [navigate, clearError])
-
-  // Redirect to platform when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/')
-    }
-  }, [isAuthenticated, navigate])
 
   const validatePassword = (password: string, confirmPassword: string) => {
     if (password.length < 6) {
@@ -136,11 +158,15 @@ const Register = () => {
     setPasswordError('')
 
     try {
+      // Solo actualizar la contraseña del usuario
       await signup(formData.email, formData.password, {
         name: formData.name,
         company: formData.company,
         role: userMetadata.role
       })
+      
+      // Redirigir después del signup exitoso
+      navigate('/')
     } catch (error) {
       console.error('Register error:', error)
     }
@@ -164,7 +190,8 @@ const Register = () => {
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#18cb96] mx-auto mb-4"></div>
-            <p className="text-gray-600">Cargando información de invitación...</p>
+            <p className="text-gray-600">Verificando invitación...</p>
+            <p className="text-sm text-gray-500 mt-2">Validando enlace de invitación</p>
           </div>
         </div>
       </div>
@@ -269,7 +296,7 @@ const Register = () => {
               onChange={handleInputChange}
               required
               minLength={6}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
               placeholder="••••••••"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -288,7 +315,7 @@ const Register = () => {
               value={formData.confirmPassword}
               onChange={handleInputChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
               placeholder="••••••••"
             />
           </div>
@@ -300,7 +327,7 @@ const Register = () => {
           >
             {isLoading ? (
               <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>

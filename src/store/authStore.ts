@@ -35,12 +35,15 @@ export const useAuthStore = create<AuthState>()(
                     const { user } = get()
                     if (!user?.id) return
 
+
+
                     try {
                         const { data: profile, error: profileError } = await supabase
                             .from('profiles')
                             .select('empresa_id')
                             .eq('user_id', user.id)
                             .single()
+
 
                         if (!profileError && profile?.empresa_id) {
                             set({ userEmpresaId: profile.empresa_id })
@@ -52,12 +55,19 @@ export const useAuthStore = create<AuthState>()(
                                 .eq('id', profile.empresa_id)
                                 .single()
 
+
                             if (!empresaError && empresa) {
                                 set({ userEmpresaNombre: empresa.nombre })
                             }
+                        } else {
+                            // Si no hay empresa_id o hay error, establecer valores por defecto
+                            console.log('🔄 No empresa_id found, setting defaults')
+                            set({ userEmpresaId: null, userEmpresaNombre: '' })
                         }
                     } catch (error) {
                         console.error('Error getting user empresa info:', error)
+                        // En caso de error, establecer valores por defecto
+                        set({ userEmpresaId: null, userEmpresaNombre: '' })
                     }
                 },
 
@@ -142,9 +152,8 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('No se pudo obtener la información del usuario')
                         }
 
-                        // Actualizar el usuario invitado con email y contraseña
+                        // Actualizar solo la contraseña del usuario invitado
                         const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-                            email: email,
                             password: password
                         })
 
@@ -159,40 +168,39 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('Error al obtener el usuario actualizado')
                         }
 
-                        // Buscar la empresa por CIF para obtener el empresa_id
-                        const { data: empresa, error: empresaError } = await supabase
-                            .from('empresas')
-                            .select('id')
-                            .eq('cif', userData.company)
+                        // Obtener el perfil existente (ya creado por la edge function)
+                        const { data: profile, error: profileError } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('user_id', updatedUser.id)
                             .single()
 
-                        if (empresaError) {
-                            throw new Error('Empresa no encontrada con el CIF proporcionado')
+                        if (profileError) {
+                            console.error('Error al obtener perfil:', profileError)
+                            throw new Error('Perfil de usuario no encontrado')
                         }
 
-                        // Insertar el perfil en la tabla profiles con los datos del formulario
-                        const { data: profileData, error: profileError } = await supabase
-                            .from('profiles')
-                            .insert({
-                                user_id: updatedUser.id,
-                                nombre: userData.name,
-                                empresa_id: empresa.id, // Usar el ID de la empresa, no el CIF
-                                es_admin: roleConverter.frontendToBackend(userData.role),
-                                fecha_creacion: new Date().toISOString()
-                            })
-
-                        if (profileError) {
-                            console.error('Error al crear perfil:', profileError)
-                            throw new Error('Error al crear el perfil del usuario')
+                        // Obtener el CIF de la empresa si hay empresa_id
+                        let companyCif = ''
+                        if (profile.empresa_id) {
+                            const { data: empresa, error: empresaError } = await supabase
+                                .from('empresas')
+                                .select('cif')
+                                .eq('id', profile.empresa_id)
+                                .single()
+                            
+                            if (!empresaError && empresa) {
+                                companyCif = empresa.cif
+                            }
                         }
 
                         // Crear objeto de usuario para el store
                         const frontendUser: FrontendUser = {
                             id: updatedUser.id,
-                            name: userData.name,
+                            name: profile.nombre || 'Usuario',
                             email: email,
-                            company: userData.company, // Mantener el CIF para el frontend
-                            role: userData.role || 'client'
+                            company: companyCif, // Mantener el CIF para el frontend
+                            role: roleConverter.backendToFrontend(profile.es_admin)
                         }
 
                         set({

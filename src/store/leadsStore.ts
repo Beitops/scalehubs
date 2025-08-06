@@ -36,6 +36,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         await get().loadLeads()
       } else if (userEmpresaId) {
         await get().loadLeads(userEmpresaId)
+      } else {
+        // Si el usuario no es admin y no tiene empresa_id, mostrar error
+        console.error('❌ User without company assigned:', user)
+        throw new Error('Usuario sin empresa asignada. Contacta al administrador.')
       }
       set({ isInitialized: true })
     } catch (error) {
@@ -52,12 +56,18 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     
     if (!user) return
 
+
+
     set({ loading: true, error: null })
     try {
       if (user.role === 'admin') {
         await get().loadLeads()
       } else if (userEmpresaId) {
         await get().loadLeads(userEmpresaId)
+      } else {
+        // Si el usuario no es admin y no tiene empresa_id, mostrar error
+        console.error('❌ User without company assigned:', user)
+        throw new Error('Usuario sin empresa asignada. Contacta al administrador.')
       }
     } catch (error) {
       console.error('Error refreshing leads:', error)

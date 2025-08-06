@@ -7,6 +7,7 @@ import Empresas from './Empresas'
 import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
+import { supabase } from '../lib/supabase'
 
 const Platform = () => {
   const [currentSection, setCurrentSection] = useState('dashboard')
@@ -40,6 +41,7 @@ const Platform = () => {
     }
   }
 
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -48,11 +50,22 @@ const Platform = () => {
     setShowErrorMessage(false)
 
     try {
-      // Preparar datos del usuario
+      // Buscar el ID de la empresa por CIF
+      const { data: empresa, error: empresaError } = await supabase
+        .from('empresas')
+        .select('id, nombre')
+        .eq('cif', newUser.cif)
+        .single()
+
+      if (empresaError || !empresa) {
+        throw new Error('Empresa no encontrada con el CIF proporcionado. Verifica que el CIF sea correcto.')
+      }
+
+      // Preparar datos del usuario con el ID de la empresa
       const userData: NewUserData = {
         name: newUser.name,
         email: newUser.email,
-        company: newUser.cif, // Mapear 'cif' a 'company' para el servicio
+        company: empresa.id.toString(), // Enviar el ID de la empresa en lugar del CIF
         role: newUser.role
       }
 
@@ -60,7 +73,7 @@ const Platform = () => {
       const response = await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
-      setMessage('Usuario invitado con éxito. Se ha enviado un email de registro.')
+      setMessage(`Usuario invitado con éxito para ${empresa.nombre}. Se ha enviado un email de registro.`)
       setShowSuccessMessage(true)
       setTimeout(() => setMessageVisible(true), 100)
 
@@ -72,7 +85,7 @@ const Platform = () => {
       setNewUser({
         name: '',
         email: '',
-        cif: '', // Cambiado de 'company' a 'cif'
+        cif: '',
         role: 'client'
       })
 
@@ -233,6 +246,9 @@ const Platform = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                   placeholder="Ej: B12345678"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  El sistema verificará que la empresa exista con este CIF
+                </p>
               </div>
 
               <div>

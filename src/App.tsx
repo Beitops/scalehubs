@@ -12,35 +12,42 @@ function App() {
   const { loadInitialLeads } = useLeadsStore()
 
   useEffect(() => {
-    checkAuth()
+
   }, [checkAuth])
 
   // Cargar leads cuando el usuario esté autenticado
   useEffect(() => {
-    if (isAuthenticated && user) {
-      loadInitialLeads()
+    const checkAuthAndLoadLeads = async () => {
+      await checkAuth()
+      if (isAuthenticated && user) {
+        // Pequeño delay para asegurar que getUserEmpresaInfo haya terminado
+
+        loadInitialLeads()
+
+      }
     }
-  }, [isAuthenticated, user, loadInitialLeads])
+    checkAuthAndLoadLeads()
+  }, [isAuthenticated, loadInitialLeads])
 
   return (
     <Router>
       <Routes>
         {/* Auth route */}
         <Route path="/auth" element={<Auth />} />
-        
+
         {/* Set password route (for invited users) */}
         <Route path="/set-password" element={<Register />} />
-        
+
         {/* Protected platform routes */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             <ProtectedRoute>
               <Platform />
             </ProtectedRoute>
-          } 
+          }
         />
-        
+
         {/* Redirect to auth if no route matches */}
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
