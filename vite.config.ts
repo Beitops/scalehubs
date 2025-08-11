@@ -10,6 +10,6 @@ export default defineConfig({
   ],
   server: {
     host: true, // Permite acceder desde fuera de localhost (necesario para ngrok)
-    allowedHosts: ['44d9d7076338.ngrok-free.app'], // <--- tu subdominio ngrok
+    allowedHosts: [], // <--- tu subdominio ngrok
   }
 })

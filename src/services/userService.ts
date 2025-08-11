@@ -51,7 +51,7 @@ export const userService = {
         name: userData.name,
         email: userData.email,
         role: roleConverter.frontendToBackend(userData.role),
-        redirectTo: '44d9d7076338.ngrok-free.app/set-password'
+        redirectTo: 'https://scalehubs.vercel.app//set-password'
       }
 
       // Solo incluir empresa_id si es un cliente y tiene empresa

@@ -94,17 +94,7 @@ const Auth = () => {
             />
           </div>
 
-          {/* Demo credentials hint */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-700 text-xs mb-2">
-              <strong>Usuarios de prueba:</strong>
-            </p>
-            <div className="space-y-1 text-xs text-blue-600">
-              <p><strong>Admin:</strong> admin@scalehubs.com / password</p>
-              <p><strong>Cliente 1:</strong> juan@empresa1.com / password</p>
-              <p><strong>Cliente 2:</strong> maria@empresa2.com / password</p>
-            </div>
-          </div>
+
 
           <button
             type="submit"
