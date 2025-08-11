@@ -38,6 +38,14 @@ interface LeadsState {
   refreshLeads: () => Promise<void>
   triggerReload: () => void
   loadDevoluciones: () => Promise<{ leadsInDevolucion: Lead[], leadsInTramite: Lead[] }>
+  loadDevolucionArchivos: (devolucionId: number) => Promise<Array<{
+    id: number
+    devolucion_id: number
+    ruta_archivo: string
+    nombre_archivo: string
+    fecha_subida: string
+    tipo: string
+  }>>
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
@@ -181,10 +189,14 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
             telefono,
             plataforma,
             fecha_entrada,
-            empresa_id
+            empresa_id,
+            empresas!leads_empresa_id_fkey (
+              id,
+              nombre
+            )
           )
         `)
-        .or('estado.is.null,estado.not.in.("rechazado","cancelado","resuelto")')
+        .or('estado.is.null,estado.not.in.("cancelado","resuelto","rechazado")')
 
       const { data, error } = await query
       console.log(data)
@@ -209,8 +221,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         const tramiteDevoluciones = filteredData.filter(d => d.estado === 'tramite') || []
         const leadsInTramite = tramiteDevoluciones.map(d => ({
           ...d.lead,
+          empresa_nombre: d.lead.empresas?.nombre,
+          motivo: d.motivo || '',
           audio_devolucion: '',
-          imagen_devolucion: ''
+          imagen_devolucion: '',
+          devolucion_id: d.id
         }))
         
         return { leadsInDevolucion: [], leadsInTramite }
@@ -219,8 +234,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         const pendienteDevoluciones = filteredData.filter(d => d.estado === 'pendiente') || []
         const leadsInDevolucion = pendienteDevoluciones.map(d => ({
           ...d.lead,
+          empresa_nombre: d.lead.empresas?.nombre,
+          motivo: d.motivo || '',
           audio_devolucion: '',
-          imagen_devolucion: ''
+          imagen_devolucion: '',
+          devolucion_id: d.id
         }))
         
         return { leadsInDevolucion, leadsInTramite: [] }
@@ -229,6 +247,49 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       console.error('Error loading devoluciones:', error)
       set({ devoluciones: [] })
       return { leadsInDevolucion: [], leadsInTramite: [] }
+    }
+  },
+
+  loadDevolucionArchivos: async (devolucionId: number) => {
+    try {
+      // Obtener el audio más reciente
+      const { data: audioData, error: audioError } = await supabase
+        .from('devolucion_archivos')
+        .select('*')
+        .eq('devolucion_id', devolucionId)
+        .eq('tipo', 'audio')
+        .order('fecha_subida', { ascending: false })
+        .limit(1)
+
+      // Obtener la imagen más reciente
+      const { data: imagenData, error: imagenError } = await supabase
+        .from('devolucion_archivos')
+        .select('*')
+        .eq('devolucion_id', devolucionId)
+        .eq('tipo', 'imagen')
+        .order('fecha_subida', { ascending: false })
+        .limit(1)
+
+      if (audioError) {
+        console.error('Error loading audio archivos:', audioError)
+      }
+      if (imagenError) {
+        console.error('Error loading imagen archivos:', imagenError)
+      }
+
+      // Combinar los resultados
+      const archivos = []
+      if (audioData && audioData.length > 0) {
+        archivos.push(...audioData)
+      }
+      if (imagenData && imagenData.length > 0) {
+        archivos.push(...imagenData)
+      }
+
+      return archivos
+    } catch (error) {
+      console.error('Error in loadDevolucionArchivos:', error)
+      return []
     }
   }
 })) 

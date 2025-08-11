@@ -28,12 +28,13 @@ interface LeadDevolucion extends Lead {
   imagen_devolucion?: string
   motivo?: string
   observaciones_admin?: string
+  devolucion_id?: number
 }
 
 const Devoluciones = () => {
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [showProcessModal, setShowProcessModal] = useState(false)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [selectedLead, setSelectedLead] = useState<LeadDevolucion | null>(null)
   const [returnForm, setReturnForm] = useState({
     audio: null as File | null,
     imagen: null as File | null,
@@ -44,8 +45,18 @@ const Devoluciones = () => {
   const [devoluciones, setDevoluciones] = useState<Devolucion[] | null>(null)
   const [leadsInDevolucion, setLeadsInDevolucion] = useState<LeadDevolucion[] | null>(null)
   const [leadsInTramite, setLeadsInTramite] = useState<LeadDevolucion[] | null>(null)
+  const [archivosDevolucion, setArchivosDevolucion] = useState<Array<{
+    id: number
+    devolucion_id: number
+    ruta_archivo: string
+    nombre_archivo: string
+    fecha_subida: string
+    tipo: string
+    urlTemporal: string | null
+  }>>([])
+  const [cargandoArchivos, setCargandoArchivos] = useState(false)
   const { user, userEmpresaId } = useAuthStore()
-  const { loadDevoluciones } = useLeadsStore()
+  const { loadDevoluciones, loadDevolucionArchivos } = useLeadsStore()
 
   // Cargar devoluciones desde la base de datos
   useEffect(() => {
@@ -67,17 +78,64 @@ const Devoluciones = () => {
     loadDevolucionesData()
   }, [user, userEmpresaId, loadDevoluciones])
 
-  const handleFinishDevolucion = (lead: Lead) => {
+  const handleFinishDevolucion = (lead: LeadDevolucion) => {
     setSelectedLead(lead)
     console.log(lead)
     setShowFinishModal(true)
   }
 
-  const handleProcessDevolucion = (lead: Lead) => {
+  const handleProcessDevolucion = async (lead: LeadDevolucion) => {
     setSelectedLead(lead)
     setShowProcessModal(true)
     setAdminObservations('')
     setShowAttachments(false)
+    setCargandoArchivos(true)
+    
+    // Cargar archivos adjuntos si existe devolucion_id
+    if (lead.devolucion_id) {
+      try {
+        const archivos = await loadDevolucionArchivos(lead.devolucion_id)
+        
+        // Crear URLs temporales para cada archivo
+        const archivosConUrls = await Promise.all(
+          archivos.map(async (archivo) => {
+            try {
+              // Extraer el nombre del archivo de la ruta completa
+              // La ruta puede ser 'pruebas/nombre_archivo.ext' o solo 'nombre_archivo.ext'
+              let nombreArchivo = archivo.ruta_archivo
+              if (archivo.ruta_archivo.includes('/')) {
+                nombreArchivo = archivo.ruta_archivo.split('/').pop() || archivo.nombre_archivo
+              }
+              
+              // Crear URL temporal para el archivo privado
+              const { data: signedUrl, error: urlError } = await supabase.storage
+                .from('pruebas')
+                .createSignedUrl(nombreArchivo, 3600) // URL válida por 1 hora
+              
+              if (urlError) {
+                console.error('Error creando URL temporal:', urlError)
+                return { ...archivo, urlTemporal: null }
+              }
+              
+              return { ...archivo, urlTemporal: signedUrl.signedUrl }
+            } catch (error) {
+              console.error('Error procesando archivo:', error)
+              return { ...archivo, urlTemporal: null }
+            }
+          })
+        )
+        
+        setArchivosDevolucion(archivosConUrls)
+      } catch (error) {
+        console.error('Error loading archivos:', error)
+        setArchivosDevolucion([])
+      } finally {
+        setCargandoArchivos(false)
+      }
+    } else {
+      setArchivosDevolucion([])
+      setCargandoArchivos(false)
+    }
   }
 
   const handleConfirmFinish = async () => {
@@ -148,7 +206,8 @@ const Devoluciones = () => {
           archivosToInsert.push({
             devolucion_id: devolucionExistente.id,
             ruta_archivo: `pruebas/${uploadedFiles.audio}`,
-            nombre_archivo: audioFileName || 'audio'
+            nombre_archivo: audioFileName || 'audio',
+            tipo: 'audio'
           })
         }
 
@@ -156,7 +215,8 @@ const Devoluciones = () => {
           archivosToInsert.push({
             devolucion_id: devolucionExistente.id,
             ruta_archivo: `pruebas/${uploadedFiles.imagen}`,
-            nombre_archivo: imagenFileName || 'imagen'
+            nombre_archivo: imagenFileName || 'imagen',
+            tipo: 'imagen'
           })
         }
 
@@ -209,7 +269,7 @@ const Devoluciones = () => {
           throw new Error('No se encontró una devolución en trámite para este lead')
         }
 
-        // Actualizar el estado de la devolución a 'rechazado'
+        // Actualizar el estado de la devolución a 'pendiente'
         const { error: updateError } = await supabase
           .from('devoluciones')
           .update({
@@ -240,6 +300,71 @@ const Devoluciones = () => {
         setAdminObservations('')
       } catch (error) {
         console.error('Error al rechazar devolución:', error)
+        // Aquí podrías mostrar un mensaje de error al usuario
+      }
+    }
+  }
+
+  const handleRejectDefinitivamente = async () => {
+    if (selectedLead && adminObservations.trim()) {
+      try {
+        // Buscar la devolución existente para este lead
+        const { data: devolucionExistente, error: searchError } = await supabase
+          .from('devoluciones')
+          .select('id')
+          .eq('lead_id', selectedLead.id)
+          .eq('estado', 'tramite')
+          .single()
+
+        if (searchError) {
+          console.error('Error buscando devolución existente:', searchError)
+          throw new Error('No se encontró una devolución en trámite para este lead')
+        }
+
+        // Actualizar el estado de la devolución a 'rechazado'
+        const { error: updateError } = await supabase
+          .from('devoluciones')
+          .update({
+            estado: 'rechazado',
+            comentario_admin: adminObservations,
+            fecha_resolucion: new Date().toISOString()
+          })
+          .eq('id', devolucionExistente.id)
+
+        if (updateError) {
+          console.error('Error actualizando devolución:', updateError)
+          throw new Error('Error al rechazar definitivamente la devolución')
+        }
+
+        // Actualizar el estado_temporal de lead a 'asignado'
+        const { error: updateLeadError } = await supabase
+          .from('leads')
+          .update({
+            estado_temporal: 'asignado'
+          })
+          .eq('id', selectedLead.id)
+
+        if (updateLeadError) {
+          console.error('Error actualizando lead:', updateLeadError)
+          throw new Error('Error al actualizar el estado temporal del lead')
+        }
+
+        console.log('Devolución rechazada definitivamente:', {
+          leadId: selectedLead.id,
+          devolucionId: devolucionExistente.id,
+          observaciones: adminObservations
+        })
+
+        // Recargar devoluciones después de la actualización exitosa
+        const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
+        setLeadsInDevolucion(newLeadsInDevolucion)
+        setLeadsInTramite(newLeadsInTramite)
+
+        setShowProcessModal(false)
+        setSelectedLead(null)
+        setAdminObservations('')
+      } catch (error) {
+        console.error('Error al rechazar definitivamente devolución:', error)
         // Aquí podrías mostrar un mensaje de error al usuario
       }
     }
@@ -716,21 +841,28 @@ const Devoluciones = () => {
                     <p><strong>Plataforma:</strong> {selectedLead.plataforma}</p>
                     <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                     <p><strong>Empresa:</strong> {selectedLead.empresa_nombre}</p>
-                    {(selectedLead as LeadDevolucion).motivo && (
-                      <p><strong>Motivos:</strong> {(selectedLead as LeadDevolucion).motivo}</p>
+                    {selectedLead.motivo && (
+                      <p><strong>Motivo de devolución:</strong> {selectedLead.motivo}</p>
                     )}
                   </div>
                 )}
               </div>
 
               {/* Attachments Section */}
-              {selectedLead && ((selectedLead as LeadDevolucion).audio_devolucion || (selectedLead as LeadDevolucion).imagen_devolucion) && (
+              {cargandoArchivos ? (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <p className="text-sm text-gray-500">Cargando archivos adjuntos...</p>
+                  </div>
+                </div>
+              ) : archivosDevolucion.length > 0 ? (
                 <div className="border border-gray-200 rounded-lg">
                   <button
                     onClick={() => setShowAttachments(!showAttachments)}
                     className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50"
                   >
-                    <span className="font-medium text-[#373643]">Ver Archivos Adjuntos</span>
+                    <span className="font-medium text-[#373643]">Ver Archivos Adjuntos ({archivosDevolucion.length})</span>
                     <svg
                       className={`w-5 h-5 transform transition-transform ${showAttachments ? 'rotate-180' : ''}`}
                       fill="none"
@@ -743,20 +875,57 @@ const Devoluciones = () => {
 
                   {showAttachments && (
                     <div className="px-4 pb-4 space-y-3">
-                      {(selectedLead as LeadDevolucion).audio_devolucion && (
-                        <div className="bg-gray-50 p-3 rounded">
-                          <p className="text-sm font-medium text-[#373643] mb-1">Audio:</p>
-                          <p className="text-xs text-gray-600">{(selectedLead as LeadDevolucion).audio_devolucion}</p>
+                      {archivosDevolucion.map((archivo, index) => (
+                        <div key={index} className="bg-gray-50 p-3 rounded">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm font-medium text-[#373643]">
+                              {archivo.nombre_archivo || `Archivo ${index + 1}`}
+                            </p>
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              archivo.tipo === 'audio' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {archivo.tipo === 'audio' ? '🎵 Audio' : '🖼️ Imagen'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600">{archivo.ruta_archivo}</p>
+                          {archivo.urlTemporal ? (
+                            <div className="mt-2">
+                              {archivo.tipo === 'audio' ? (
+                                <audio controls className="w-full">
+                                  <source src={archivo.urlTemporal} />
+                                  Tu navegador no soporta el elemento de audio.
+                                </audio>
+                              ) : (
+                                <img 
+                                  src={archivo.urlTemporal}
+                                  alt="Archivo adjunto"
+                                  className="max-w-full h-auto rounded"
+                                  onError={(e) => {
+                                    console.error('Error loading image:', e)
+                                    e.currentTarget.style.display = 'none'
+                                  }}
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                              <p className="text-xs text-red-600">
+                                ❌ Error al cargar el archivo. Intenta recargar la página.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {(selectedLead as LeadDevolucion).imagen_devolucion && (
-                        <div className="bg-gray-50 p-3 rounded">
-                          <p className="text-sm font-medium text-[#373643] mb-1">Imagen:</p>
-                          <p className="text-xs text-gray-600">{(selectedLead as LeadDevolucion).imagen_devolucion}</p>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-500 text-center">
+                    📎 No hay archivos adjuntos (audio o imagen) para esta devolución
+                  </p>
                 </div>
               )}
 
@@ -784,9 +953,16 @@ const Devoluciones = () => {
                 <button
                   onClick={handleRejectDevolucion}
                   disabled={!adminObservations.trim()}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Rechazar
+                </button>
+                <button
+                  onClick={handleRejectDefinitivamente}
+                  disabled={!adminObservations.trim()}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Rechazar Definitivamente
                 </button>
                 <button
                   onClick={handleAcceptDevolucion}

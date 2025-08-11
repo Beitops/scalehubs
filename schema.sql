@@ -9,6 +9,7 @@ CREATE TABLE public.campañas (
   CONSTRAINT campañas_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.devolucion_archivos (
+  tipo text,
   devolucion_id integer,
   ruta_archivo text NOT NULL,
   nombre_archivo character varying,
@@ -18,6 +19,7 @@ CREATE TABLE public.devolucion_archivos (
   CONSTRAINT devolucion_archivos_devolucion_id_fkey FOREIGN KEY (devolucion_id) REFERENCES public.devoluciones(id)
 );
 CREATE TABLE public.devoluciones (
+  motivo text,
   lead_id integer,
   usuario_id uuid,
   comentario_admin text,
@@ -34,8 +36,8 @@ CREATE TABLE public.empresa_campañas (
   campaña_id integer NOT NULL,
   id integer NOT NULL DEFAULT nextval('"empresa_campañas_id_seq"'::regclass),
   CONSTRAINT empresa_campañas_pkey PRIMARY KEY (id),
-  CONSTRAINT empresa_campañas_campaña_id_fkey FOREIGN KEY (campaña_id) REFERENCES public.campañas(id),
-  CONSTRAINT empresa_campañas_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id)
+  CONSTRAINT empresa_campañas_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id),
+  CONSTRAINT empresa_campañas_campaña_id_fkey FOREIGN KEY (campaña_id) REFERENCES public.campañas(id)
 );
 CREATE TABLE public.empresa_hubs (
   empresa_id integer NOT NULL,
@@ -74,9 +76,9 @@ CREATE TABLE public.leads (
   id integer NOT NULL DEFAULT nextval('leads_id_seq'::regclass),
   fecha_entrada timestamp without time zone NOT NULL DEFAULT now(),
   CONSTRAINT leads_pkey PRIMARY KEY (id),
-  CONSTRAINT leads_campaña_id_fkey FOREIGN KEY (campaña_id) REFERENCES public.campañas(id),
   CONSTRAINT leads_hub_id_fkey FOREIGN KEY (hub_id) REFERENCES public.hubs(id),
-  CONSTRAINT leads_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id)
+  CONSTRAINT leads_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id),
+  CONSTRAINT leads_campaña_id_fkey FOREIGN KEY (campaña_id) REFERENCES public.campañas(id)
 );
 CREATE TABLE public.logs_leads (
   lead_id integer,
@@ -86,8 +88,8 @@ CREATE TABLE public.logs_leads (
   id integer NOT NULL DEFAULT nextval('logs_leads_id_seq'::regclass),
   fecha timestamp without time zone DEFAULT now(),
   CONSTRAINT logs_leads_pkey PRIMARY KEY (id),
-  CONSTRAINT logs_leads_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES auth.users(id),
-  CONSTRAINT logs_leads_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id)
+  CONSTRAINT logs_leads_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT logs_leads_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.profiles (
   user_id uuid NOT NULL,
