@@ -244,23 +244,26 @@ const Register = () => {
             </p>
           </div>
 
-          <div>
-            <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
-              Empresa
-            </label>
-            <input
-              type="text"
-              id="company"
-              name="company"
-              value={userMetadata.companyName}
-              disabled
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-              placeholder="Nombre de la empresa"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Empresa asignada en tu invitación
-            </p>
-          </div>
+          {/* Solo mostrar campo de empresa si el usuario NO es administrador */}
+          {userMetadata.role === 'client' && (
+            <div>
+              <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
+                Empresa
+              </label>
+              <input
+                type="text"
+                id="company"
+                name="company"
+                value={userMetadata.companyName}
+                disabled
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                placeholder="Nombre de la empresa"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Empresa asignada en tu invitación
+              </p>
+            </div>
+          )}
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-2">

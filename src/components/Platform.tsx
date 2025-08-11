@@ -22,8 +22,8 @@ const Platform = () => {
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    cif: '', // Cambiado de 'company' a 'cif'
-    role: 'client' as 'admin' | 'client'
+    role: 'client' as 'admin' | 'client',
+    cif: '' // Movido después del rol
   })
   const { user, logout, checkAuth, isAuthenticated } = useAuthStore()
   const { loadInitialLeads, reloadKey } = useLeadsStore()
@@ -62,30 +62,49 @@ const Platform = () => {
     setShowErrorMessage(false)
 
     try {
-      // Buscar el ID de la empresa por CIF
-      const { data: empresa, error: empresaError } = await supabase
-        .from('empresas')
-        .select('id, nombre')
-        .eq('cif', newUser.cif)
-        .single()
+      let userData: NewUserData
 
-      if (empresaError || !empresa) {
-        throw new Error('Empresa no encontrada con el CIF proporcionado. Verifica que el CIF sea correcto.')
-      }
+      if (newUser.role === 'client') {
+        // Para clientes, buscar el ID de la empresa por CIF
+        if (!newUser.cif.trim()) {
+          throw new Error('El CIF de la empresa es obligatorio para usuarios cliente.')
+        }
 
-      // Preparar datos del usuario con el ID de la empresa
-      const userData: NewUserData = {
-        name: newUser.name,
-        email: newUser.email,
-        company: empresa.id.toString(), // Enviar el ID de la empresa en lugar del CIF
-        role: newUser.role
+        const { data: empresa, error: empresaError } = await supabase
+          .from('empresas')
+          .select('id, nombre')
+          .eq('cif', newUser.cif)
+          .single()
+
+        if (empresaError || !empresa) {
+          throw new Error('Empresa no encontrada con el CIF proporcionado. Verifica que el CIF sea correcto.')
+        }
+
+        userData = {
+          name: newUser.name,
+          email: newUser.email,
+          company: empresa.id.toString(),
+          role: newUser.role
+        }
+      } else {
+        // Para administradores, no se requiere empresa
+        userData = {
+          name: newUser.name,
+          email: newUser.email,
+          company: '', // Los admins no tienen empresa
+          role: newUser.role
+        }
       }
 
       // Enviar solicitud al backend
       const response = await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
-      setMessage(`Usuario invitado con éxito para ${empresa.nombre}. Se ha enviado un email de registro.`)
+      const successMessage = newUser.role === 'client' 
+        ? `Usuario cliente invitado con éxito. Se ha enviado un email de registro.`
+        : `Usuario administrador invitado con éxito. Se ha enviado un email de registro.`
+      
+      setMessage(successMessage)
       setShowSuccessMessage(true)
       setTimeout(() => setMessageVisible(true), 100)
 
@@ -97,8 +116,8 @@ const Platform = () => {
       setNewUser({
         name: '',
         email: '',
-        cif: '',
-        role: 'client'
+        role: 'client',
+        cif: ''
       })
 
     } catch (error) {
@@ -121,10 +140,21 @@ const Platform = () => {
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setNewUser({
-      ...newUser,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    
+    // Si se cambia el rol a admin, limpiar el CIF
+    if (name === 'role' && value === 'admin') {
+      setNewUser({
+        ...newUser,
+        [name]: value,
+        cif: ''
+      })
+    } else {
+      setNewUser({
+        ...newUser,
+        [name]: value
+      })
+    }
   }
 
   const handleOpenSidebar = () => {
@@ -245,25 +275,6 @@ const Platform = () => {
               </div>
 
               <div>
-                <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
-                  CIF de la empresa
-                </label>
-                <input
-                  type="text"
-                  id="cif"
-                  name="cif"
-                  value={newUser.cif}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                  placeholder="Ej: B12345678"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  El sistema verificará que la empresa exista con este CIF
-                </p>
-              </div>
-
-              <div>
                 <label htmlFor="role" className="block text-sm font-medium text-[#373643] mb-2">
                   Rol
                 </label>
@@ -279,6 +290,27 @@ const Platform = () => {
                   <option value="admin">Administrador</option>
                 </select>
               </div>
+
+              {newUser.role === 'client' && (
+                <div>
+                  <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
+                    CIF de la empresa
+                  </label>
+                  <input
+                    type="text"
+                    id="cif"
+                    name="cif"
+                    value={newUser.cif}
+                    onChange={handleInputChange}
+                    required={newUser.role === 'client'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    placeholder="Ej: B12345678"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    El sistema verificará que la empresa exista con este CIF
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button

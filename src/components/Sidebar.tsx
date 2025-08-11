@@ -104,9 +104,11 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
           <div className="ml-3 flex-1 min-w-0">
             <p className="text-sm font-medium text-[#373643] truncate">{user?.name || 'Usuario'}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email || 'usuario@empresa.com'}</p>
-            <p className="text-xs text-gray-400 truncate">
-              <CompanyName cif={user?.company} fallback="Empresa" />
-            </p>
+            {user?.role !== 'admin' && (
+              <p className="text-xs text-gray-400 truncate">
+                <CompanyName cif={user?.company} fallback="Empresa" />
+              </p>
+            )}
             <p className="text-xs text-[#18cb96] font-medium capitalize">
               {user?.role === 'admin' ? '👑 Administrador' : '👤 Cliente'}
             </p>

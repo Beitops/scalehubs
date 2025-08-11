@@ -6,14 +6,14 @@ import { createClient } from '@supabase/supabase-js'
 export interface NewUserData {
   name: string
   email: string
-  company: string // Ahora será el ID de la empresa (string)
+  company: string // Puede ser el ID de la empresa o vacío para admins
   role: 'admin' | 'client' // Frontend format
 }
 
 export interface UserDataForBackend {
   name: string
   email: string
-  empresa_id: number // Cambiado de 'cif' a 'empresa_id'
+  empresa_id?: number // Opcional para admins
   role: boolean // Backend format
   redirectTo: string
 }
@@ -50,12 +50,14 @@ export const userService = {
       const backendData: UserDataForBackend = {
         name: userData.name,
         email: userData.email,
-        empresa_id: parseInt(userData.company), // Convertir string a number
         role: roleConverter.frontendToBackend(userData.role),
         redirectTo: '44d9d7076338.ngrok-free.app/set-password'
       }
 
-
+      // Solo incluir empresa_id si es un cliente y tiene empresa
+      if (userData.role === 'client' && userData.company) {
+        backendData.empresa_id = parseInt(userData.company)
+      }
 
       // Realizar la petición POST con el header Bearer
       const response = await axiosInstance.post(
