@@ -2,7 +2,7 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 
 const Dashboard = () => {
-  const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
+  const { user, userEmpresaNombre } = useAuthStore()
   const { leads, loading } = useLeadsStore()
 
   // Filtrar leads que no estén en devolución
