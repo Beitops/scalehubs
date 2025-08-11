@@ -199,7 +199,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         .or('estado.is.null,estado.not.in.("cancelado","resuelto","rechazado")')
 
       const { data, error } = await query
-      console.log(data)
 
       if (error) {
         console.error('Error loading devoluciones:', error)

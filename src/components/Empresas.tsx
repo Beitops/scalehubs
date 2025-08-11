@@ -42,7 +42,6 @@ const Empresas = () => {
       setLoading(true)
     
       const data = await companyService.getCompanies()
-      console.log('🔄 Datos recibidos:', data)
 
       setCompanies(data)
     } catch (error) {

@@ -48,7 +48,6 @@ export const companyService = {
         .from('empresas')
         .select('*')
         .order('nombre')
-      console.log('🔄 getCompanies data:', data)
       if (error) {
         console.error('Error getting companies:', error)
         return []
@@ -131,7 +130,7 @@ export const companyService = {
         .from('empresas')
         .update({
           cif: updates.cif,
-          nombre: updates.name,
+          nombre: updates.nombre,
           email_contacto: updates.email_contacto,
           volumen_diario: updates.volumen_diario,
           prioridad: updates.prioridad,

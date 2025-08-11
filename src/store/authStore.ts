@@ -61,7 +61,6 @@ export const useAuthStore = create<AuthState>()(
                             }
                         } else {
                             // Si no hay empresa_id o hay error, establecer valores por defecto
-                            console.log('🔄 No empresa_id found, setting defaults')
                             set({ userEmpresaId: null, userEmpresaNombre: '' })
                         }
                     } catch (error) {

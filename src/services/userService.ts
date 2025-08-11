@@ -55,9 +55,7 @@ export const userService = {
         redirectTo: '44d9d7076338.ngrok-free.app/set-password'
       }
 
-      console.log('Enviando petición con JWT:', accessToken ? 'Token presente' : 'Sin token')
-      console.log('URL de la edge function:', import.meta.env.VITE_SUPABASE_URL_INVITE_USER)
-      console.log('Datos enviados:', backendData)
+
 
       // Realizar la petición POST con el header Bearer
       const response = await axiosInstance.post(

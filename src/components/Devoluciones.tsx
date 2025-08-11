@@ -80,7 +80,6 @@ const Devoluciones = () => {
 
   const handleFinishDevolucion = (lead: LeadDevolucion) => {
     setSelectedLead(lead)
-    console.log(lead)
     setShowFinishModal(true)
   }
 
@@ -231,12 +230,7 @@ const Devoluciones = () => {
           }
         }
 
-        console.log('Devolución tramitada exitosamente:', {
-          leadId: selectedLead.id,
-          devolucionId: devolucionExistente.id,
-          archivos: uploadedFiles,
-          motivo: returnForm.motivo
-        })
+
 
         // Recargar devoluciones después de la actualización exitosa
         const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
@@ -284,11 +278,7 @@ const Devoluciones = () => {
           throw new Error('Error al rechazar la devolución')
         }
 
-        console.log('Devolución rechazada exitosamente:', {
-          leadId: selectedLead.id,
-          devolucionId: devolucionExistente.id,
-          observaciones: adminObservations
-        })
+
 
         // Recargar devoluciones después de la actualización exitosa
         const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
@@ -349,11 +339,7 @@ const Devoluciones = () => {
           throw new Error('Error al actualizar el estado temporal del lead')
         }
 
-        console.log('Devolución rechazada definitivamente:', {
-          leadId: selectedLead.id,
-          devolucionId: devolucionExistente.id,
-          observaciones: adminObservations
-        })
+
 
         // Recargar devoluciones después de la actualización exitosa
         const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
@@ -401,11 +387,7 @@ const Devoluciones = () => {
           throw new Error('Error al aceptar la devolución')
         }
 
-        console.log('Devolución aceptada exitosamente:', {
-          leadId: selectedLead.id,
-          devolucionId: devolucionExistente.id,
-          observaciones: adminObservations
-        })
+
 
         // Recargar devoluciones después de la actualización exitosa
         const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()

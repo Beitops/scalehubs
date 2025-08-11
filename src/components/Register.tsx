@@ -27,7 +27,6 @@ const Register = () => {
   useEffect(() => {
     const hash = window.location.hash
     if (!hash || hash === '') {
-      console.log('No hash found in URL')
       navigate('/auth')
       return
     }
@@ -42,7 +41,6 @@ const Register = () => {
         const refreshToken = urlParams.get('refresh_token')
         
         if (!accessToken || !refreshToken) {
-          console.log('No access token or refresh token found in URL')
           navigate('/auth')
           return
         }
@@ -59,14 +57,12 @@ const Register = () => {
         }
 
         if (!data.session) {
-          console.log('No session created from refresh token')
           navigate('/auth')
           return
         }
 
         // Obtener metadata del usuario invitado
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        console.log(`user: ${user?.id}`)
         
         if (userError || !user) {
           console.error('Error getting user:', userError)
