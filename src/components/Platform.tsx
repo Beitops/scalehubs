@@ -97,7 +97,7 @@ const Platform = () => {
       }
 
       // Enviar solicitud al backend
-      const response = await userService.registerUser(userData)
+      await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
       const successMessage = newUser.role === 'client' 

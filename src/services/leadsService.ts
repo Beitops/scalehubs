@@ -86,7 +86,7 @@ class LeadsService {
 
   async updateLeadStatus(leadId: number, estadoTemporal: string, userId?: string): Promise<void> {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('leads')
         .update({ estado_temporal: estadoTemporal })
         .eq('id', leadId)

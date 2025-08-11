@@ -4,25 +4,6 @@ import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 import { supabase } from '../lib/supabase'
 
-interface Devolucion {
-  id: number
-  lead_id: number
-  usuario_id: string
-  comentario_admin: string | null
-  fecha_resolucion: string | null
-  fecha_solicitud: string
-  estado: string
-  lead: {
-    id: number
-    nombre_cliente: string
-    telefono: string
-    plataforma: string
-    fecha_entrada: string
-    empresa_id: number
-    empresa_nombre?: string
-  }
-}
-
 interface LeadDevolucion extends Lead {
   audio_devolucion?: string
   imagen_devolucion?: string
@@ -42,7 +23,6 @@ const Devoluciones = () => {
   })
   const [adminObservations, setAdminObservations] = useState('')
   const [showAttachments, setShowAttachments] = useState(false)
-  const [devoluciones, setDevoluciones] = useState<Devolucion[] | null>(null)
   const [leadsInDevolucion, setLeadsInDevolucion] = useState<LeadDevolucion[] | null>(null)
   const [leadsInTramite, setLeadsInTramite] = useState<LeadDevolucion[] | null>(null)
   const [archivosDevolucion, setArchivosDevolucion] = useState<Array<{
@@ -69,7 +49,6 @@ const Devoluciones = () => {
         setLeadsInTramite(leadsInTramite)
       } catch (error) {
         console.error('Error loading devoluciones:', error)
-        setDevoluciones([])
         setLeadsInDevolucion([])
         setLeadsInTramite([])
       }
@@ -145,7 +124,7 @@ const Devoluciones = () => {
         let audioFileName = ''
         if (returnForm.audio) {
           audioFileName = `devolucion_${selectedLead.id}_audio_${Date.now()}.${returnForm.audio.name.split('.').pop()}`
-          const { data: audioData, error: audioError } = await supabase.storage
+          const {error: audioError } = await supabase.storage
             .from('pruebas')
             .upload(audioFileName, returnForm.audio)
 
@@ -159,7 +138,7 @@ const Devoluciones = () => {
         let imagenFileName = ''
         if (returnForm.imagen) {
           imagenFileName = `devolucion_${selectedLead.id}_imagen_${Date.now()}.${returnForm.imagen.name.split('.').pop()}`
-          const { data: imagenData, error: imagenError } = await supabase.storage
+          const { error: imagenError } = await supabase.storage
             .from('pruebas')
             .upload(imagenFileName, returnForm.imagen)
 

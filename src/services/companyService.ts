@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase'
-import type { FrontendEmpresa, DatabaseEmpresa } from '../types/database'
 
 export interface Company {
   id: number

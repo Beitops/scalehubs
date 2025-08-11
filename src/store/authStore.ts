@@ -1,9 +1,8 @@
 import { create } from 'zustand'
 import { persist, devtools } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { roleConverter } from '../utils/roleConverter'
-import type { DatabaseProfile, FrontendUser, DatabaseEmpresa } from '../types/database'
+import type { FrontendUser } from '../types/database'
 import { useLeadsStore } from './leadsStore'
 
 interface AuthState {
@@ -141,7 +140,7 @@ export const useAuthStore = create<AuthState>()(
                     }
                 },
 
-                signup: async (email: string, password: string, userData: any) => {
+                signup: async (email: string, password: string) => {
                     set({ isLoading: true, error: null })
 
                     try {
@@ -153,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         // Actualizar solo la contraseña del usuario invitado
-                        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+                        const { error: updateError } = await supabase.auth.updateUser({
                             password: password
                         })
 

@@ -24,7 +24,7 @@ const Leads = () => {
     getLeadsInDateRange 
   } = useLeadsStore()
 
-  const [activeLeads, setActiveLeads] = useState<Lead[]>(leads.filter(lead => lead.estado_temporal !== 'devolucion'))
+  const [activeLeads] = useState<Lead[]>(leads.filter(lead => lead.estado_temporal !== 'devolucion'))
 
 
   const filteredLeads = activeLeads.filter(lead => {

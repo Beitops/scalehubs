@@ -1,7 +1,7 @@
 import axiosInstance from '../api/axiosConfig'
 import { roleConverter } from '../utils/roleConverter'
 import { supabase } from '../lib/supabase'
-import { createClient } from '@supabase/supabase-js'
+
 
 export interface NewUserData {
   name: string
