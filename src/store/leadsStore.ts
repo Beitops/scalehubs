@@ -1,19 +1,43 @@
 import { create } from 'zustand'
 import { leadsService, type Lead } from '../services/leadsService'
 import { useAuthStore } from './authStore'
+import { supabase } from '../lib/supabase'
+
+interface Devolucion {
+  id: number
+  lead_id: number
+  usuario_id: string
+  comentario_admin: string | null
+  fecha_resolucion: string | null
+  fecha_solicitud: string
+  estado: string
+  lead: {
+    id: number
+    nombre_cliente: string
+    telefono: string
+    plataforma: string
+    fecha_entrada: string
+    empresa_id: number
+    empresa_nombre?: string
+  }
+}
 
 interface LeadsState {
   leads: Lead[]
   loading: boolean
   error: string | null
   isInitialized: boolean
+  reloadKey: number
+  devoluciones: Devolucion[]
   getLeadsByCompany: (empresaId: number) => Promise<Lead[]>
   getAllLeads: () => Promise<Lead[]>
-  updateLeadStatus: (leadId: number, estadoTemporal: string) => Promise<void>
+  updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadInitialLeads: () => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
+  triggerReload: () => void
+  loadDevoluciones: () => Promise<{ leadsInDevolucion: Lead[], leadsInTramite: Lead[] }>
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
@@ -21,6 +45,8 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   loading: false,
   error: null,
   isInitialized: false,
+  reloadKey: 0,
+  devoluciones: [],
 
   loadInitialLeads: async () => {
     const { user, userEmpresaId } = useAuthStore.getState()
@@ -98,7 +124,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   getLeadsByCompany: async (empresaId: number) => {
     try {
       const leads = await leadsService.getLeadsByCompany(empresaId)
-      set({ leads })
       return leads
     } catch (error) {
       console.error('Error getting leads by company:', error)
@@ -109,7 +134,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   getAllLeads: async () => {
     try {
       const leads = await leadsService.getAllLeads()
-      set({ leads })
       return leads
     } catch (error) {
       console.error('Error getting all leads:', error)
@@ -117,18 +141,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  updateLeadStatus: async (leadId: number, estadoTemporal: string) => {
+  updateLeadStatus: async (leadId: number, estadoTemporal: string, userId?: string) => {
     try {
-      await leadsService.updateLeadStatus(leadId, estadoTemporal)
-      
-      // Actualizar el estado local
-      set(state => ({
-        leads: state.leads.map(lead => 
-          lead.id === leadId 
-            ? { ...lead, estado_temporal: estadoTemporal }
-            : lead
-        )
-      }))
+      await leadsService.updateLeadStatus(leadId, estadoTemporal, userId)
     } catch (error) {
       console.error('Error updating lead status:', error)
       throw error
@@ -141,6 +156,79 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     } catch (error) {
       console.error('Error getting leads in date range:', error)
       throw error
+    }
+  },
+
+  triggerReload: () => {
+    set(state => ({ reloadKey: state.reloadKey + 1 }))
+  },
+
+  loadDevoluciones: async () => {
+    const { user, userEmpresaId } = useAuthStore.getState()
+    
+    if (!user) {
+      return { leadsInDevolucion: [], leadsInTramite: [] }
+    }
+
+    try {
+      let query = supabase
+        .from('devoluciones')
+        .select(`
+          *,
+          lead:leads(
+            id,
+            nombre_cliente,
+            telefono,
+            plataforma,
+            fecha_entrada,
+            empresa_id
+          )
+        `)
+        .or('estado.is.null,estado.not.in.("rechazado","cancelado","resuelto")')
+
+      const { data, error } = await query
+      console.log(data)
+
+      if (error) {
+        console.error('Error loading devoluciones:', error)
+        set({ devoluciones: [] })
+        return { leadsInDevolucion: [], leadsInTramite: [] }
+      }
+
+      // Filtrar por empresa_id si el usuario no es admin
+      let filteredData = data || []
+      if (user.role !== 'admin' && userEmpresaId) {
+        filteredData = filteredData.filter(d => d.lead?.empresa_id === userEmpresaId)
+      }
+
+      set({ devoluciones: filteredData })
+
+      // Filtrar según el rol del usuario
+      if (user.role === 'admin') {
+        // Para admin: mostrar solo las que tengan estado 'tramite'
+        const tramiteDevoluciones = filteredData.filter(d => d.estado === 'tramite') || []
+        const leadsInTramite = tramiteDevoluciones.map(d => ({
+          ...d.lead,
+          audio_devolucion: '',
+          imagen_devolucion: ''
+        }))
+        
+        return { leadsInDevolucion: [], leadsInTramite }
+      } else {
+        // Para clientes: mostrar solo las que tengan estado 'pendiente'
+        const pendienteDevoluciones = filteredData.filter(d => d.estado === 'pendiente') || []
+        const leadsInDevolucion = pendienteDevoluciones.map(d => ({
+          ...d.lead,
+          audio_devolucion: '',
+          imagen_devolucion: ''
+        }))
+        
+        return { leadsInDevolucion, leadsInTramite: [] }
+      }
+    } catch (error) {
+      console.error('Error loading devoluciones:', error)
+      set({ devoluciones: [] })
+      return { leadsInDevolucion: [], leadsInTramite: [] }
     }
   }
 })) 

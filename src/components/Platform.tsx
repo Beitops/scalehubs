@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Dashboard from './Dashboard'
 import Leads from './Leads'
@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
+import { useLeadsStore } from '../store/leadsStore'
 
 const Platform = () => {
   const [currentSection, setCurrentSection] = useState('dashboard')
@@ -24,7 +25,18 @@ const Platform = () => {
     cif: '', // Cambiado de 'company' a 'cif'
     role: 'client' as 'admin' | 'client'
   })
-  const { user, logout } = useAuthStore()
+  const { user, logout, checkAuth, isAuthenticated } = useAuthStore()
+  const { loadInitialLeads, reloadKey } = useLeadsStore()
+
+  // Cargar leads cuando el usuario esté autenticado
+  useEffect(() => {
+    const checkAuthAndLoadLeads = async () => {
+
+      await checkAuth()
+      loadInitialLeads()
+    }
+    checkAuthAndLoadLeads()
+  }, [isAuthenticated, reloadKey])
 
   const renderSection = () => {
     switch (currentSection) {
@@ -44,7 +56,7 @@ const Platform = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     setIsLoading(true)
     setShowSuccessMessage(false)
     setShowErrorMessage(false)
@@ -96,7 +108,7 @@ const Platform = () => {
       setTimeout(() => setMessageVisible(true), 100)
     } finally {
       setIsLoading(false)
-      
+
       // Ocultar mensaje después de 4 segundos
       setTimeout(() => {
         setMessageVisible(false)

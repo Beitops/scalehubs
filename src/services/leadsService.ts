@@ -84,16 +84,34 @@ class LeadsService {
     }
   }
 
-  async updateLeadStatus(leadId: number, estadoTemporal: string): Promise<void> {
+  async updateLeadStatus(leadId: number, estadoTemporal: string, userId?: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('leads')
         .update({ estado_temporal: estadoTemporal })
         .eq('id', leadId)
+        .select()
 
       if (error) {
         console.error('Error updating lead status:', error)
         throw error
+      }
+
+      // Si se está solicitando una devolución y se proporciona userId, insertar en tabla devoluciones
+      if (estadoTemporal === 'devolucion' && userId) {
+        // Insertar en tabla devoluciones usando el leadId que ya tenemos
+        const { error: devolucionError } = await supabase
+          .from('devoluciones')
+          .insert({
+            lead_id: leadId,
+            usuario_id: userId,
+            estado: 'pendiente'
+          })
+
+        if (devolucionError) {
+          console.error('Error creating devolucion record:', devolucionError)
+          throw devolucionError
+        }
       }
     } catch (error) {
       console.error('Error in updateLeadStatus:', error)

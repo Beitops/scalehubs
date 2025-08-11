@@ -13,6 +13,7 @@ const Leads = () => {
     startDate: '',
     endDate: ''
   })
+  
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const { 
     leads, 
@@ -23,8 +24,8 @@ const Leads = () => {
     getLeadsInDateRange 
   } = useLeadsStore()
 
-  // Filtrar leads que no estén en devolución
-  const activeLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
+  const [activeLeads, setActiveLeads] = useState<Lead[]>(leads.filter(lead => lead.estado_temporal !== 'devolucion'))
+
 
   const filteredLeads = activeLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
@@ -56,7 +57,7 @@ const Leads = () => {
     }
 
     fetchLeadsInRange()
-  }, [exportDateRange, getLeadsInDateRange, user, userEmpresaId])
+  }, [exportDateRange])
 
   const handleExport = () => {
     setShowExportModal(true)
@@ -116,9 +117,9 @@ const Leads = () => {
   }
 
   const handleConfirmReturn = async () => {
-    if (selectedLead) {
+    if (selectedLead && user?.id) {
       try {
-        await updateLeadStatus(selectedLead.id, 'devolucion')
+        await updateLeadStatus(selectedLead.id, 'devolucion', user.id)
         setShowReturnModal(false)
         setSelectedLead(null)
         
