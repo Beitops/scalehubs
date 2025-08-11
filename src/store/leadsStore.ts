@@ -45,7 +45,8 @@ interface LeadsState {
     nombre_archivo: string
     fecha_subida: string
     tipo: string
-  }>>
+  }>>,
+  resetInitialized: () => void
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
@@ -290,5 +291,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       console.error('Error in loadDevolucionArchivos:', error)
       return []
     }
+  },
+
+  resetInitialized: () => {
+    set({ leads: [], devoluciones: [], isInitialized: false })
   }
 })) 

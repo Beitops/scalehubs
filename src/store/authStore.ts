@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { roleConverter } from '../utils/roleConverter'
 import type { DatabaseProfile, FrontendUser, DatabaseEmpresa } from '../types/database'
+import { useLeadsStore } from './leadsStore'
 
 interface AuthState {
     user: FrontendUser | null
@@ -239,6 +240,7 @@ export const useAuthStore = create<AuthState>()(
                             userEmpresaId: null,
                             userEmpresaNombre: ''
                         })
+                        useLeadsStore.getState().resetInitialized()
                     }
                 },
 
