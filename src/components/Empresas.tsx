@@ -154,21 +154,41 @@ const Empresas = () => {
     }
   }
 
+  const getPriorityColor = (prioridad: number) => {
+    switch (prioridad) {
+      case 1: return 'bg-red-100 text-red-800'
+      case 2: return 'bg-orange-100 text-orange-800'
+      case 3: return 'bg-yellow-100 text-yellow-800'
+      case 4: return 'bg-blue-100 text-blue-800'
+      default: return 'bg-green-100 text-green-800'
+    }
+  }
+
+  const getPriorityText = (prioridad: number) => {
+    switch (prioridad) {
+      case 1: return 'Muy Alta'
+      case 2: return 'Alta'
+      case 3: return 'Media'
+      case 4: return 'Baja'
+      default: return 'Muy Baja'
+    }
+  }
+
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#373643]">Empresas</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#373643]">Empresas</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             Gestiona todas las empresas registradas en el sistema
           </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors flex items-center gap-2"
+          className="w-full sm:w-auto px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           Añadir Empresa
@@ -177,7 +197,7 @@ const Empresas = () => {
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div>
             <label htmlFor="nameFilter" className="block text-sm font-medium text-[#373643] mb-2">
               Filtrar por nombre
@@ -188,7 +208,7 @@ const Empresas = () => {
               value={nameFilter}
               onChange={(e) => setNameFilter(e.target.value)}
               placeholder="Buscar por nombre..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
             />
           </div>
           <div>
@@ -201,7 +221,7 @@ const Empresas = () => {
               value={cifFilter}
               onChange={(e) => setCifFilter(e.target.value)}
               placeholder="Buscar por CIF..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
             />
           </div>
         </div>
@@ -216,7 +236,8 @@ const Empresas = () => {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista de escritorio - Tabla */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -264,21 +285,8 @@ const Empresas = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          company.prioridad === 1 
-                            ? 'bg-red-100 text-red-800' 
-                            : company.prioridad === 2 
-                            ? 'bg-orange-100 text-orange-800'
-                            : company.prioridad === 3 
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : company.prioridad === 4 
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {company.prioridad === 1 ? 'Muy Alta' : 
-                           company.prioridad === 2 ? 'Alta' : 
-                           company.prioridad === 3 ? 'Media' : 
-                           company.prioridad === 4 ? 'Baja' : 'Muy Baja'}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(company.prioridad)}`}>
+                          {getPriorityText(company.prioridad)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -294,6 +302,60 @@ const Empresas = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Vista móvil - Tarjetas */}
+            <div className="lg:hidden">
+              <div className="p-4 space-y-4">
+                {currentCompanies.map((company) => (
+                  <div key={company.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <h3 className="text-sm font-semibold text-[#373643] leading-tight">
+                          {company.nombre}
+                        </h3>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(company.prioridad)}`}>
+                          {getPriorityText(company.prioridad)}
+                        </span>
+                      </div>
+                      
+                      {/* Email arriba */}
+                      <div className="text-xs">
+                        <span className="text-gray-500 block">Email:</span>
+                        <span className="text-gray-900 font-medium">
+                          {company.email_contacto || '-'}
+                        </span>
+                      </div>
+                      
+                      {/* CIF, Volumen y Estado abajo en grid */}
+                      <div className="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-gray-500 block">CIF:</span>
+                          <span className="text-gray-900 font-mono font-medium">
+                            {company.cif}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 block">Volumen:</span>
+                          <span className="text-gray-900 font-medium">
+                            {company.volumen_diario.toLocaleString()}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 block">Estado:</span>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            company.activa 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {company.activa ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Paginación */}
@@ -359,7 +421,7 @@ const Empresas = () => {
                       <button
                         onClick={goToNextPage}
                         disabled={currentPage === totalPages}
-                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed"
                       >
                         <span className="sr-only">Siguiente</span>
                         <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -379,14 +441,14 @@ const Empresas = () => {
       {showAddModal && (
         <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
           <div className="fixed inset-0 bg-black opacity-50" onClick={() => setShowAddModal(false)} />
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative z-10">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[#373643]">Añadir Nueva Empresa</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-[#373643]">Añadir Nueva Empresa</h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -404,7 +466,7 @@ const Empresas = () => {
                   value={newCompany.nombre}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                   placeholder="Nombre de la empresa"
                 />
               </div>
@@ -419,7 +481,7 @@ const Empresas = () => {
                   name="email"
                   value={newCompany.email}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                   placeholder="contacto@empresa.com"
                 />
               </div>
@@ -435,7 +497,7 @@ const Empresas = () => {
                   value={newCompany.cif}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                   placeholder="Ej: B12345678"
                 />
               </div>
@@ -452,7 +514,7 @@ const Empresas = () => {
                   onChange={handleInputChange}
                   required
                   min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -470,7 +532,7 @@ const Empresas = () => {
                   value={newCompany.prioridad}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                 >
                   <option value={1}>Muy Alta (1)</option>
                   <option value={2}>Alta (2)</option>
@@ -480,18 +542,18 @@ const Empresas = () => {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full sm:flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">
@@ -513,12 +575,12 @@ const Empresas = () => {
 
       {/* Success Message */}
       {showSuccessMessage && (
-        <div className={`fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[9999] transition-all duration-300 ease-in-out transform ${
+        <div className={`fixed top-4 right-4 left-4 sm:left-auto bg-green-500 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg z-[9999] transition-all duration-300 ease-in-out transform ${
           messageVisible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
         }`}>
           <div className="flex items-center">
             <span className="mr-2">✅</span>
-            <span>{message}</span>
+            <span className="text-sm sm:text-base">{message}</span>
           </div>
         </div>
       )}
