@@ -9,6 +9,8 @@ import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
 import { useLeadsStore } from '../store/leadsStore'
+import type { LeadDevolucion, Lead } from '../services/leadsService'
+
 
 const Platform = () => {
   const [currentSection, setCurrentSection] = useState('dashboard')
@@ -25,31 +27,53 @@ const Platform = () => {
     role: 'client' as 'admin' | 'client',
     cif: '' // Movido después del rol
   })
-  const { user, logout, checkAuth, isAuthenticated } = useAuthStore()
-  const { loadInitialLeads, reloadKey } = useLeadsStore()
+  const [activeLeads, setActiveLeads] = useState<Lead[] | null>(null)
+  const [leadsInDevolucion, setLeadsInDevolucion] = useState<LeadDevolucion[] | null>(null)
+  const [leadsInTramite, setLeadsInTramite] = useState<LeadDevolucion[] | null>(null)
 
+  const { user, logout, checkAuth } = useAuthStore()
+  const { loadInitialLeads, loadDevoluciones, isInitialized } = useLeadsStore()
+
+  console.log('platform')
   // Cargar leads cuando el usuario esté autenticado
   useEffect(() => {
-    const checkAuthAndLoadLeads = async () => {
+    const loadInitialLoadsAndDevoluciones = async () => {
 
-      await checkAuth()
-      loadInitialLeads()
+        await checkAuth()
+        await loadInitialLeads()
+
+      // Obtener los leads directamente del store después de cargarlos
+      const currentLeads = useLeadsStore.getState().leads
+
+      const newActiveLeads = currentLeads.filter(lead => lead.estado_temporal !== 'devolucion')
+      setActiveLeads(newActiveLeads)
+
+      try {
+        const { leadsInDevolucion, leadsInTramite } = await loadDevoluciones()
+        setLeadsInDevolucion(leadsInDevolucion)
+        setLeadsInTramite(leadsInTramite)
+      } catch (error) {
+        console.error('Error loading devoluciones:', error)
+        setLeadsInDevolucion([])
+        setLeadsInTramite([])
+      }
     }
-    checkAuthAndLoadLeads()
-  }, [isAuthenticated, reloadKey])
+
+    loadInitialLoadsAndDevoluciones()
+  }, [checkAuth, loadInitialLeads, loadDevoluciones])
+
 
   const renderSection = () => {
     switch (currentSection) {
       case 'dashboard':
-        return <Dashboard />
+        return <Dashboard activeLeads={activeLeads || []} leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} />
       case 'leads':
-        return <Leads />
+        return <Leads activeLeads={activeLeads || []} />
       case 'devoluciones':
-        return <Devoluciones />
+        return <Devoluciones leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} setLeadsInDevolucion={setLeadsInDevolucion} setLeadsInTramite={setLeadsInTramite} />
       case 'empresas':
         return <Empresas />
-      default:
-        return <Dashboard />
+
     }
   }
 
@@ -100,10 +124,10 @@ const Platform = () => {
       await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
-      const successMessage = newUser.role === 'client' 
+      const successMessage = newUser.role === 'client'
         ? `Usuario cliente invitado con éxito. Se ha enviado un email de registro.`
         : `Usuario administrador invitado con éxito. Se ha enviado un email de registro.`
-      
+
       setMessage(successMessage)
       setShowSuccessMessage(true)
       setTimeout(() => setMessageVisible(true), 100)
@@ -141,7 +165,7 @@ const Platform = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    
+
     // Si se cambia el rol a admin, limpiar el CIF
     if (name === 'role' && value === 'admin') {
       setNewUser({
@@ -164,6 +188,15 @@ const Platform = () => {
   const handleCloseSidebar = () => {
     setSidebarOpen(false);
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="p-6 flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
+        <span className="ml-3 text-gray-600">Cargando datos...</span>
+      </div>
+    )
+  }
 
   return (
     <>

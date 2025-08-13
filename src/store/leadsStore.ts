@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { leadsService, type Lead } from '../services/leadsService'
 import { useAuthStore } from './authStore'
 import { supabase } from '../lib/supabase'
+import { platformConverter } from '../utils/platformConverter'
 
 interface Devolucion {
   id: number
@@ -58,10 +59,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   devoluciones: [],
 
   loadInitialLeads: async () => {
+
     const { user, userEmpresaId } = useAuthStore.getState()
     
     if (!user) return
-
     // Evitar cargar si ya está inicializado
     if (get().isInitialized) return
 
@@ -76,7 +77,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         console.error('❌ User without company assigned:', user)
         throw new Error('Usuario sin empresa asignada. Contacta al administrador.')
       }
-      set({ isInitialized: true })
+      set({ isInitialized: true, loading: false })
     } catch (error) {
       console.error('Error loading initial leads:', error)
       set({ 
@@ -120,7 +121,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         ? await leadsService.getLeadsByCompany(empresaId)
         : await leadsService.getAllLeads()
       
-      set({ leads, loading: false })
+      const leadsWithPlatformName = leads.map(lead => {
+        return { ...lead, plataforma_lead: platformConverter(lead.plataforma|| '') }
+      })
+      set({ leads: leadsWithPlatformName, loading: false })
     } catch (error) {
       console.error('Error loading leads:', error)
       set({ 

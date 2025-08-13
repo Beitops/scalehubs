@@ -36,7 +36,6 @@ export const useAuthStore = create<AuthState>()(
                     if (!user?.id) return
 
 
-
                     try {
                         const { data: profile, error: profileError } = await supabase
                             .from('profiles')
@@ -46,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
 
 
                         if (!profileError && profile?.empresa_id) {
+
                             set({ userEmpresaId: profile.empresa_id })
 
                             // Obtener nombre de la empresa
@@ -299,7 +299,7 @@ export const useAuthStore = create<AuthState>()(
                                 isLoading: false
                             })
 
-                            // Obtener información de la empresa después del checkAuth
+                            // Obtener información de la empresa después del checkAuth y esperar a que termine
                             await get().getUserEmpresaInfo()
                         } else {
                             set({
@@ -318,8 +318,10 @@ export const useAuthStore = create<AuthState>()(
                 name: 'auth-storage', // name of the item in localStorage
                 partialize: (state) => ({
                     user: state.user,
-                    isAuthenticated: state.isAuthenticated
-                }), // only persist these fields
+                    isAuthenticated: state.isAuthenticated,
+                    userEmpresaId: state.userEmpresaId,
+                    userEmpresaNombre: state.userEmpresaNombre
+                }), // persist these fields
             }
         ),
         {

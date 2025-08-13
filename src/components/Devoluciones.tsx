@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
-import type { Lead } from '../services/leadsService'
+import type { LeadDevolucion } from '../services/leadsService'
 import { supabase } from '../lib/supabase'
 
-interface LeadDevolucion extends Lead {
-  audio_devolucion?: string
-  imagen_devolucion?: string
-  motivo?: string
-  observaciones_admin?: string
-  devolucion_id?: number
+
+
+interface DevolucionesProps {
+  leadsInDevolucion: LeadDevolucion[]
+  leadsInTramite: LeadDevolucion[]
+  setLeadsInDevolucion: (leads: LeadDevolucion[]) => void
+  setLeadsInTramite: (leads: LeadDevolucion[]) => void
 }
 
-const Devoluciones = () => {
+const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion, setLeadsInTramite }: DevolucionesProps) => {
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [showProcessModal, setShowProcessModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<LeadDevolucion | null>(null)
@@ -23,8 +24,7 @@ const Devoluciones = () => {
   })
   const [adminObservations, setAdminObservations] = useState('')
   const [showAttachments, setShowAttachments] = useState(false)
-  const [leadsInDevolucion, setLeadsInDevolucion] = useState<LeadDevolucion[] | null>(null)
-  const [leadsInTramite, setLeadsInTramite] = useState<LeadDevolucion[] | null>(null)
+
   const [archivosDevolucion, setArchivosDevolucion] = useState<Array<{
     id: number
     devolucion_id: number
@@ -35,27 +35,10 @@ const Devoluciones = () => {
     urlTemporal: string | null
   }>>([])
   const [cargandoArchivos, setCargandoArchivos] = useState(false)
-  const { user, userEmpresaId } = useAuthStore()
+  const { user } = useAuthStore()
   const { loadDevoluciones, loadDevolucionArchivos } = useLeadsStore()
 
-  // Cargar devoluciones desde la base de datos
-  useEffect(() => {
-    const loadDevolucionesData = async () => {
-      if (!user) return
-
-      try {
-        const { leadsInDevolucion, leadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(leadsInDevolucion)
-        setLeadsInTramite(leadsInTramite)
-      } catch (error) {
-        console.error('Error loading devoluciones:', error)
-        setLeadsInDevolucion([])
-        setLeadsInTramite([])
-      }
-    }
-
-    loadDevolucionesData()
-  }, [user, userEmpresaId, loadDevoluciones])
+  console.log('devoluciones')
 
   const handleFinishDevolucion = (lead: LeadDevolucion) => {
     setSelectedLead(lead)

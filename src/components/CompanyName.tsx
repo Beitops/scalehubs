@@ -7,7 +7,7 @@ interface CompanyNameProps {
   showLoading?: boolean
 }
 
-const CompanyName = ({ cif, fallback = 'Empresa', className = '', showLoading = false }: CompanyNameProps) => {
+const CompanyName = ({ cif, className = '', showLoading = false }: CompanyNameProps) => {
   const { companyName, isLoading, error } = useCompanyName(cif)
 
   if (isLoading && showLoading) {
@@ -20,7 +20,7 @@ const CompanyName = ({ cif, fallback = 'Empresa', className = '', showLoading = 
 
   return (
     <span className={className}>
-      {companyName || fallback}
+      {companyName}
     </span>
   )
 }

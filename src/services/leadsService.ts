@@ -13,6 +13,7 @@ export interface Lead {
   hub_id?: number
   plataforma_lead_id?: string
   fecha_asignacion?: string
+  plataforma_lead?: string
 }
 
 export interface CreateLeadData {
@@ -24,6 +25,13 @@ export interface CreateLeadData {
   hub_id?: number
   plataforma_lead_id?: string
   estado_temporal?: string
+}
+export interface LeadDevolucion extends Lead {
+  audio_devolucion?: string
+  imagen_devolucion?: string
+  motivo?: string
+  observaciones_admin?: string
+  devolucion_id?: number
 }
 
 class LeadsService {

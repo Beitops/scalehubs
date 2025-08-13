@@ -1,25 +1,30 @@
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
+import type { Lead } from '../services/leadsService'
 
-const Dashboard = () => {
+interface DashboardProps {
+  activeLeads: Lead[]
+  leadsInDevolucion: Lead[]
+  leadsInTramite: Lead[]
+}
+
+const Dashboard = ({ activeLeads, leadsInDevolucion, leadsInTramite }: DashboardProps) => {
   const { user, userEmpresaNombre } = useAuthStore()
-  const { leads, loading } = useLeadsStore()
-
-  // Filtrar leads que no estén en devolución
-  const activeLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
-
+  const { loading } = useLeadsStore()
+  console.log('dashboard')
   // Calcular estadísticas basadas en los leads reales
   const totalLeads = activeLeads.length
   const leadsThisMonth = activeLeads.filter(lead => {
-    const leadDate = new Date(lead.fecha_entrada)
-    const now = new Date()
-    return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear()
+    const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const leadDate = new Date(lead.fecha_entrada).getTime()
+    return new Date(leadDate).getTime() >= hace30Dias.getTime() ? lead : null
   }).length
-
   const platformDistribution = activeLeads.reduce((acc, lead) => {
-    acc[lead.plataforma] = (acc[lead.plataforma] || 0) + 1
+    acc[lead.plataforma_lead || ''] = (acc[lead.plataforma_lead || ''] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  const leadsBuenos = user?.role !== 'admin' ? leadsInDevolucion.length / (activeLeads.length || 1) * 100 : leadsInTramite.length / (activeLeads.length || 1) * 100
 
   const stats = [
     {
@@ -39,8 +44,8 @@ const Dashboard = () => {
       color: 'bg-green-500'
     },
     {
-      title: 'Porcentaje Leads Buenos',
-      value: '92.8%',
+      title: user?.role === 'admin' ? 'Porcentaje Leads en Tramite' : 'Porcentaje Leads en Devolución',
+      value: `${leadsBuenos.toFixed(2)}%`,
       change: '+2.1%',
       changeType: 'positive' as const,
       icon: '✅',
@@ -76,8 +81,8 @@ const Dashboard = () => {
       <div className="mb-6 lg:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Dashboard</h1>
         <p className="text-gray-600 mt-2 text-sm sm:text-base">
-          {user?.role === 'admin' 
-            ? 'Bienvenido a ScaleHubs - Resumen general del sistema' 
+          {user?.role === 'admin'
+            ? 'Bienvenido a ScaleHubs - Resumen general del sistema'
             : `Bienvenido a ScaleHubs - Resumen de ${userEmpresaNombre || user?.company || 'tu empresa'}`
           }
         </p>
@@ -104,9 +109,8 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="mt-3 sm:mt-4">
-              <span className={`text-xs sm:text-sm font-medium ${
-                stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <span className={`text-xs sm:text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+                }`}>
                 {stat.change}
               </span>
               <span className="text-xs sm:text-sm text-gray-500 ml-1">vs mes anterior</span>
@@ -154,7 +158,7 @@ const Dashboard = () => {
                 const percentage = totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0
                 const colors = ['bg-blue-500', 'bg-[#18cb96]', 'bg-purple-500', 'bg-orange-500', 'bg-red-500']
                 const color = colors[index % colors.length]
-                
+
                 return (
                   <div key={platform} className="flex items-center justify-between">
                     <div className="flex items-center">
