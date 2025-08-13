@@ -17,7 +17,7 @@ interface AuthState {
     logout: () => void
     clearError: () => void
     checkAuth: () => Promise<void>
-    getUserEmpresaInfo: () => Promise<void>
+    getUserEmpresaInfo: () => Promise<{ userEmpresaId: number | null; userEmpresaNombre: string }>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -33,8 +33,7 @@ export const useAuthStore = create<AuthState>()(
 
                 getUserEmpresaInfo: async () => {
                     const { user } = get()
-                    if (!user?.id) return
-
+                    if (!user?.id) return { userEmpresaId: null, userEmpresaNombre: '' }
 
                     try {
                         const { data: profile, error: profileError } = await supabase
@@ -43,11 +42,7 @@ export const useAuthStore = create<AuthState>()(
                             .eq('user_id', user.id)
                             .single()
 
-
                         if (!profileError && profile?.empresa_id) {
-
-                            set({ userEmpresaId: profile.empresa_id })
-
                             // Obtener nombre de la empresa
                             const { data: empresa, error: empresaError } = await supabase
                                 .from('empresas')
@@ -55,18 +50,19 @@ export const useAuthStore = create<AuthState>()(
                                 .eq('id', profile.empresa_id)
                                 .single()
 
-
                             if (!empresaError && empresa) {
-                                set({ userEmpresaNombre: empresa.nombre })
+                                return { userEmpresaId: profile.empresa_id, userEmpresaNombre: empresa.nombre }
+                            } else {
+                                return { userEmpresaId: profile.empresa_id, userEmpresaNombre: '' }
                             }
                         } else {
-                            // Si no hay empresa_id o hay error, establecer valores por defecto
-                            set({ userEmpresaId: null, userEmpresaNombre: '' })
+                            // Si no hay empresa_id o hay error, retornar valores por defecto
+                            return { userEmpresaId: null, userEmpresaNombre: '' }
                         }
                     } catch (error) {
                         console.error('Error getting user empresa info:', error)
-                        // En caso de error, establecer valores por defecto
-                        set({ userEmpresaId: null, userEmpresaNombre: '' })
+                        // En caso de error, retornar valores por defecto
+                        return { userEmpresaId: null, userEmpresaNombre: '' }
                     }
                 },
 
@@ -89,9 +85,16 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         // Obtener el perfil del usuario desde la tabla profiles
-                        const { data: profile, error: profileError } = await supabase
+                        const { data: profileWithEmpresa, error: profileError } = await supabase
                             .from('profiles')
-                            .select('*')
+                            .select(`
+                                *,
+                                empresas!inner(
+                                    id,
+                                    nombre,
+                                    cif
+                                )
+                            `)
                             .eq('user_id', data.user.id)
                             .single()
 
@@ -100,38 +103,29 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('Perfil de usuario no encontrado')
                         }
 
-                        // Obtener el CIF de la empresa si hay empresa_id
-                        let companyCif = ''
-                        if (profile.empresa_id) {
-                            const { data: empresa, error: empresaError } = await supabase
-                                .from('empresas')
-                                .select('cif')
-                                .eq('id', profile.empresa_id)
-                                .single()
-                            
-                            if (!empresaError && empresa) {
-                                companyCif = empresa.cif
-                            }
-                        }
+                        // Extraer información de la empresa
+                        const empresa = profileWithEmpresa.empresas
+                        const companyCif = empresa?.cif || ''
+                        const userEmpresaId = empresa?.id || null
+                        const userEmpresaNombre = empresa?.nombre || ''
 
                         // Crear objeto de usuario para el frontend
                         const frontendUser: FrontendUser = {
-                            id: profile.user_id,
-                            name: profile.nombre || 'Usuario',
+                            id: profileWithEmpresa.user_id,
+                            name: profileWithEmpresa.nombre || 'Usuario',
                             email: data.user.email || '',
                             company: companyCif,
-                            role: roleConverter.backendToFrontend(profile.es_admin)
+                            role: roleConverter.backendToFrontend(profileWithEmpresa.es_admin)
                         }
 
                         set({
                             user: frontendUser,
                             isAuthenticated: true,
                             isLoading: false,
-                            error: null
+                            error: null,
+                            userEmpresaId: userEmpresaId,
+                            userEmpresaNombre: userEmpresaNombre
                         })
-
-                        // Obtener información de la empresa después del login
-                        await get().getUserEmpresaInfo()
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -168,9 +162,16 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         // Obtener el perfil existente (ya creado por la edge function)
-                        const { data: profile, error: profileError } = await supabase
+                        const { data: profileWithEmpresa, error: profileError } = await supabase
                             .from('profiles')
-                            .select('*')
+                            .select(`
+                                *,
+                                empresas!inner(
+                                    id,
+                                    nombre,
+                                    cif
+                                )
+                            `)
                             .eq('user_id', updatedUser.id)
                             .single()
 
@@ -179,38 +180,29 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('Perfil de usuario no encontrado')
                         }
 
-                        // Obtener el CIF de la empresa si hay empresa_id
-                        let companyCif = ''
-                        if (profile.empresa_id) {
-                            const { data: empresa, error: empresaError } = await supabase
-                                .from('empresas')
-                                .select('cif')
-                                .eq('id', profile.empresa_id)
-                                .single()
-                            
-                            if (!empresaError && empresa) {
-                                companyCif = empresa.cif
-                            }
-                        }
+                        // Extraer información de la empresa
+                        const empresa = profileWithEmpresa.empresas
+                        const companyCif = empresa?.cif || ''
+                        const userEmpresaId = empresa?.id || null
+                        const userEmpresaNombre = empresa?.nombre || ''
 
                         // Crear objeto de usuario para el store
                         const frontendUser: FrontendUser = {
                             id: updatedUser.id,
-                            name: profile.nombre || 'Usuario',
+                            name: profileWithEmpresa.nombre || 'Usuario',
                             email: email,
-                            company: companyCif, // Mantener el CIF para el frontend
-                            role: roleConverter.backendToFrontend(profile.es_admin)
+                            company: companyCif,
+                            role: roleConverter.backendToFrontend(profileWithEmpresa.es_admin)
                         }
 
                         set({
                             user: frontendUser,
                             isAuthenticated: true,
                             isLoading: false,
-                            error: null
+                            error: null,
+                            userEmpresaId: userEmpresaId,
+                            userEmpresaNombre: userEmpresaNombre
                         })
-
-                        // Obtener información de la empresa después del signup
-                        await get().getUserEmpresaInfo()
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -253,10 +245,17 @@ export const useAuthStore = create<AuthState>()(
                         const { data: { session } } = await supabase.auth.getSession()
                         
                         if (session?.user) {
-                            // Obtener el perfil del usuario desde la tabla profiles
-                            const { data: profile, error: profileError } = await supabase
+                            // Obtener el perfil del usuario y la información de la empresa en una sola consulta
+                            const { data: profileWithEmpresa, error: profileError } = await supabase
                                 .from('profiles')
-                                .select('*')
+                                .select(`
+                                    *,
+                                    empresas!inner(
+                                        id,
+                                        nombre,
+                                        cif
+                                    )
+                                `)
                                 .eq('user_id', session.user.id)
                                 .single()
 
@@ -271,36 +270,30 @@ export const useAuthStore = create<AuthState>()(
                                 return
                             }
 
-                            // Obtener el CIF de la empresa si hay empresa_id
-                            let companyCif = ''
-                            if (profile.empresa_id) {
-                                const { data: empresa, error: empresaError } = await supabase
-                                    .from('empresas')
-                                    .select('cif')
-                                    .eq('id', profile.empresa_id)
-                                    .single()
-                                
-                                if (!empresaError && empresa) {
-                                    companyCif = empresa.cif
-                                }
-                            }
+                            // Extraer información de la empresa
+                            const empresa = profileWithEmpresa.empresas
+                            const companyCif = empresa?.cif || ''
+                            const userEmpresaId = empresa?.id || null
+                            const userEmpresaNombre = empresa?.nombre || ''
+
+                            console.log(companyCif)
 
                             // Usar datos del perfil
                             const frontendUser: FrontendUser = {
-                                id: profile.user_id,
-                                name: profile.nombre || 'Usuario',
+                                id: profileWithEmpresa.user_id,
+                                name: profileWithEmpresa.nombre || 'Usuario',
                                 email: session.user.email || '',
-                                company: companyCif, // CIF de la empresa
-                                role: roleConverter.backendToFrontend(profile.es_admin)
+                                company: companyCif,
+                                role: roleConverter.backendToFrontend(profileWithEmpresa.es_admin)
                             }
+                            
                             set({
                                 user: frontendUser,
                                 isAuthenticated: true,
-                                isLoading: false
+                                isLoading: false,
+                                userEmpresaId: userEmpresaId,
+                                userEmpresaNombre: userEmpresaNombre
                             })
-
-                            // Obtener información de la empresa después del checkAuth y esperar a que termine
-                            await get().getUserEmpresaInfo()
                         } else {
                             set({
                                 user: null,
