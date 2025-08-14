@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { leadsService, type Lead } from '../services/leadsService'
+import { leadsService, type Lead, type LeadDevolucion } from '../services/leadsService'
 import { useAuthStore } from './authStore'
 import { supabase } from '../lib/supabase'
 import { platformConverter } from '../utils/platformConverter'
@@ -30,6 +30,8 @@ interface LeadsState {
   isInitialized: boolean
   reloadKey: number
   devoluciones: Devolucion[]
+  leadsInDevolucion: LeadDevolucion[]
+  leadsInTramite: LeadDevolucion[]
   getLeadsByCompany: (empresaId: number) => Promise<Lead[]>
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
@@ -38,7 +40,7 @@ interface LeadsState {
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
   triggerReload: () => void
-  loadDevoluciones: () => Promise<{ leadsInDevolucion: Lead[], leadsInTramite: Lead[] }>
+  loadDevoluciones: () => Promise<void>
   loadDevolucionArchivos: (devolucionId: number) => Promise<Array<{
     id: number
     devolucion_id: number
@@ -57,21 +59,24 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   isInitialized: false,
   reloadKey: 0,
   devoluciones: [],
+  leadsInDevolucion: [],
+  leadsInTramite: [],
 
   loadInitialLeads: async () => {
-
     const { user, userEmpresaId } = useAuthStore.getState()
-    
+
     if (!user) return
     // Evitar cargar si ya está inicializado
     if (get().isInitialized) return
 
     set({ loading: true, error: null })
     try {
-      if (user.role === 'admin') {
+      if (user?.role === 'admin') {
+
         await get().loadLeads()
-      } else if (userEmpresaId) {
-        await get().loadLeads(userEmpresaId)
+      } else if (user?.role === 'client' && userEmpresaId) {
+
+        await get().loadLeads(userEmpresaId || undefined)
       } else {
         // Si el usuario no es admin y no tiene empresa_id, mostrar error
         console.error('❌ User without company assigned:', user)
@@ -180,7 +185,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     const { user, userEmpresaId } = useAuthStore.getState()
     
     if (!user) {
-      return { leadsInDevolucion: [], leadsInTramite: [] }
+      set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
     }
 
     try {
@@ -207,20 +212,18 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
       if (error) {
         console.error('Error loading devoluciones:', error)
-        set({ devoluciones: [] })
-        return { leadsInDevolucion: [], leadsInTramite: [] }
+        set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
       }
 
       // Filtrar por empresa_id si el usuario no es admin
       let filteredData = data || []
-      if (user.role !== 'admin' && userEmpresaId) {
+      if (user?.role !== 'admin' && userEmpresaId) {
         filteredData = filteredData.filter(d => d.lead?.empresa_id === userEmpresaId)
       }
 
-      set({ devoluciones: filteredData })
 
       // Filtrar según el rol del usuario
-      if (user.role === 'admin') {
+      if (user?.role === 'admin') {
         // Para admin: mostrar solo las que tengan estado 'tramite'
         const tramiteDevoluciones = filteredData.filter(d => d.estado === 'tramite') || []
         const leadsInTramite = tramiteDevoluciones.map(d => ({
@@ -232,7 +235,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           devolucion_id: d.id
         }))
         
-        return { leadsInDevolucion: [], leadsInTramite }
+        set({ devoluciones: filteredData, leadsInTramite })
       } else {
         // Para clientes: mostrar solo las que tengan estado 'pendiente'
         const pendienteDevoluciones = filteredData.filter(d => d.estado === 'pendiente') || []
@@ -245,12 +248,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           devolucion_id: d.id
         }))
         
-        return { leadsInDevolucion, leadsInTramite: [] }
+        set({ devoluciones: filteredData, leadsInDevolucion })
       }
     } catch (error) {
       console.error('Error loading devoluciones:', error)
-      set({ devoluciones: [] })
-      return { leadsInDevolucion: [], leadsInTramite: [] }
+      set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
     }
   },
 

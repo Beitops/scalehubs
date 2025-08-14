@@ -440,14 +440,14 @@ const Empresas = () => {
 
       {/* Modal Añadir Empresa */}
       {showAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 flex items-start sm:items-center justify-center z-[9999] p-2 sm:p-4">
           <div className="fixed inset-0 bg-black opacity-50" onClick={() => setShowAddModal(false)} />
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-2 sm:mx-0 p-4 sm:p-6 relative z-10 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto mt-4 sm:mt-0">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-xl font-bold text-[#373643]">Añadir Nueva Empresa</h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
+                className="text-gray-400 hover:text-gray-600 p-1 -mr-1"
               >
                 <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -455,9 +455,9 @@ const Empresas = () => {
               </button>
             </div>
 
-            <form onSubmit={handleAddCompany} className="space-y-4">
+            <form onSubmit={handleAddCompany} className="space-y-3 sm:space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="name" className="block text-sm font-medium text-[#373643] mb-1 sm:mb-2">
                   Nombre de la empresa *
                 </label>
                 <input
@@ -473,7 +473,7 @@ const Empresas = () => {
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-1 sm:mb-2">
                   Email de contacto
                 </label>
                 <input
@@ -488,7 +488,7 @@ const Empresas = () => {
               </div>
 
               <div>
-                <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-1 sm:mb-2">
                   CIF *
                 </label>
                 <input
@@ -504,7 +504,7 @@ const Empresas = () => {
               </div>
 
               <div>
-                <label htmlFor="volumen_diario" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="volumen_diario" className="block text-sm font-medium text-[#373643] mb-1 sm:mb-2">
                   Volumen diario *
                 </label>
                 <input
@@ -524,7 +524,7 @@ const Empresas = () => {
               </div>
 
               <div>
-                <label htmlFor="prioridad" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="prioridad" className="block text-sm font-medium text-[#373643] mb-1 sm:mb-2">
                   Prioridad *
                 </label>
                 <select
@@ -543,18 +543,18 @@ const Empresas = () => {
                 </select>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="w-full sm:flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full sm:flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">

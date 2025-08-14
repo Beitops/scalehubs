@@ -9,11 +9,9 @@ import { supabase } from '../lib/supabase'
 interface DevolucionesProps {
   leadsInDevolucion: LeadDevolucion[]
   leadsInTramite: LeadDevolucion[]
-  setLeadsInDevolucion: (leads: LeadDevolucion[]) => void
-  setLeadsInTramite: (leads: LeadDevolucion[]) => void
 }
 
-const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion, setLeadsInTramite }: DevolucionesProps) => {
+const Devoluciones = ({ leadsInDevolucion, leadsInTramite }: DevolucionesProps) => {
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [showProcessModal, setShowProcessModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<LeadDevolucion | null>(null)
@@ -51,12 +49,12 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
     setAdminObservations('')
     setShowAttachments(false)
     setCargandoArchivos(true)
-    
+
     // Cargar archivos adjuntos si existe devolucion_id
     if (lead.devolucion_id) {
       try {
         const archivos = await loadDevolucionArchivos(lead.devolucion_id)
-        
+
         // Crear URLs temporales para cada archivo
         const archivosConUrls = await Promise.all(
           archivos.map(async (archivo) => {
@@ -67,17 +65,17 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
               if (archivo.ruta_archivo.includes('/')) {
                 nombreArchivo = archivo.ruta_archivo.split('/').pop() || archivo.nombre_archivo
               }
-              
+
               // Crear URL temporal para el archivo privado
               const { data: signedUrl, error: urlError } = await supabase.storage
                 .from('pruebas')
                 .createSignedUrl(nombreArchivo, 3600) // URL válida por 1 hora
-              
+
               if (urlError) {
                 console.error('Error creando URL temporal:', urlError)
                 return { ...archivo, urlTemporal: null }
               }
-              
+
               return { ...archivo, urlTemporal: signedUrl.signedUrl }
             } catch (error) {
               console.error('Error procesando archivo:', error)
@@ -85,7 +83,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
             }
           })
         )
-        
+
         setArchivosDevolucion(archivosConUrls)
       } catch (error) {
         console.error('Error loading archivos:', error)
@@ -107,7 +105,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
         let audioFileName = ''
         if (returnForm.audio) {
           audioFileName = `devolucion_${selectedLead.id}_audio_${Date.now()}.${returnForm.audio.name.split('.').pop()}`
-          const {error: audioError } = await supabase.storage
+          const { error: audioError } = await supabase.storage
             .from('pruebas')
             .upload(audioFileName, returnForm.audio)
 
@@ -195,9 +193,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
 
 
         // Recargar devoluciones después de la actualización exitosa
-        const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(newLeadsInDevolucion)
-        setLeadsInTramite(newLeadsInTramite)
+        await loadDevoluciones()
 
         setShowFinishModal(false)
         setSelectedLead(null)
@@ -243,9 +239,8 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
 
 
         // Recargar devoluciones después de la actualización exitosa
-        const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(newLeadsInDevolucion)
-        setLeadsInTramite(newLeadsInTramite)
+        await loadDevoluciones()
+
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -304,9 +299,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
 
 
         // Recargar devoluciones después de la actualización exitosa
-        const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(newLeadsInDevolucion)
-        setLeadsInTramite(newLeadsInTramite)
+        await loadDevoluciones()
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -352,9 +345,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
 
 
         // Recargar devoluciones después de la actualización exitosa
-        const { leadsInDevolucion: newLeadsInDevolucion, leadsInTramite: newLeadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(newLeadsInDevolucion)
-        setLeadsInTramite(newLeadsInTramite)
+        await loadDevoluciones()
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -825,11 +816,10 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
                             <p className="text-sm font-medium text-[#373643]">
                               {archivo.nombre_archivo || `Archivo ${index + 1}`}
                             </p>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              archivo.tipo === 'audio' 
-                                ? 'bg-blue-100 text-blue-800' 
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${archivo.tipo === 'audio'
+                                ? 'bg-blue-100 text-blue-800'
                                 : 'bg-green-100 text-green-800'
-                            }`}>
+                              }`}>
                               {archivo.tipo === 'audio' ? '🎵 Audio' : '🖼️ Imagen'}
                             </span>
                           </div>
@@ -842,7 +832,7 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite, setLeadsInDevolucion,
                                   Tu navegador no soporta el elemento de audio.
                                 </audio>
                               ) : (
-                                <img 
+                                <img
                                   src={archivo.urlTemporal}
                                   alt="Archivo adjunto"
                                   className="max-w-full h-auto rounded"

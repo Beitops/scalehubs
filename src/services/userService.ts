@@ -1,6 +1,7 @@
 import axiosInstance from '../api/axiosConfig'
 import { roleConverter } from '../utils/roleConverter'
 import { supabase } from '../lib/supabase'
+import type { DatabaseProfile } from '../types/database'
 
 
 export interface NewUserData {
@@ -125,5 +126,53 @@ export const userService = {
     } catch (error: any) {
       throw new Error('Error al obtener usuarios: ' + (error.message || 'Error desconocido'))
     }
+  }
+} 
+
+// Función para obtener todos los usuarios (solo para admins)
+export const getAllUsers = async (): Promise<DatabaseProfile[]> => {
+  try {
+    const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      *,
+      empresa:empresas!profiles_empresa_id_fkey (
+        id,
+        nombre,
+        cif
+      )
+    `)
+      .order('fecha_creacion', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching users:', error)
+      throw error
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('Error in getAllUsers:', error)
+    throw error
+  }
+}
+
+// Función para obtener usuarios por empresa (para clientes)
+export const getUsersByCompany = async (empresaId: number): Promise<DatabaseProfile[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('fecha_creacion', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching company users:', error)
+      throw error
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('Error in getUsersByCompany:', error)
+    throw error
   }
 } 

@@ -3,11 +3,15 @@ import Auth from './components/Auth'
 import Register from './components/Register'
 import Platform from './components/Platform'
 import ProtectedRoute from './components/ProtectedRoute'
+import { useSupabaseAuthListener } from './hooks/useSupabaseAuthListener'
+
 
 
 
 
 function App() {
+  console.log('App')
+  useSupabaseAuthListener()
 
   return (
     <Router>

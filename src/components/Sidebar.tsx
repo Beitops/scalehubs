@@ -31,6 +31,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
   // Menú adicional solo para admins
   const adminMenuItems = [
     { id: 'empresas', label: 'Empresas', icon: '🏢' },
+    { id: 'usuarios', label: 'Usuarios', icon: '👤' },
   ]
 
   // Combinar menús según el rol del usuario

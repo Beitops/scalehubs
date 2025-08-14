@@ -4,11 +4,9 @@ import type { Lead } from '../services/leadsService'
 
 interface DashboardProps {
   activeLeads: Lead[]
-  leadsInDevolucion: Lead[]
-  leadsInTramite: Lead[]
 }
 
-const Dashboard = ({ activeLeads, leadsInDevolucion, leadsInTramite }: DashboardProps) => {
+const Dashboard = ({ activeLeads }: DashboardProps) => {
   const { user, userEmpresaNombre } = useAuthStore()
   const { loading } = useLeadsStore()
   console.log('dashboard')
@@ -24,7 +22,6 @@ const Dashboard = ({ activeLeads, leadsInDevolucion, leadsInTramite }: Dashboard
     return acc
   }, {} as Record<string, number>)
 
-  const leadsBuenos = user?.role !== 'admin' ? leadsInDevolucion.length / (activeLeads.length || 1) * 100 : leadsInTramite.length / (activeLeads.length || 1) * 100
 
   const stats = [
     {
@@ -45,7 +42,7 @@ const Dashboard = ({ activeLeads, leadsInDevolucion, leadsInTramite }: Dashboard
     },
     {
       title: user?.role === 'admin' ? 'Porcentaje Leads en Tramite' : 'Porcentaje Leads en Devolución',
-      value: `${leadsBuenos.toFixed(2)}%`,
+      value: `30%`,
       change: '+2.1%',
       changeType: 'positive' as const,
       icon: '✅',

@@ -4,12 +4,14 @@ import Dashboard from './Dashboard'
 import Leads from './Leads'
 import Devoluciones from './Devoluciones'
 import Empresas from './Empresas'
+import Usuarios from './Usuarios'
 import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
 import { useLeadsStore } from '../store/leadsStore'
-import type { LeadDevolucion, Lead } from '../services/leadsService'
+import type { Lead } from '../services/leadsService'
+
 
 
 const Platform = () => {
@@ -28,52 +30,62 @@ const Platform = () => {
     cif: '' // Movido después del rol
   })
   const [activeLeads, setActiveLeads] = useState<Lead[] | null>(null)
-  const [leadsInDevolucion, setLeadsInDevolucion] = useState<LeadDevolucion[] | null>(null)
-  const [leadsInTramite, setLeadsInTramite] = useState<LeadDevolucion[] | null>(null)
+
 
   const { user, logout, checkAuth } = useAuthStore()
-  const { loadInitialLeads, loadDevoluciones, isInitialized } = useLeadsStore()
+  const { loadInitialLeads, loadDevoluciones, isInitialized, leadsInDevolucion, leadsInTramite } = useLeadsStore()
 
-  console.log('platform')
   // Cargar leads cuando el usuario esté autenticado
   useEffect(() => {
+
+    if (!user) return
+
+    let isReady = true
     const loadInitialLoadsAndDevoluciones = async () => {
 
-        await checkAuth()
-        await loadInitialLeads()
+      if (isReady) {
 
-      // Obtener los leads directamente del store después de cargarlos
-      const currentLeads = useLeadsStore.getState().leads
 
-      const newActiveLeads = currentLeads.filter(lead => lead.estado_temporal !== 'devolucion')
-      setActiveLeads(newActiveLeads)
+        try {
 
-      try {
-        const { leadsInDevolucion, leadsInTramite } = await loadDevoluciones()
-        setLeadsInDevolucion(leadsInDevolucion)
-        setLeadsInTramite(leadsInTramite)
-      } catch (error) {
-        console.error('Error loading devoluciones:', error)
-        setLeadsInDevolucion([])
-        setLeadsInTramite([])
+          await loadInitialLeads()
+
+          const currentLeads = useLeadsStore.getState().leads
+
+          const newActiveLeads = currentLeads.filter(lead => lead.estado_temporal !== 'devolucion')
+          setActiveLeads(newActiveLeads)
+          loadDevoluciones()
+
+        } catch (error) {
+          console.error('Error loading data:', error)
+
+        }
       }
+
+      return () => {
+        isReady = false
+      }
+
     }
 
     loadInitialLoadsAndDevoluciones()
-  }, [checkAuth, loadInitialLeads, loadDevoluciones])
+  }, [checkAuth, loadInitialLeads, loadDevoluciones, user])
 
 
   const renderSection = () => {
     switch (currentSection) {
       case 'dashboard':
-        return <Dashboard activeLeads={activeLeads || []} leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} />
+        return <Dashboard activeLeads={activeLeads || []} />
       case 'leads':
         return <Leads activeLeads={activeLeads || []} />
       case 'devoluciones':
-        return <Devoluciones leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} setLeadsInDevolucion={setLeadsInDevolucion} setLeadsInTramite={setLeadsInTramite} />
+        return <Devoluciones leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} />
       case 'empresas':
         return <Empresas />
-
+      case 'usuarios':
+        return <Usuarios />
+      default:
+        return <Dashboard activeLeads={activeLeads || []} />
     }
   }
 
