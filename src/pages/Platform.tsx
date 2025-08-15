@@ -1,23 +1,15 @@
 import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar'
-import Dashboard from './Dashboard'
-import Leads from './Leads'
-import Devoluciones from './Devoluciones'
-import Empresas from './Empresas'
-import Usuarios from './Usuarios'
 import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
 import { useLeadsStore } from '../store/leadsStore'
-
-
-
+import { Outlet } from 'react-router-dom'
 
 
 const Platform = () => {
   
-  const [currentSection, setCurrentSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
@@ -69,22 +61,6 @@ const Platform = () => {
   }, [checkAuth, loadInitialLeads, loadDevoluciones, user])
 
 
-  const renderSection = () => {
-    switch (currentSection) {
-      case 'dashboard':
-        return <Dashboard />
-      case 'leads':
-        return <Leads />
-      case 'devoluciones':
-        return <Devoluciones />
-      case 'empresas':
-        return <Empresas />
-      case 'usuarios':
-        return <Usuarios />
-      default:
-        return <Dashboard />
-    }
-  }
 
 
   const handleAddUser = async (e: React.FormEvent) => {
@@ -231,8 +207,6 @@ const Platform = () => {
         <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}>
           <Sidebar
-            currentSection={currentSection}
-            setCurrentSection={setCurrentSection}
             onClose={handleCloseSidebar}
             sidebarOpen={sidebarOpen}
             user={user}
@@ -262,7 +236,7 @@ const Platform = () => {
           </header>
 
           <main className="flex-1 overflow-auto">
-            {renderSection()}
+            <Outlet />
           </main>
         </div>
       </div>

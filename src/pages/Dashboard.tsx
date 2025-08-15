@@ -4,6 +4,7 @@ import { useLeadsStore } from '../store/leadsStore'
 
 
 const Dashboard = () => {
+  console.log('Dashboard')
   const { user, userEmpresaNombre } = useAuthStore()
   const { loading, activeLeads } = useLeadsStore()
   // Calcular estadísticas basadas en los leads reales

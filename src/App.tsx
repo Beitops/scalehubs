@@ -4,6 +4,11 @@ import Register from './pages/Register'
 import Platform from './pages/Platform'
 import ProtectedRoute from './pages/ProtectedRoute'
 import { useSupabaseAuthListener } from './hooks/useSupabaseAuthListener'
+import Dashboard from './pages/Dashboard'
+import Leads from './pages/Leads'
+import Devoluciones from './pages/Devoluciones'
+import Empresas from './pages/Empresas'
+import Usuarios from './pages/Usuarios'
 
 
 
@@ -30,7 +35,13 @@ function App() {
               <Platform />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/leads" element={<Leads />} />
+          <Route path="/devoluciones" element={<Devoluciones />} />
+          <Route path="/empresas" element={<Empresas />} />
+          <Route path="/usuarios" element={<Usuarios />} />
+        </Route>
 
         {/* Redirect to auth if no route matches */}
         <Route path="*" element={<Navigate to="/auth" replace />} />

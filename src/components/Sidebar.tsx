@@ -1,4 +1,5 @@
 
+import { NavLink } from 'react-router-dom'
 import CompanyName from './CompanyName'
 
 interface User {
@@ -10,8 +11,6 @@ interface User {
 }
 
 interface SidebarProps {
-  currentSection: string
-  setCurrentSection: (section: string) => void
   onClose: () => void
   sidebarOpen?: boolean
   user?: User | null
@@ -19,28 +18,25 @@ interface SidebarProps {
   onAddUser?: () => void
 }
 
-const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, onAddUser }: SidebarProps) => {
-  
+const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
+
   // Menú base para todos los usuarios
   const baseMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'leads', label: 'Leads', icon: '👥' },
-    { id: 'devoluciones', label: 'Devoluciones', icon: '📦' },
-  ]
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', to: '/' },
+    { id: 'leads', label: 'Leads', icon: '👥', to: '/leads' },
+    { id: 'devoluciones', label: 'Devoluciones', icon: '📦', to: '/devoluciones' },
+  ];
 
-  // Menú adicional solo para admins
   const adminMenuItems = [
-    { id: 'empresas', label: 'Empresas', icon: '🏢' },
-    { id: 'usuarios', label: 'Usuarios', icon: '👤' },
-  ]
+    { id: 'empresas', label: 'Empresas', icon: '🏢', to: '/empresas' },
+    { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' },
+  ];
 
-  // Combinar menús según el rol del usuario
-  const menuItems = user?.role === 'admin' 
+  const menuItems = user?.role === 'admin'
     ? [...baseMenuItems, ...adminMenuItems]
-    : baseMenuItems
+    : baseMenuItems;
 
-  const handleMenuClick = (section: string) => {
-    setCurrentSection(section)
+  const handleMenuClick = () => {
     // Close sidebar on mobile after menu selection
     onClose()
   }
@@ -68,16 +64,20 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
         <ul className="space-y-2 px-4">
           {menuItems.map((item) => (
             <li key={item.id}>
-              <button
-                onClick={() => handleMenuClick(item.id)}
-                className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors ${currentSection === item.id
-                  ? 'bg-[#18cb96] text-white'
-                  : 'text-[#373643] hover:bg-gray-100'
-                  }`}
+              <NavLink
+                to={item.to}
+                onClick={() => handleMenuClick()}
+                end={item.id === 'dashboard'}
+                className={({ isActive }) =>
+                  `w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors ${isActive
+                    ? 'bg-[#18cb96] text-white'
+                    : 'text-[#373643] hover:bg-gray-100'
+                  }`
+                }
               >
                 <span className="mr-3 text-lg">{item.icon}</span>
                 <span className="font-medium">{item.label}</span>
-              </button>
+              </NavLink>
             </li>
           ))}
         </ul>
@@ -107,7 +107,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
             <p className="text-xs text-gray-500 truncate">{user?.email || 'usuario@empresa.com'}</p>
             {user?.role !== 'admin' && (
               <p className="text-xs text-gray-400 truncate">
-                <CompanyName cif={user?.company}/>
+                <CompanyName cif={user?.company} />
               </p>
             )}
             <p className="text-xs text-[#18cb96] font-medium capitalize">
@@ -115,7 +115,7 @@ const Sidebar = ({ currentSection, setCurrentSection, onClose, user, onLogout, o
             </p>
           </div>
         </div>
-        
+
         {/* Logout Button */}
         <button
           onClick={onLogout}
