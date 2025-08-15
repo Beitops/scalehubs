@@ -1,8 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Auth from './components/Auth'
-import Register from './components/Register'
-import Platform from './components/Platform'
-import ProtectedRoute from './components/ProtectedRoute'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import Auth from './pages/Auth'
+import Register from './pages/Register'
+import Platform from './pages/Platform'
+import ProtectedRoute from './pages/ProtectedRoute'
 import { useSupabaseAuthListener } from './hooks/useSupabaseAuthListener'
 
 
@@ -14,7 +14,7 @@ function App() {
   useSupabaseAuthListener()
 
   return (
-    <Router>
+
       <Routes>
         {/* Auth route */}
         <Route path="/auth" element={<Auth />} />
@@ -35,7 +35,7 @@ function App() {
         {/* Redirect to auth if no route matches */}
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
-    </Router>
+
   )
 }
 

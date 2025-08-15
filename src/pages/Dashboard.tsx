@@ -130,7 +130,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
                     <span className="inline-block px-2 py-1 text-xs font-medium bg-[#18cb96] text-white rounded-full">
-                      {lead.plataforma}
+                      {lead.plataforma_lead}
                     </span>
                     <p className="text-xs text-gray-500 mt-1">{new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>

@@ -85,7 +85,8 @@ class LeadsService {
 
       return data?.map(lead => ({
         ...lead,
-        empresa_nombre: lead.empresas?.nombre
+        empresa_nombre: lead.empresas?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma|| '')
       })) || []
     } catch (error) {
       console.error('Error in getAllLeads:', error)

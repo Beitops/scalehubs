@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import Sidebar from './Sidebar'
+import Sidebar from '../components/Sidebar'
 import Dashboard from './Dashboard'
 import Leads from './Leads'
 import Devoluciones from './Devoluciones'
