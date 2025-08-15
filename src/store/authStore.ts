@@ -70,7 +70,6 @@ export const useAuthStore = create<AuthState>()(
                 },
 
                 login: async (email: string, password: string) => {
-                    set({ isLoading: true, error: null })
 
                     try {
                         // Iniciar sesión con Supabase
@@ -87,7 +86,7 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('No se pudo autenticar al usuario')
                         }
 
-                        set({ isAuthenticated: true})
+
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -208,6 +207,7 @@ export const useAuthStore = create<AuthState>()(
 
                     try {
                         if (session?.user && session.user.id) {
+                            set({ isLoading: true, error: null })
                             // Obtener el perfil del usuario y la información de la empresa en una sola consulta
                             const { data: profileWithEmpresa, error: profileError } = await supabase
                                 .from('profiles')
@@ -268,7 +268,8 @@ export const useAuthStore = create<AuthState>()(
                     user: state.user,
                     isAuthenticated: state.isAuthenticated,
                     userEmpresaId: state.userEmpresaId,
-                    userEmpresaNombre: state.userEmpresaNombre
+                    userEmpresaNombre: state.userEmpresaNombre,
+                    session: state.session
                 }), // persist these fields
             }
         ),

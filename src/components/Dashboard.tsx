@@ -1,15 +1,11 @@
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
-import type { Lead } from '../services/leadsService'
 
-interface DashboardProps {
-  activeLeads: Lead[]
-}
 
-const Dashboard = ({ activeLeads }: DashboardProps) => {
+
+const Dashboard = () => {
   const { user, userEmpresaNombre } = useAuthStore()
-  const { loading } = useLeadsStore()
-  console.log('dashboard')
+  const { loading, activeLeads } = useLeadsStore()
   // Calcular estadísticas basadas en los leads reales
   const totalLeads = activeLeads.length
   const leadsThisMonth = activeLeads.filter(lead => {

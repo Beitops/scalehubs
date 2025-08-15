@@ -3,11 +3,9 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 
-interface LeadsProps {
-  activeLeads: Lead[]
-}
 
-const Leads = ({ activeLeads }: LeadsProps) => {
+
+const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
@@ -24,11 +22,12 @@ const Leads = ({ activeLeads }: LeadsProps) => {
     error, 
     refreshLeads, 
     updateLeadStatus, 
-    getLeadsInDateRange 
+    getLeadsInDateRange,
+    activeLeads
   } = useLeadsStore()
 
 
-  console.log('leads')
+
 
   const filteredLeads = activeLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { leadsService, type Lead, type LeadDevolucion } from '../services/leadsService'
 import { useAuthStore } from './authStore'
 import { supabase } from '../lib/supabase'
-import { platformConverter } from '../utils/platformConverter'
+
 
 interface Devolucion {
   id: number
@@ -25,6 +25,7 @@ interface Devolucion {
 
 interface LeadsState {
   leads: Lead[]
+  activeLeads: Lead[]
   loading: boolean
   error: string | null
   isInitialized: boolean
@@ -54,6 +55,7 @@ interface LeadsState {
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
   leads: [],
+  activeLeads: [],
   loading: false,
   error: null,
   isInitialized: false,
@@ -126,10 +128,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         ? await leadsService.getLeadsByCompany(empresaId)
         : await leadsService.getAllLeads()
       
-      const leadsWithPlatformName = leads.map(lead => {
-        return { ...lead, plataforma_lead: platformConverter(lead.plataforma|| '') }
-      })
-      set({ leads: leadsWithPlatformName, loading: false })
+
+      const newActiveLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
+      set({ leads, activeLeads: newActiveLeads, loading: false })
     } catch (error) {
       console.error('Error loading leads:', error)
       set({ 

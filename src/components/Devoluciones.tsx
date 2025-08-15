@@ -5,13 +5,7 @@ import type { LeadDevolucion } from '../services/leadsService'
 import { supabase } from '../lib/supabase'
 
 
-
-interface DevolucionesProps {
-  leadsInDevolucion: LeadDevolucion[]
-  leadsInTramite: LeadDevolucion[]
-}
-
-const Devoluciones = ({ leadsInDevolucion, leadsInTramite }: DevolucionesProps) => {
+const Devoluciones = () => {
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [showProcessModal, setShowProcessModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<LeadDevolucion | null>(null)
@@ -34,9 +28,9 @@ const Devoluciones = ({ leadsInDevolucion, leadsInTramite }: DevolucionesProps) 
   }>>([])
   const [cargandoArchivos, setCargandoArchivos] = useState(false)
   const { user } = useAuthStore()
-  const { loadDevoluciones, loadDevolucionArchivos } = useLeadsStore()
+  const { loadDevoluciones, loadDevolucionArchivos, leadsInDevolucion, leadsInTramite } = useLeadsStore()
 
-  console.log('devoluciones')
+
 
   const handleFinishDevolucion = (lead: LeadDevolucion) => {
     setSelectedLead(lead)

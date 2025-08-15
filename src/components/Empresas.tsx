@@ -18,7 +18,6 @@ const Empresas = () => {
   const [nameFilter, setNameFilter] = useState('')
   const [cifFilter, setCifFilter] = useState('')
   
-  console.log('empresas')
   // Formulario nueva empresa
   const [newCompany, setNewCompany] = useState({
     nombre: '',

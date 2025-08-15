@@ -10,11 +10,13 @@ import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
 import { useLeadsStore } from '../store/leadsStore'
-import type { Lead } from '../services/leadsService'
+
+
 
 
 
 const Platform = () => {
+  
   const [currentSection, setCurrentSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showAddUserModal, setShowAddUserModal] = useState(false)
@@ -29,11 +31,11 @@ const Platform = () => {
     role: 'client' as 'admin' | 'client',
     cif: '' // Movido después del rol
   })
-  const [activeLeads, setActiveLeads] = useState<Lead[] | null>(null)
+
 
 
   const { user, logout, checkAuth } = useAuthStore()
-  const { loadInitialLeads, loadDevoluciones, isInitialized, leadsInDevolucion, leadsInTramite } = useLeadsStore()
+  const { loadInitialLeads, loadDevoluciones, isInitialized } = useLeadsStore()
 
   // Cargar leads cuando el usuario esté autenticado
   useEffect(() => {
@@ -49,11 +51,6 @@ const Platform = () => {
         try {
 
           await loadInitialLeads()
-
-          const currentLeads = useLeadsStore.getState().leads
-
-          const newActiveLeads = currentLeads.filter(lead => lead.estado_temporal !== 'devolucion')
-          setActiveLeads(newActiveLeads)
           loadDevoluciones()
 
         } catch (error) {
@@ -75,17 +72,17 @@ const Platform = () => {
   const renderSection = () => {
     switch (currentSection) {
       case 'dashboard':
-        return <Dashboard activeLeads={activeLeads || []} />
+        return <Dashboard />
       case 'leads':
-        return <Leads activeLeads={activeLeads || []} />
+        return <Leads />
       case 'devoluciones':
-        return <Devoluciones leadsInDevolucion={leadsInDevolucion || []} leadsInTramite={leadsInTramite || []} />
+        return <Devoluciones />
       case 'empresas':
         return <Empresas />
       case 'usuarios':
         return <Usuarios />
       default:
-        return <Dashboard activeLeads={activeLeads || []} />
+        return <Dashboard />
     }
   }
 

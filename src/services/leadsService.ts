@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { platformConverter } from '../utils/platformConverter'
 
 export interface Lead {
   id: number
@@ -48,7 +49,6 @@ class LeadsService {
         `)
         .eq('empresa_id', empresaId)
         .order('fecha_entrada', { ascending: false })
-
       if (error) {
         console.error('Error fetching leads by company:', error)
         throw error
@@ -56,7 +56,8 @@ class LeadsService {
 
       return data?.map(lead => ({
         ...lead,
-        empresa_nombre: lead.empresas?.nombre
+        empresa_nombre: lead.empresas?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma|| '')
       })) || []
     } catch (error) {
       console.error('Error in getLeadsByCompany:', error)

@@ -10,7 +10,7 @@ import { useSupabaseAuthListener } from './hooks/useSupabaseAuthListener'
 
 
 function App() {
-  console.log('App')
+
   useSupabaseAuthListener()
 
   return (
