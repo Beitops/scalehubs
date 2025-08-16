@@ -227,7 +227,7 @@ const Leads = () => {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                    {lead.plataforma}
+                    {lead.plataforma_lead}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-gray-600">

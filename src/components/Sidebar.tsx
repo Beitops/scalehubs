@@ -22,7 +22,8 @@ const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
 
   // Menú base para todos los usuarios
   const baseMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', to: '/' },
+    { id: 'home', label: 'Inicio', icon: '🏠', to: '/' },
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', to: '/dashboard' },
     { id: 'leads', label: 'Leads', icon: '👥', to: '/leads' },
     { id: 'devoluciones', label: 'Devoluciones', icon: '📦', to: '/devoluciones' },
   ];

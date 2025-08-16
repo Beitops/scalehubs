@@ -9,6 +9,7 @@ import Leads from './pages/Leads'
 import Devoluciones from './pages/Devoluciones'
 import Empresas from './pages/Empresas'
 import Usuarios from './pages/Usuarios'
+import Home from './pages/Home'
 
 
 
@@ -36,7 +37,8 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<Dashboard />} />
+          <Route index path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/leads" element={<Leads />} />
           <Route path="/devoluciones" element={<Devoluciones />} />
           <Route path="/empresas" element={<Empresas />} />

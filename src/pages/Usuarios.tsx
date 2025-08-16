@@ -1,57 +1,43 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
-import { getAllUsers, getUsersByCompany } from '../services/userService'
+import { useUserStore } from '../store/userStore'
 import type { DatabaseProfile } from '../types/database'
 
 interface UsuariosProps {}
 
 const Usuarios = ({}: UsuariosProps) => {
-  const [users, setUsers] = useState<DatabaseProfile[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<DatabaseProfile[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showAdmins, setShowAdmins] = useState(false)
   const [showUserModal, setShowUserModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<DatabaseProfile | null>(null)
   
-  // Filtros
+  // Estados locales para filtros y UI
+  const [filteredUsers, setFilteredUsers] = useState<DatabaseProfile[]>([])
+  const [showAdmins, setShowAdmins] = useState(false)
   const [nameFilter, setNameFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
-
+  
   const { user, userEmpresaId } = useAuthStore()
+  
+  // Usar el store de usuarios solo para lo esencial
+  const {
+    users,
+    loading,
+    error,
+    loadUsers
+  } = useUserStore()
+
+  console.log('users', users)
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    if (user?.role && (user.role === 'admin' || userEmpresaId)) {
+      loadUsers(user.role, userEmpresaId || undefined)
+    }
+  }, [user?.role, userEmpresaId, loadUsers])
 
+  // Aplicar filtros cuando cambien los usuarios o filtros
   useEffect(() => {
     applyFilters()
   }, [users, nameFilter, companyFilter, dateFilter, showAdmins])
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      let usersData: DatabaseProfile[]
-      
-      if (user?.role === 'admin') {
-        usersData = await getAllUsers()
-      } else if (userEmpresaId) {
-        usersData = await getUsersByCompany(userEmpresaId)
-      } else {
-        usersData = []
-      }
-      
-      setUsers(usersData)
-    } catch (err) {
-      console.error('Error loading users:', err)
-      setError('Error al cargar los usuarios')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const applyFilters = () => {
     let filtered = [...users]
@@ -86,6 +72,13 @@ const Usuarios = ({}: UsuariosProps) => {
     }
 
     setFilteredUsers(filtered)
+  }
+
+  const clearFilters = () => {
+    setNameFilter('')
+    setCompanyFilter('')
+    setDateFilter('')
+    setShowAdmins(false)
   }
 
   const handleUserClick = (user: DatabaseProfile) => {
@@ -128,7 +121,7 @@ const Usuarios = ({}: UsuariosProps) => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-700">{error}</p>
           <button 
-            onClick={loadUsers}
+            onClick={() => loadUsers(user?.role || '', userEmpresaId || undefined)}
             className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             Reintentar
@@ -137,6 +130,8 @@ const Usuarios = ({}: UsuariosProps) => {
       </div>
     )
   }
+
+  console.log('filteredUsers', filteredUsers)
 
   return (
     <div className="p-2 sm:p-4 md:p-6 lg:p-8">
@@ -153,7 +148,15 @@ const Usuarios = ({}: UsuariosProps) => {
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 mx-2 sm:mx-0">
-        <h2 className="text-base sm:text-lg font-semibold text-[#373643] mb-3 sm:mb-4">Filtros</h2>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h2 className="text-base sm:text-lg font-semibold text-[#373643]">Filtros</h2>
+          <button
+            onClick={clearFilters}
+            className="text-sm text-[#18cb96] hover:text-[#15b885] font-medium"
+          >
+            Limpiar filtros
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -276,7 +279,7 @@ const Usuarios = ({}: UsuariosProps) => {
                   </td>
                   {user?.role === 'admin' && (
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(userItem as any)?.empresas?.nombre || 'Sin empresa'}
+                      {(userItem as any)?.empresa?.nombre || 'Sin empresa'}
                     </td>
                   )}
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
