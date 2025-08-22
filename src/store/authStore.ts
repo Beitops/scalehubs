@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist, devtools } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
-import { roleConverter } from '../utils/roleConverter'
 import type { FrontendUser } from '../types/database'
 import { useLeadsStore } from './leadsStore'
 import type { Session } from '@supabase/supabase-js'
@@ -141,6 +140,18 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('Perfil de usuario no encontrado')
                         }
 
+                        const { data: roles, error: rolesError } = await supabase
+                            .from('roles')
+                            .select('nombre')
+                            .eq('id', profileWithEmpresa.rol_id)
+                            .single()
+
+                        if (rolesError || !roles) {
+                            console.error('Error al obtener roles:', rolesError)
+                            throw new Error('Error al obtener roles')
+                        }
+                        
+
                         // Extraer información de la empresa
                         const empresa = profileWithEmpresa.empresas
                         const companyCif = empresa?.cif || ''
@@ -150,10 +161,10 @@ export const useAuthStore = create<AuthState>()(
                         // Crear objeto de usuario para el store
                         const frontendUser: FrontendUser = {
                             id: updatedUser.id,
-                            name: profileWithEmpresa.nombre || 'Usuario',
+                            nombre: profileWithEmpresa.nombre || 'Usuario',
                             email: email,
-                            company: companyCif,
-                            role: roleConverter.backendToFrontend(profileWithEmpresa.es_admin)
+                            empresa: companyCif,
+                            rol: roles.nombre
                         }
 
                         set({
@@ -221,6 +232,9 @@ export const useAuthStore = create<AuthState>()(
                                 `)
                                 .eq('user_id', session.user.id)
                                 .single()
+                            
+
+
 
                             if (profileError) {
                                 console.error('Error al obtener perfil:', profileError)
@@ -233,6 +247,17 @@ export const useAuthStore = create<AuthState>()(
                                 return
                             }
 
+                            const { data: roles, error: rolesError } = await supabase
+                                .from('roles')
+                                .select('nombre')
+                                .eq('id', profileWithEmpresa.rol_id)
+                                .single()
+
+                            if (rolesError || !roles) {
+                                console.error('Error al obtener roles:', rolesError)
+                                throw new Error('Error al obtener roles')
+                            }
+
                             // Extraer información de la empresa (puede ser null para admins)
                             const empresa = profileWithEmpresa.empresas
                             const companyCif = empresa?.cif || ''
@@ -241,10 +266,10 @@ export const useAuthStore = create<AuthState>()(
 
                             const frontendUser: FrontendUser = {
                                 id: profileWithEmpresa.user_id,
-                                name: profileWithEmpresa.nombre || 'Usuario',
+                                nombre: profileWithEmpresa.nombre || 'Usuario',
                                 email: session.user.email || '',
-                                company: companyCif,
-                                role: roleConverter.backendToFrontend(profileWithEmpresa.es_admin)
+                                empresa: companyCif,
+                                rol: roles.nombre
                             }
 
                             set({

@@ -38,7 +38,7 @@ const Dashboard = () => {
       color: 'bg-green-500'
     },
     {
-      title: user?.role === 'admin' ? 'Porcentaje Leads en Tramite' : 'Porcentaje Leads en Devolución',
+              title: user?.rol === 'administrador' ? 'Porcentaje Leads en Tramite' : 'Porcentaje Leads en Devolución',
       value: `30%`,
       change: '+2.1%',
       changeType: 'positive' as const,
@@ -75,12 +75,12 @@ const Dashboard = () => {
       <div className="mb-6 lg:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Dashboard</h1>
         <p className="text-gray-600 mt-2 text-sm sm:text-base">
-          {user?.role === 'admin'
+          {user?.rol === 'administrador'
             ? 'Bienvenido a ScaleHubs - Resumen general del sistema'
-            : `Bienvenido a ScaleHubs - Resumen de ${userEmpresaNombre || user?.company || 'tu empresa'}`
+            : `Bienvenido a ScaleHubs - Resumen de ${userEmpresaNombre || user?.empresa || 'tu empresa'}`
           }
         </p>
-        {user?.role === 'admin' && (
+        {user?.rol === 'administrador' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-blue-700 text-xs">
               👑 <strong>Modo Administrador:</strong> Visualizando estadísticas de todo el sistema
@@ -125,7 +125,7 @@ const Dashboard = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-[#373643] text-sm sm:text-base truncate">{lead.nombre_cliente}</p>
                     <p className="text-xs sm:text-sm text-gray-600 truncate">{lead.telefono}</p>
-                    {user?.role === 'admin' && (
+                    {user?.rol === 'administrador' && (
                       <p className="text-xs text-gray-500 truncate">{lead.empresa_nombre || '-'}</p>
                     )}
                   </div>

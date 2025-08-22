@@ -18,9 +18,9 @@ const Platform = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [newUser, setNewUser] = useState({
-    name: '',
+    nombre: '',
     email: '',
-    role: 'client' as 'admin' | 'client',
+    rol: '',
     cif: '' // Movido después del rol
   })
 
@@ -73,7 +73,7 @@ const Platform = () => {
     try {
       let userData: NewUserData
 
-      if (newUser.role === 'client') {
+      if (newUser.rol === 'client') {
         // Para clientes, buscar el ID de la empresa por CIF
         if (!newUser.cif.trim()) {
           throw new Error('El CIF de la empresa es obligatorio para usuarios cliente.')
@@ -90,18 +90,18 @@ const Platform = () => {
         }
 
         userData = {
-          name: newUser.name,
+          nombre: newUser.nombre,
           email: newUser.email,
-          company: empresa.id.toString(),
-          role: newUser.role
+          empresa: empresa.id.toString(),
+          rol: newUser.rol
         }
       } else {
         // Para administradores, no se requiere empresa
         userData = {
-          name: newUser.name,
+          nombre: newUser.nombre,
           email: newUser.email,
-          company: '', // Los admins no tienen empresa
-          role: newUser.role
+          empresa: '', // Los admins no tienen empresa
+          rol: newUser.rol
         }
       }
 
@@ -109,7 +109,7 @@ const Platform = () => {
       await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
-      const successMessage = newUser.role === 'client'
+      const successMessage = newUser.rol === 'client'
         ? `Usuario cliente invitado con éxito. Se ha enviado un email de registro.`
         : `Usuario administrador invitado con éxito. Se ha enviado un email de registro.`
 
@@ -123,9 +123,9 @@ const Platform = () => {
 
       // Limpiar formulario
       setNewUser({
-        name: '',
+        nombre: '',
         email: '',
-        role: 'client',
+        rol: 'client',
         cif: ''
       })
 
@@ -152,7 +152,7 @@ const Platform = () => {
     const { name, value } = e.target
 
     // Si se cambia el rol a admin, limpiar el CIF
-    if (name === 'role' && value === 'admin') {
+            if (name === 'rol' && value === 'administrador') {
       setNewUser({
         ...newUser,
         [name]: value,
@@ -209,7 +209,6 @@ const Platform = () => {
           <Sidebar
             onClose={handleCloseSidebar}
             sidebarOpen={sidebarOpen}
-            user={user}
             onLogout={logout}
             onAddUser={() => setShowAddUserModal(true)}
           />
@@ -266,7 +265,7 @@ const Platform = () => {
                   type="text"
                   id="name"
                   name="name"
-                  value={newUser.name}
+                  value={newUser.nombre}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
@@ -297,7 +296,7 @@ const Platform = () => {
                 <select
                   id="role"
                   name="role"
-                  value={newUser.role}
+                  value={newUser.rol}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
@@ -307,7 +306,7 @@ const Platform = () => {
                 </select>
               </div>
 
-              {newUser.role === 'client' && (
+              {newUser.rol === 'client' && (
                 <div>
                   <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
                     CIF de la empresa
@@ -318,7 +317,7 @@ const Platform = () => {
                     name="cif"
                     value={newUser.cif}
                     onChange={handleInputChange}
-                    required={newUser.role === 'client'}
+                    required={newUser.rol === 'client'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                     placeholder="Ej: B12345678"
                   />

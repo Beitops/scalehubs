@@ -10,12 +10,12 @@ const Home = () => {
       <div className="mb-6 lg:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Bienvenido a ScaleHubs</h1>
         <p className="text-gray-600 mt-2 text-sm sm:text-base">
-          {user?.role === 'admin'
-            ? 'Tu plataforma central para la gestión integral de leads y empresas'
-            : `Bienvenido a ${userEmpresaNombre || user?.company || 'tu empresa'} en ScaleHubs`
-          }
+                      {user?.rol === 'administrador'
+              ? 'Tu plataforma central para la gestión integral de leads y empresas'
+              : `Bienvenido a ${userEmpresaNombre || user?.empresa || 'tu empresa'} en ScaleHubs`
+            }
         </p>
-        {user?.role === 'admin' && (
+        {user?.rol === 'administrador' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-blue-700 text-xs">
               👑 <strong>Modo Administrador:</strong> Acceso completo al sistema
@@ -43,7 +43,7 @@ const Home = () => {
               Esta es la página principal de tu aplicación ScaleHubs. Desde aquí puedes acceder a todas las funcionalidades disponibles según tu rol en el sistema.
             </p>
             
-            {user?.role === 'admin' ? (
+            {user?.rol === 'administrador' ? (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-medium text-blue-800 mb-2">Funcionalidades de Administrador:</h3>
                 <ul className="text-sm text-blue-700 space-y-1">
@@ -92,7 +92,7 @@ const Home = () => {
               </div>
             </div>
 
-            {user?.role === 'admin' && (
+            {user?.rol === 'administrador' && (
               <>
                 <div className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="w-8 h-8 bg-[#18cb96] rounded-lg flex items-center justify-center text-white text-sm mr-3">
@@ -137,10 +137,10 @@ const Home = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-[#18cb96] mb-1">
-                {user?.role === 'admin' ? '👑' : '🏢'}
+                {user?.rol === 'administrador' ? '👑' : '🏢'}
               </div>
               <p className="text-sm font-medium text-[#373643]">Rol</p>
-              <p className="text-xs text-gray-600 capitalize">{user?.role || 'N/A'}</p>
+              <p className="text-xs text-gray-600 capitalize">{user?.rol || 'N/A'}</p>
             </div>
 
             <div className="text-center p-4 bg-gray-50 rounded-lg">

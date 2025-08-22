@@ -370,12 +370,12 @@ const Devoluciones = () => {
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Devoluciones</h1>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
-            {user?.role === 'admin'
+            {user?.rol === 'administrador'
               ? 'Gestiona las devoluciones de leads de todas las empresas'
-              : `Devoluciones pendientes de ${user?.company}`
+              : `Devoluciones pendientes de ${user?.empresa}`
             }
           </p>
-          {user?.role === 'admin' && (
+          {user?.rol === 'administrador' && (
             <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-700 text-xs">
                 👑 <strong>Modo Administrador:</strong> Visualizando devoluciones de todo el sistema
@@ -386,7 +386,7 @@ const Devoluciones = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {user?.role !== 'admin' && (
+          {user?.rol !== 'administrador' && (
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -402,7 +402,7 @@ const Devoluciones = () => {
             </div>
           )}
 
-          {user?.role === 'admin' && (
+          {user?.rol === 'administrador' && (
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -420,7 +420,7 @@ const Devoluciones = () => {
         </div>
 
         {/* Devoluciones Pendientes Section (Solo para clientes) */}
-        {user?.role === 'client' && leadsInDevolucion && leadsInDevolucion.length > 0 && (
+        {user?.rol === 'client' && leadsInDevolucion && leadsInDevolucion.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-[#373643]">Devoluciones Pendientes</h2>
@@ -440,7 +440,7 @@ const Devoluciones = () => {
                     <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                     <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                     <p><span className="font-medium">Plataforma:</span> {lead.plataforma}</p>
-                    {user?.role === 'admin' && (
+                    {user?.rol === 'administrador' && (
                       <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre}</p>
                     )}
                   </div>
@@ -520,7 +520,7 @@ const Devoluciones = () => {
         )}
 
         {/* En Trámite Section (Admin Only) */}
-        {user?.role === 'admin' && leadsInTramite && leadsInTramite.length > 0 && (
+        {user?.rol === 'administrador' && leadsInTramite && leadsInTramite.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-[#373643]">En Trámite de Revisión</h2>

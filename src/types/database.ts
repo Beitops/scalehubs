@@ -141,10 +141,10 @@ export interface ApiLeadResponse {
  */
 export interface FrontendUser {
   id: string // user_id
-  name: string // nombre
+  nombre: string // nombre
   email: string // se obtiene de auth.users
-  company: string // CIF de la empresa (se obtiene de empresas.cif)
-  role: 'admin' | 'client' // convertido desde es_admin
+  empresa: string // CIF de la empresa (se obtiene de empresas.cif)
+  rol: string // convertido desde es_admin
 }
 
 export interface FrontendEmpresa {

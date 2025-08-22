@@ -73,10 +73,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      if (user?.role === 'admin') {
+      if (user?.rol === 'administrador') {
 
         await get().loadLeads()
-      } else if (user?.role === 'client' && userEmpresaId) {
+      } else if (userEmpresaId) {
 
         await get().loadLeads(userEmpresaId || undefined)
       } else {
@@ -103,7 +103,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      if (user.role === 'admin') {
+      if (user.rol === 'administrador') {
         await get().loadLeads()
       } else if (userEmpresaId) {
         await get().loadLeads(userEmpresaId)
@@ -218,13 +218,13 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
       // Filtrar por empresa_id si el usuario no es admin
       let filteredData = data || []
-      if (user?.role !== 'admin' && userEmpresaId) {
+      if (user?.rol !== 'administrador' && userEmpresaId) {
         filteredData = filteredData.filter(d => d.lead?.empresa_id === userEmpresaId)
       }
 
 
       // Filtrar según el rol del usuario
-      if (user?.role === 'admin') {
+      if (user?.rol === 'administrador') {
         // Para admin: mostrar solo las que tengan estado 'tramite'
         const tramiteDevoluciones = filteredData.filter(d => d.estado === 'tramite') || []
         const leadsInTramite = tramiteDevoluciones.map(d => ({

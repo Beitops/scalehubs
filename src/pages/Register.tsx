@@ -13,9 +13,9 @@ const Register = () => {
     company: ''
   })
   const [userMetadata, setUserMetadata] = useState({
-    name: '',
-    companyName: '',
-    role: 'client' as 'admin' | 'client'
+    nombre: '',
+    nombreEmpresa: '',
+    rol: 'client' as 'administrador' | 'client'
   })
   const [passwordError, setPasswordError] = useState('')
   const [isValidHash, setIsValidHash] = useState(false)
@@ -84,7 +84,7 @@ const Register = () => {
         }
 
         // Obtener el nombre de la empresa por empresa_id
-        let companyName = ''
+        let nombreEmpresa = ''
         if (profile.empresa_id) {
           const { data: empresa, error: empresaError } = await supabase
             .from('empresas')
@@ -93,7 +93,7 @@ const Register = () => {
             .single()
           
           if (!empresaError && empresa) {
-            companyName = empresa.nombre
+            nombreEmpresa = empresa.nombre
           }
         }
 
@@ -106,9 +106,9 @@ const Register = () => {
 
         // Actualizar estado con los datos obtenidos de profiles
         setUserMetadata({
-          name: profile.nombre,
-          companyName,
-          role: profile.es_admin ? 'admin' : 'client'
+          nombre: profile.nombre,
+          nombreEmpresa,
+          rol: profile.es_admin ? 'administrador' : 'client'
         })
 
         setFormData(prev => ({
@@ -156,9 +156,9 @@ const Register = () => {
     try {
       // Solo actualizar la contraseña del usuario
       await signup(formData.email, formData.password, {
-        name: formData.name,
-        company: formData.company,
-        role: userMetadata.role
+        nombre: formData.name,
+        empresa: formData.company,
+        rol: userMetadata.rol
       })
       
       // Redirigir después del signup exitoso
@@ -234,7 +234,7 @@ const Register = () => {
               type="text"
               id="name"
               name="name"
-              value={userMetadata.name}
+              value={userMetadata.nombre}
               disabled
               className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
               placeholder="Tu nombre completo"
@@ -245,7 +245,7 @@ const Register = () => {
           </div>
 
           {/* Solo mostrar campo de empresa si el usuario NO es administrador */}
-          {userMetadata.role === 'client' && (
+          {userMetadata.rol === 'client' && (
             <div>
               <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
                 Empresa
@@ -254,7 +254,7 @@ const Register = () => {
                 type="text"
                 id="company"
                 name="company"
-                value={userMetadata.companyName}
+                value={userMetadata.nombreEmpresa}
                 disabled
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
                 placeholder="Nombre de la empresa"

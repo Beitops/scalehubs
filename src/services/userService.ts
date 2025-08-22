@@ -1,21 +1,20 @@
 import axiosInstance from '../api/axiosConfig'
-import { roleConverter } from '../utils/roleConverter'
 import { supabase } from '../lib/supabase'
 import type { DatabaseProfile } from '../types/database'
 
 
 export interface NewUserData {
-  name: string
+  nombre: string
   email: string
-  company: string // Puede ser el ID de la empresa o vacío para admins
-  role: 'admin' | 'client' // Frontend format
+  empresa: string // Puede ser el ID de la empresa o vacío para admins
+  rol: string // Frontend format
 }
 
 export interface UserDataForBackend {
   name: string
   email: string
   empresa_id?: number // Opcional para admins
-  role: boolean // Backend format
+  role: string // Backend format
   redirectTo: string
 }
 
@@ -49,15 +48,15 @@ export const userService = {
 
       // Convertir formato frontend a backend
       const backendData: UserDataForBackend = {
-        name: userData.name,
+        name: userData.nombre,
         email: userData.email,
-        role: roleConverter.frontendToBackend(userData.role),
+        role: userData.rol,
         redirectTo: 'https://scalehubs.vercel.app//set-password'
       }
 
       // Solo incluir empresa_id si es un cliente y tiene empresa
-      if (userData.role === 'client' && userData.company) {
-        backendData.empresa_id = parseInt(userData.company)
+      if (userData.rol === 'client' && userData.empresa) {
+        backendData.empresa_id = parseInt(userData.empresa)
       }
 
       // Realizar la petición POST con el header Bearer

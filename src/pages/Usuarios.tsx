@@ -26,13 +26,13 @@ const Usuarios = ({}: UsuariosProps) => {
     loadUsers
   } = useUserStore()
 
-  console.log('users', users)
+
 
   useEffect(() => {
-    if (user?.role && (user.role === 'admin' || userEmpresaId)) {
-      loadUsers(user.role, userEmpresaId || undefined)
+    if (user?.rol && (user.rol === 'administrador' || userEmpresaId)) {
+      loadUsers(user.rol, userEmpresaId || undefined)
     }
-  }, [user?.role, userEmpresaId, loadUsers])
+  }, [user?.rol, userEmpresaId, loadUsers])
 
   // Aplicar filtros cuando cambien los usuarios o filtros
   useEffect(() => {
@@ -57,7 +57,7 @@ const Usuarios = ({}: UsuariosProps) => {
     }
 
     // Filtro por empresa (solo para admins)
-    if (companyFilter && user?.role === 'admin') {
+    if (companyFilter && user?.rol === 'administrador') {
       filtered = filtered.filter(user => 
         user.empresa_id?.toString().includes(companyFilter) ||
         (user as any)?.empresas?.nombre?.toLowerCase().includes(companyFilter.toLowerCase())
@@ -121,7 +121,7 @@ const Usuarios = ({}: UsuariosProps) => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-700">{error}</p>
           <button 
-            onClick={() => loadUsers(user?.role || '', userEmpresaId || undefined)}
+            onClick={() => loadUsers(user?.rol || '', userEmpresaId || undefined)}
             className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             Reintentar
@@ -139,10 +139,10 @@ const Usuarios = ({}: UsuariosProps) => {
       <div className="mb-4 sm:mb-6 lg:mb-8 mx-2 sm:mx-0">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#373643]">Usuarios</h1>
         <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
-          {user?.role === 'admin' 
-            ? 'Gestión de usuarios del sistema' 
-            : 'Usuarios de tu empresa'
-          }
+                  {user?.rol === 'administrador'
+          ? 'Gestión de usuarios del sistema' 
+          : 'Usuarios de tu empresa'
+        }
         </p>
       </div>
 
@@ -171,7 +171,7 @@ const Usuarios = ({}: UsuariosProps) => {
             />
           </div>
 
-          {user?.role === 'admin' && (
+          {user?.rol === 'administrador' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Empresa
@@ -201,7 +201,7 @@ const Usuarios = ({}: UsuariosProps) => {
       </div>
 
       {/* Toggle para mostrar usuarios por tipo (solo para admins) */}
-      {user?.role === 'admin' && (
+      {user?.rol === 'administrador' && (
         <div className="mb-4 mx-2 sm:mx-0">
           <div className="flex items-center gap-3">
             <button
@@ -234,7 +234,7 @@ const Usuarios = ({}: UsuariosProps) => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Rol
                 </th>
-                {user?.role === 'admin' && (
+                {user?.rol === 'administrador' && (
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Empresa
                   </th>
@@ -277,7 +277,7 @@ const Usuarios = ({}: UsuariosProps) => {
                       {getRoleLabel(userItem.es_admin)}
                     </span>
                   </td>
-                  {user?.role === 'admin' && (
+                  {user?.rol === 'administrador' && (
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {(userItem as any)?.empresa?.nombre || 'Sin empresa'}
                     </td>
@@ -333,7 +333,7 @@ const Usuarios = ({}: UsuariosProps) => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getRoleColor(userItem.es_admin)}`}>
                       {getRoleLabel(userItem.es_admin)}
                     </span>
-                    {user?.role === 'admin' && userItem.empresa_id && (
+                    {user?.rol === 'administrador' && userItem.empresa_id && (
                       <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
                         {(userItem as any)?.empresas?.nombre || `Empresa ID: ${userItem.empresa_id}`}
                       </span>
@@ -412,7 +412,7 @@ const Usuarios = ({}: UsuariosProps) => {
                       <label className="block text-xs sm:text-sm font-medium text-gray-500">ID de Empresa</label>
                       <p className="text-sm text-gray-900">{selectedUser.empresa_id || 'Sin empresa'}</p>
                     </div>
-                    {user?.role === 'admin' && selectedUser.empresa_id && (
+                    {user?.rol === 'administrador' && selectedUser.empresa_id && (
                       <div>
                         <label className="block text-xs sm:text-sm font-medium text-gray-500">Nombre de Empresa</label>
                         <p className="text-sm text-gray-900">

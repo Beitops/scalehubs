@@ -2,23 +2,18 @@
 import { NavLink } from 'react-router-dom'
 import CompanyName from './CompanyName'
 
-interface User {
-  id: string
-  name: string
-  email: string
-  company: string // CIF de la empresa
-  role: 'admin' | 'client'
-}
+import { useAuthStore } from '../store/authStore'
 
 interface SidebarProps {
   onClose: () => void
   sidebarOpen?: boolean
-  user?: User | null
   onLogout?: () => void
   onAddUser?: () => void
 }
 
-const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
+const Sidebar = ({ onClose, onLogout, onAddUser }: SidebarProps) => {
+
+  const { user } = useAuthStore()
 
   // Menú base para todos los usuarios
   const baseMenuItems = [
@@ -33,7 +28,7 @@ const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
     { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' },
   ];
 
-  const menuItems = user?.role === 'admin'
+  const menuItems = user?.rol === 'administrador'
     ? [...baseMenuItems, ...adminMenuItems]
     : baseMenuItems;
 
@@ -85,7 +80,7 @@ const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
       </nav>
 
       {/* Add User Button (Admin Only) */}
-      {user?.role === 'admin' && onAddUser && (
+              {user?.rol === 'administrador' && onAddUser && (
         <div className="px-4 mb-4">
           <button
             onClick={onAddUser}
@@ -101,18 +96,18 @@ const Sidebar = ({ onClose, user, onLogout, onAddUser }: SidebarProps) => {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center mb-3">
           <div className="w-8 h-8 bg-[#18cb96] rounded-full flex items-center justify-center text-white font-bold">
-            {user?.name?.charAt(0) || 'U'}
+            {user?.nombre?.charAt(0) || 'U'}
           </div>
           <div className="ml-3 flex-1 min-w-0">
-            <p className="text-sm font-medium text-[#373643] truncate">{user?.name || 'Usuario'}</p>
+            <p className="text-sm font-medium text-[#373643] truncate">{user?.nombre || 'Usuario'}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email || 'usuario@empresa.com'}</p>
-            {user?.role !== 'admin' && (
+            {user?.rol !== 'administrador' && (
               <p className="text-xs text-gray-400 truncate">
-                <CompanyName cif={user?.company} />
+                <CompanyName cif={user?.empresa} />
               </p>
             )}
             <p className="text-xs text-[#18cb96] font-medium capitalize">
-              {user?.role === 'admin' ? '👑 Administrador' : '👤 Cliente'}
+              {user?.rol === 'administrador' ? '👑 Administrador' : '👤 Cliente'}
             </p>
           </div>
         </div>

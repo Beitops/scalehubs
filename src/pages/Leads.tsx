@@ -28,7 +28,6 @@ const Leads = () => {
 
 
 
-
   const filteredLeads = activeLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
@@ -42,7 +41,7 @@ const Leads = () => {
     const fetchLeadsInRange = async () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
-          const empresaId = user?.role !== 'admin' ? userEmpresaId : undefined
+          const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
           const leadsInRange = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
@@ -70,7 +69,7 @@ const Leads = () => {
 
     // Crear CSV content
     const headers = ['Fecha', 'Nombre', 'Teléfono', 'Plataforma']
-    if (user?.role === 'admin') {
+    if (user?.rol === 'administrador') {
       headers.push('Empresa')
     }
 
@@ -83,7 +82,7 @@ const Leads = () => {
           lead.telefono,
           lead.plataforma
         ]
-        if (user?.role === 'admin') {
+        if (user?.rol === 'administrador') {
           row.push(`"${lead.empresa_nombre || ''}"`)
         }
         return row.join(',')
@@ -159,12 +158,12 @@ const Leads = () => {
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Gestión de Leads</h1>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
-            {user?.role === 'admin' 
+            {user?.rol === 'administrador' 
               ? 'Administra y visualiza todos los leads generados en redes sociales' 
-              : `Leads asignados a ${userEmpresaNombre || user?.company || 'tu empresa'}`
+              : `Leads asignados a ${userEmpresaNombre || user?.empresa || 'tu empresa'}`
             }
           </p>
-          {user?.role === 'admin' && (
+          {user?.rol === 'administrador' && (
             <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-700 text-xs">
                 👑 <strong>Modo Administrador:</strong> Visualizando todos los leads del sistema
@@ -233,12 +232,12 @@ const Leads = () => {
                 <div className="space-y-1 text-xs text-gray-600">
                   <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                   <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                  {user?.role === 'admin' && (
+                  {user?.rol === 'administrador' && (
                     <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
                   )}
                 </div>
                 <div className="flex gap-2 mt-3">
-                  {user?.role !== 'admin' && (
+                  {user?.rol !== 'administrador' && (
                     <button 
                       onClick={() => handleReturnLead(lead)}
                       className="text-red-400 hover:text-red-600 text-xs font-medium transition-colors"
@@ -268,12 +267,12 @@ const Leads = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Plataforma
                   </th>
-                  {user?.role === 'admin' && (
+                  {user?.rol === 'administrador' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                       Empresa
                     </th>
                   )}
-                  {user?.role !== 'admin' && (
+                  {user?.rol !== 'administrador' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                       Devoluciones
                     </th>
@@ -297,12 +296,12 @@ const Leads = () => {
                         {lead.plataforma_lead}
                       </span>
                     </td>
-                    {user?.role === 'admin' && (
+                    {user?.rol === 'administrador' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                         {lead.empresa_nombre || '-'}
                       </td>
                     )}
-                    {user?.role !== 'admin' && (
+                    {user?.rol !== 'administrador' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button 
                           onClick={() => handleReturnLead(lead)}
@@ -323,7 +322,7 @@ const Leads = () => {
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-sm text-gray-700">
                 Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{activeLeads.length}</span> leads
-                {user?.role === 'client' && (
+                {user?.rol === 'client' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
               </div>

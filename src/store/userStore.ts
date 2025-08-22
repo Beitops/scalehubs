@@ -34,7 +34,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       
       let usersData: DatabaseProfile[]
       
-      if (userRole === 'admin') {
+      if (userRole === 'administrador') {
         usersData = await getAllUsers()
       } else if (userEmpresaId) {
         usersData = await getUsersByCompany(userEmpresaId)

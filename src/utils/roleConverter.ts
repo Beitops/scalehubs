@@ -10,8 +10,8 @@ export const roleConverter = {
    * @param role - Rol en formato frontend ('admin' | 'client')
    * @returns boolean - true si es admin, false si es client
    */
-  frontendToBackend: (role: 'admin' | 'client'): boolean => {
-    return role === 'admin'
+  frontendToBackend: (role: string): boolean => {
+    return role === 'administrador'
   },
 
   /**
