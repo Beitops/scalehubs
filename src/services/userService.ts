@@ -14,7 +14,7 @@ export interface UserDataForBackend {
   name: string
   email: string
   empresa_id?: number // Opcional para admins
-  role: string // Backend format
+  rol: string // Backend format
   redirectTo: string
 }
 
@@ -50,12 +50,12 @@ export const userService = {
       const backendData: UserDataForBackend = {
         name: userData.nombre,
         email: userData.email,
-        role: userData.rol,
-        redirectTo: 'https://scalehubs.vercel.app//set-password'
+        rol: userData.rol,
+        redirectTo: 'http://localhost:5173/set-password'
       }
 
-      // Solo incluir empresa_id si es un cliente y tiene empresa
-      if (userData.rol === 'client' && userData.empresa) {
+      // Solo incluir empresa_id si NO es administrador y tiene empresa
+      if (userData.rol !== 'administrador' && userData.empresa) {
         backendData.empresa_id = parseInt(userData.empresa)
       }
 

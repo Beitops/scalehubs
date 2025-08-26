@@ -21,7 +21,7 @@ const Platform = () => {
     nombre: '',
     email: '',
     rol: '',
-    cif: '' // Movido después del rol
+    cif: '' 
   })
 
 
@@ -71,12 +71,17 @@ const Platform = () => {
     setShowErrorMessage(false)
 
     try {
+      // Validar que se haya seleccionado un rol
+      if (!newUser.rol.trim()) {
+        throw new Error('Debes seleccionar un rol para el usuario.')
+      }
+
       let userData: NewUserData
 
-      if (newUser.rol === 'client') {
-        // Para clientes, buscar el ID de la empresa por CIF
+      if (newUser.rol !== 'administrador') {
+        // Para coordinadores y agentes, buscar el ID de la empresa por CIF
         if (!newUser.cif.trim()) {
-          throw new Error('El CIF de la empresa es obligatorio para usuarios cliente.')
+          throw new Error('El CIF de la empresa es obligatorio para usuarios coordinadores y agentes.')
         }
 
         const { data: empresa, error: empresaError } = await supabase
@@ -109,9 +114,9 @@ const Platform = () => {
       await userService.registerUser(userData)
 
       // Mostrar mensaje de éxito
-      const successMessage = newUser.rol === 'client'
-        ? `Usuario cliente invitado con éxito. Se ha enviado un email de registro.`
-        : `Usuario administrador invitado con éxito. Se ha enviado un email de registro.`
+      const successMessage = newUser.rol === 'administrador'
+        ? `Usuario administrador invitado con éxito. Se ha enviado un email de registro.`
+        : `Usuario ${newUser.rol} invitado con éxito. Se ha enviado un email de registro.`
 
       setMessage(successMessage)
       setShowSuccessMessage(true)
@@ -125,7 +130,7 @@ const Platform = () => {
       setNewUser({
         nombre: '',
         email: '',
-        rol: 'client',
+        rol: '',
         cif: ''
       })
 
@@ -152,7 +157,7 @@ const Platform = () => {
     const { name, value } = e.target
 
     // Si se cambia el rol a admin, limpiar el CIF
-            if (name === 'rol' && value === 'administrador') {
+      if (name === 'rol' && value === 'administrador') {
       setNewUser({
         ...newUser,
         [name]: value,
@@ -164,6 +169,7 @@ const Platform = () => {
         [name]: value
       })
     }
+
   }
 
   const handleOpenSidebar = () => {
@@ -258,13 +264,13 @@ const Platform = () => {
 
             <form onSubmit={handleAddUser} className="space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="nombre" className="block text-sm font-medium text-[#373643] mb-2">
                   Nombre completo
                 </label>
                 <input
                   type="text"
-                  id="name"
-                  name="name"
+                  id="nombre"
+                  name="nombre"
                   value={newUser.nombre}
                   onChange={handleInputChange}
                   required
@@ -290,23 +296,25 @@ const Platform = () => {
               </div>
 
               <div>
-                <label htmlFor="role" className="block text-sm font-medium text-[#373643] mb-2">
+                <label htmlFor="rol" className="block text-sm font-medium text-[#373643] mb-2">
                   Rol
                 </label>
                 <select
-                  id="role"
-                  name="role"
+                  id="rol"
+                  name="rol"
                   value={newUser.rol}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                 >
-                  <option value="client">Cliente</option>
-                  <option value="admin">Administrador</option>
+                  <option value="">Selecciona un rol</option>
+                  <option value="coordinador">Coordinador</option>
+                  <option value="agente">Agente</option>
+                  <option value="administrador">Administrador</option>
                 </select>
               </div>
 
-              {newUser.rol === 'client' && (
+              {newUser.rol !== 'administrador' && (
                 <div>
                   <label htmlFor="cif" className="block text-sm font-medium text-[#373643] mb-2">
                     CIF de la empresa
@@ -317,8 +325,8 @@ const Platform = () => {
                     name="cif"
                     value={newUser.cif}
                     onChange={handleInputChange}
-                    required={newUser.rol === 'client'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    required={newUser.rol !== 'administrador'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-[#18cb96] focus:border-transparent"
                     placeholder="Ej: B12345678"
                   />
                   <p className="text-xs text-gray-500 mt-1">

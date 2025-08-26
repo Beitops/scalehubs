@@ -419,8 +419,8 @@ const Devoluciones = () => {
           )}
         </div>
 
-        {/* Devoluciones Pendientes Section (Solo para clientes) */}
-        {user?.rol === 'client' && leadsInDevolucion && leadsInDevolucion.length > 0 && (
+        {/* Devoluciones Pendientes Section (Solo para coordinadores y agentes) */}
+        {user?.rol !== 'administrador' && leadsInDevolucion && leadsInDevolucion.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-[#373643]">Devoluciones Pendientes</h2>
@@ -439,7 +439,7 @@ const Devoluciones = () => {
                   <div className="space-y-1 text-xs text-gray-600">
                     <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                     <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                    <p><span className="font-medium">Plataforma:</span> {lead.plataforma}</p>
+                    <p><span className="font-medium">Plataforma:</span> {lead.plataforma_lead}</p>
                     {user?.rol === 'administrador' && (
                       <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre}</p>
                     )}
@@ -495,7 +495,7 @@ const Devoluciones = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                          {lead.plataforma}
+                          {lead.plataforma_lead}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -539,7 +539,7 @@ const Devoluciones = () => {
                   <div className="space-y-1 text-xs text-gray-600">
                     <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                     <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                    <p><span className="font-medium">Plataforma:</span> {lead.plataforma}</p>
+                    <p><span className="font-medium">Plataforma:</span> {lead.plataforma_lead}</p>
                     <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre}</p>
                   </div>
                   <div className="flex gap-2 mt-3">
@@ -596,7 +596,7 @@ const Devoluciones = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                          {lead.plataforma}
+                          {lead.plataforma_lead}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
@@ -668,7 +668,7 @@ const Devoluciones = () => {
                   <div className="text-xs text-gray-600 mb-3">
                     <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
                     <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
-                    <p><strong>Plataforma:</strong> {selectedLead.plataforma}</p>
+                    <p><strong>Plataforma:</strong> {selectedLead.plataforma_lead}</p>
                     <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>
                 )}
@@ -767,7 +767,7 @@ const Devoluciones = () => {
                   <div className="text-xs text-gray-600">
                     <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
                     <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
-                    <p><strong>Plataforma:</strong> {selectedLead.plataforma}</p>
+                    <p><strong>Plataforma:</strong> {selectedLead.plataforma_lead}</p>
                     <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                     <p><strong>Empresa:</strong> {selectedLead.empresa_nombre}</p>
                     {selectedLead.motivo && (

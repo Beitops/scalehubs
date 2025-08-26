@@ -322,7 +322,7 @@ const Leads = () => {
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-sm text-gray-700">
                 Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{activeLeads.length}</span> leads
-                {user?.rol === 'client' && (
+                {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { leadsService, type Lead, type LeadDevolucion } from '../services/leadsService'
 import { useAuthStore } from './authStore'
 import { supabase } from '../lib/supabase'
+import { platformConverter } from '../utils/platformConverter'
 
 
 interface Devolucion {
@@ -233,7 +234,8 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           motivo: d.motivo || '',
           audio_devolucion: '',
           imagen_devolucion: '',
-          devolucion_id: d.id
+          devolucion_id: d.id,
+          plataforma_lead: platformConverter(d.lead.plataforma || '')
         }))
         
         set({ devoluciones: filteredData, leadsInTramite })
@@ -246,7 +248,8 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           motivo: d.motivo || '',
           audio_devolucion: '',
           imagen_devolucion: '',
-          devolucion_id: d.id
+          devolucion_id: d.id,
+          plataforma_lead: platformConverter(d.lead.plataforma || '')
         }))
         
         set({ devoluciones: filteredData, leadsInDevolucion })

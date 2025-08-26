@@ -15,7 +15,7 @@ const Register = () => {
   const [userMetadata, setUserMetadata] = useState({
     nombre: '',
     nombreEmpresa: '',
-    rol: 'client' as 'administrador' | 'client'
+    rol: ''
   })
   const [passwordError, setPasswordError] = useState('')
   const [isValidHash, setIsValidHash] = useState(false)
@@ -73,7 +73,7 @@ const Register = () => {
         // Consultar la tabla profiles para obtener los datos del usuario
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, roles(*)')
           .eq('user_id', user.id)
           .single()
 
@@ -108,7 +108,7 @@ const Register = () => {
         setUserMetadata({
           nombre: profile.nombre,
           nombreEmpresa,
-          rol: profile.es_admin ? 'administrador' : 'client'
+          rol: profile.roles?.nombre
         })
 
         setFormData(prev => ({
@@ -245,7 +245,7 @@ const Register = () => {
           </div>
 
           {/* Solo mostrar campo de empresa si el usuario NO es administrador */}
-          {userMetadata.rol === 'client' && (
+          {userMetadata.rol !== 'administrador' && (
             <div>
               <label htmlFor="company" className="block text-sm font-medium text-[#373643] mb-2">
                 Empresa

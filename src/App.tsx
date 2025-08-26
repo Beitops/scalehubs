@@ -28,6 +28,8 @@ function App() {
         {/* Set password route (for invited users) */}
         <Route path="/set-password" element={<Register />} />
 
+        <Route path="/prueba" element={<h1>Prueba</h1>} />
+
         {/* Protected platform routes */}
         <Route
           path="/"
