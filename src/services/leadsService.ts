@@ -65,6 +65,36 @@ class LeadsService {
     }
   }
 
+  async getLeadsByCompanyAndUser(empresaId: number, userId: string): Promise<Lead[]> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .eq('user_id', userId)
+        .order('fecha_entrada', { ascending: false })
+      if (error) {
+        console.error('Error fetching leads by company and user:', error)
+        throw error
+      }
+
+      return data?.map(lead => ({
+        ...lead,
+        empresa_nombre: lead.empresas?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma|| '')
+      })) || []
+    } catch (error) {
+      console.error('Error in getLeadsByCompanyAndUser:', error)
+      throw error
+    }
+  }
+
   async getAllLeads(): Promise<Lead[]> {
     try {
       const { data, error } = await supabase

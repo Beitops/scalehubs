@@ -38,6 +38,7 @@ interface LeadsState {
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
+  loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
   loadInitialLeads: () => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
@@ -75,11 +76,21 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       if (user?.rol === 'administrador') {
-
+        // Administrador ve todos los leads
         await get().loadLeads()
       } else if (userEmpresaId) {
-
-        await get().loadLeads(userEmpresaId || undefined)
+        // Usuario no admin, verificar rol
+        if (user?.rol === 'coordinador') {
+          // Coordinador ve todos los leads de su empresa
+          await get().loadLeads(userEmpresaId)
+        } else if (user?.rol === 'agente') {
+          // Agente solo ve los leads asignados a él
+          await get().loadLeadsByUser(userEmpresaId, user.id)
+        } else {
+          // Rol no reconocido, mostrar error
+          console.error('❌ Unknown user role:', user.rol)
+          throw new Error('Rol de usuario no reconocido. Contacta al administrador.')
+        }
       } else {
         // Si el usuario no es admin y no tiene empresa_id, mostrar error
         console.error('❌ User without company assigned:', user)
@@ -100,14 +111,23 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     
     if (!user) return
 
-
-
     set({ loading: true, error: null })
     try {
       if (user.rol === 'administrador') {
         await get().loadLeads()
       } else if (userEmpresaId) {
-        await get().loadLeads(userEmpresaId)
+        // Usuario no admin, verificar rol
+        if (user.rol === 'coordinador') {
+          // Coordinador ve todos los leads de su empresa
+          await get().loadLeads(userEmpresaId)
+        } else if (user.rol === 'agente') {
+          // Agente solo ve los leads asignados a él
+          await get().loadLeadsByUser(userEmpresaId, user.id)
+        } else {
+          // Rol no reconocido, mostrar error
+          console.error('❌ Unknown user role:', user.rol)
+          throw new Error('Rol de usuario no reconocido. Contacta al administrador.')
+        }
       } else {
         // Si el usuario no es admin y no tiene empresa_id, mostrar error
         console.error('❌ User without company assigned:', user)
@@ -136,6 +156,22 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       console.error('Error loading leads:', error)
       set({ 
         error: error instanceof Error ? error.message : 'Error al cargar los leads',
+        loading: false 
+      })
+    }
+  },
+
+  loadLeadsByUser: async (empresaId: number, userId: string) => {
+    set({ loading: true, error: null })
+    try {
+      const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId)
+      
+      const newActiveLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
+      set({ leads, activeLeads: newActiveLeads, loading: false })
+    } catch (error) {
+      console.error('Error loading leads by user:', error)
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar los leads del usuario',
         loading: false 
       })
     }

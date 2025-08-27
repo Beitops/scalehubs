@@ -5,15 +5,13 @@ import Platform from './pages/Platform'
 import ProtectedRoute from './pages/ProtectedRoute'
 import { useSupabaseAuthListener } from './hooks/useSupabaseAuthListener'
 import Dashboard from './pages/Dashboard'
+import MenuLeads from './pages/MenuLeads'
 import Leads from './pages/Leads'
+import HistorialLeads from './pages/HistorialLeads'
 import Devoluciones from './pages/Devoluciones'
 import Empresas from './pages/Empresas'
 import Usuarios from './pages/Usuarios'
 import Home from './pages/Home'
-
-
-
-
 
 function App() {
 
@@ -41,7 +39,9 @@ function App() {
         >
           <Route index path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/leads" element={<Leads />} />
+          <Route path="/leads" element={<MenuLeads />} />
+          <Route path="/leads/activos" element={<Leads />} />
+          <Route path="/leads/historial" element={<HistorialLeads />} />
           <Route path="/devoluciones" element={<Devoluciones />} />
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/usuarios" element={<Usuarios />} />
