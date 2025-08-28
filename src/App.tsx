@@ -12,6 +12,7 @@ import Devoluciones from './pages/Devoluciones'
 import Empresas from './pages/Empresas'
 import Usuarios from './pages/Usuarios'
 import Home from './pages/Home'
+import LeadsLayout from './components/LeadsLayout'
 
 function App() {
 
@@ -39,10 +40,12 @@ function App() {
         >
           <Route index path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/leads" element={<MenuLeads />} />
-          <Route path="/leads/activos" element={<Leads />} />
-          <Route path="/leads/historial" element={<HistorialLeads />} />
-          <Route path="/leads/devoluciones" element={<Devoluciones />} />
+          <Route path="/leads" element={<LeadsLayout />}>
+            <Route index element={<MenuLeads />} />
+            <Route path="activos" element={<Leads />} />
+            <Route path="historial" element={<HistorialLeads />} />
+            <Route path="devoluciones" element={<Devoluciones />} />
+          </Route>
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/usuarios" element={<Usuarios />} />
         </Route>

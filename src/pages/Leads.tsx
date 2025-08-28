@@ -214,13 +214,6 @@ const Leads = () => {
               : `Leads asignados a ${userEmpresaNombre || user?.empresa || 'tu empresa'}`
             }
           </p>
-          {user?.rol === 'administrador' && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-blue-700 text-xs">
-                👑 <strong>Modo Administrador:</strong> Visualizando todos los leads del sistema
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Filters and Export */}

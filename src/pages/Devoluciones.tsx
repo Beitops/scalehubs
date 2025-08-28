@@ -386,13 +386,6 @@ const Devoluciones = () => {
               : `Devoluciones pendientes de ${user?.empresa}`
             }
           </p>
-          {user?.rol === 'administrador' && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-blue-700 text-xs">
-                👑 <strong>Modo Administrador:</strong> Visualizando devoluciones de todo el sistema
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Stats Cards */}
