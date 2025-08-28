@@ -17,21 +17,20 @@ const HistorialLeads = () => {
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const {
     loading, 
-    error, 
-    refreshLeads, 
+    error,
     getLeadsInDateRange,
     leads
   } = useLeadsStore()
 
-  // Filtrar leads por estado (devolucion o resuelto)
+  // Filtrar leads por estado (devolucion o devuelto)
   const historialLeads = leads.filter(lead => 
-    lead.estado_temporal === 'devuelto' || lead.estado_temporal === 'resuelto'
+    lead.estado === 'devolucion' || lead.estado === 'devuelto'
   )
 
   const filteredLeads = historialLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
-    const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
+    const matchesStatus = !statusFilter || lead.estado === statusFilter
     return matchesDate && matchesPhone && matchesStatus
   })
 
@@ -50,7 +49,7 @@ const HistorialLeads = () => {
           )
           // Filtrar solo los del historial
           const historialInRange = leadsInRange.filter(lead => 
-            lead.estado_temporal === 'devuelto' || lead.estado_temporal === 'resuelto'
+            lead.estado === 'devolucion' || lead.estado === 'devuelto'
           )
           setLeadsToExport(historialInRange)
         } catch (error) {
@@ -86,7 +85,7 @@ const HistorialLeads = () => {
           `"${lead.nombre_cliente}"`,
           lead.telefono,
           lead.plataforma,
-          lead.estado_temporal || ''
+          lead.estado || ''
         ]
         if (user?.rol === 'administrador') {
           row.push(`"${lead.empresa_nombre || ''}"`)
@@ -119,16 +118,16 @@ const HistorialLeads = () => {
   }
 
   const getStatusBadge = (status: string) => {
-    if (status === 'devuelto') {
+    if (status === 'devolucion') {
       return (
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
           Devolución
         </span>
       )
-    } else if (status === 'resuelto') {
+    } else if (status === 'devuelto') {
       return (
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-green-700 bg-green-100">
-          Resuelto
+          Devuelto
         </span>
       )
     }
@@ -231,7 +230,7 @@ const HistorialLeads = () => {
                 >
                   <option value="">Todos los estados</option>
                   <option value="devolucion">Devolución</option>
-                  <option value="resuelto">Resuelto</option>
+                  <option value="devuelto">Devuelto</option>
                 </select>
               </div>
             </div>
@@ -333,7 +332,7 @@ const HistorialLeads = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(lead.estado_temporal || '')}
+                        {getStatusBadge(lead.estado || '')}
                       </td>
                       {user?.rol === 'administrador' && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">

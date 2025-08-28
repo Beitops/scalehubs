@@ -10,6 +10,7 @@ export interface Lead {
   empresa_id: number
   empresa_nombre?: string
   estado_temporal?: string
+  estado?: string
   campaña_id?: number
   hub_id?: number
   plataforma_lead_id?: string
@@ -124,7 +125,7 @@ class LeadsService {
     }
   }
 
-  async updateLeadStatus(leadId: number, estadoTemporal: string, userId?: string): Promise<void> {
+  async updateLeadStatus(leadId: number, estadoTemporal: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('leads')
@@ -136,25 +137,41 @@ class LeadsService {
         console.error('Error updating lead status:', error)
         throw error
       }
-
-      // Si se está solicitando una devolución y se proporciona userId, insertar en tabla devoluciones
-      if (estadoTemporal === 'devolucion' && userId) {
-        // Insertar en tabla devoluciones usando el leadId que ya tenemos
-        const { error: devolucionError } = await supabase
-          .from('devoluciones')
-          .insert({
-            lead_id: leadId,
-            usuario_id: userId,
-            estado: 'pendiente'
-          })
-
-        if (devolucionError) {
-          console.error('Error creating devolucion record:', devolucionError)
-          throw devolucionError
-        }
-      }
     } catch (error) {
       console.error('Error in updateLeadStatus:', error)
+      throw error
+    }
+  }
+
+  async returnLead(leadId: number, userId: string): Promise<void> {
+    try {
+      // Actualizar el estado del lead a 'devolucion'
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({ estado: 'devolucion' })
+        .eq('id', leadId)
+        .select()
+
+      if (updateError) {
+        console.error('Error updating lead estado:', updateError)
+        throw updateError
+      }
+
+      // Insertar en tabla devoluciones
+      const { error: devolucionError } = await supabase
+        .from('devoluciones')
+        .insert({
+          lead_id: leadId,
+          usuario_id: userId,
+          estado: 'pendiente'
+        })
+
+      if (devolucionError) {
+        console.error('Error creating devolucion record:', devolucionError)
+        throw devolucionError
+      }
+    } catch (error) {
+      console.error('Error in returnLead:', error)
       throw error
     }
   }

@@ -42,7 +42,7 @@ function App() {
           <Route path="/leads" element={<MenuLeads />} />
           <Route path="/leads/activos" element={<Leads />} />
           <Route path="/leads/historial" element={<HistorialLeads />} />
-          <Route path="/devoluciones" element={<Devoluciones />} />
+          <Route path="/leads/devoluciones" element={<Devoluciones />} />
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/usuarios" element={<Usuarios />} />
         </Route>

@@ -37,6 +37,7 @@ interface LeadsState {
   getLeadsByCompany: (empresaId: number) => Promise<Lead[]>
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
+  returnLead: (leadId: number, userId: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
   loadInitialLeads: () => Promise<void>
@@ -150,7 +151,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         : await leadsService.getAllLeads()
       
 
-      const newActiveLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
+      const newActiveLeads = leads.filter(lead => lead.estado === 'activo')
       set({ leads, activeLeads: newActiveLeads, loading: false })
     } catch (error) {
       console.error('Error loading leads:', error)
@@ -166,7 +167,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     try {
       const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId)
       
-      const newActiveLeads = leads.filter(lead => lead.estado_temporal !== 'devolucion')
+      const newActiveLeads = leads.filter(lead => lead.estado === 'activo')
       set({ leads, activeLeads: newActiveLeads, loading: false })
     } catch (error) {
       console.error('Error loading leads by user:', error)
@@ -197,11 +198,20 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  updateLeadStatus: async (leadId: number, estadoTemporal: string, userId?: string) => {
+  updateLeadStatus: async (leadId: number, estadoTemporal: string) => {
     try {
-      await leadsService.updateLeadStatus(leadId, estadoTemporal, userId)
+      await leadsService.updateLeadStatus(leadId, estadoTemporal)
     } catch (error) {
       console.error('Error updating lead status:', error)
+      throw error
+    }
+  },
+
+  returnLead: async (leadId: number, userId: string) => {
+    try {
+      await leadsService.returnLead(leadId, userId)
+    } catch (error) {
+      console.error('Error returning lead:', error)
       throw error
     }
   },
@@ -259,7 +269,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         filteredData = filteredData.filter(d => d.lead?.empresa_id === userEmpresaId)
       }
 
-
       // Filtrar según el rol del usuario
       if (user?.rol === 'administrador') {
         // Para admin: mostrar solo las que tengan estado 'tramite'
@@ -273,7 +282,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           devolucion_id: d.id,
           plataforma_lead: platformConverter(d.lead.plataforma || '')
         }))
-        
         set({ devoluciones: filteredData, leadsInTramite })
       } else {
         // Para clientes: mostrar solo las que tengan estado 'pendiente'
@@ -287,7 +295,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           devolucion_id: d.id,
           plataforma_lead: platformConverter(d.lead.plataforma || '')
         }))
-        
+
         set({ devoluciones: filteredData, leadsInDevolucion })
       }
     } catch (error) {

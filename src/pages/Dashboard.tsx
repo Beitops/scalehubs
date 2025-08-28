@@ -1,20 +1,43 @@
+import { useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
-import { useLeadsStore } from '../store/leadsStore'
+import { useDashboardStore } from '../store/dashboardStore'
 
 
 
 const Dashboard = () => {
-  console.log('Dashboard')
   const { user, userEmpresaNombre } = useAuthStore()
-  const { loading, activeLeads } = useLeadsStore()
-  // Calcular estadísticas basadas en los leads reales
-  const totalLeads = activeLeads.length
-  const leadsThisMonth = activeLeads.filter(lead => {
+  const { loading, dashboardLeads, loadDashboardLeads, isInitialized } = useDashboardStore()
+
+  // Cargar datos del dashboard cuando el componente se monte
+  useEffect(() => {
+    if (!user) return
+
+    let isReady = true
+    const loadData = async () => {
+      if (isReady) {
+        try {
+          await loadDashboardLeads()
+        } catch (error) {
+          console.error('Error loading dashboard data:', error)
+        }
+      }
+    }
+
+    loadData()
+
+    return () => {
+      isReady = false
+    }
+  }, [user, loadDashboardLeads])
+
+  // Calcular estadísticas basadas en los leads del dashboard
+  const totalLeads = dashboardLeads.length
+  const leadsThisMonth = dashboardLeads.filter(lead => {
     const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const leadDate = new Date(lead.fecha_entrada).getTime()
     return new Date(leadDate).getTime() >= hace30Dias.getTime() ? lead : null
   }).length
-  const platformDistribution = activeLeads.reduce((acc, lead) => {
+  const platformDistribution = dashboardLeads.reduce((acc, lead) => {
     acc[lead.plataforma_lead || ''] = (acc[lead.plataforma_lead || ''] || 0) + 1
     return acc
   }, {} as Record<string, number>)
@@ -56,11 +79,11 @@ const Dashboard = () => {
   ]
 
   // Obtener leads recientes (últimos 4)
-  const recentLeads = activeLeads
+  const recentLeads = dashboardLeads
     .sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
     .slice(0, 4)
 
-  if (loading) {
+  if (!isInitialized || loading) {
     return (
       <div className="p-6 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>

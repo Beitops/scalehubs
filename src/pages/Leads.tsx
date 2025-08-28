@@ -9,6 +9,7 @@ import type { Lead } from '../services/leadsService'
 const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -23,6 +24,7 @@ const Leads = () => {
     error, 
     refreshLeads, 
     updateLeadStatus, 
+    returnLead,
     getLeadsInDateRange,
     activeLeads
   } = useLeadsStore()
@@ -32,7 +34,8 @@ const Leads = () => {
   const filteredLeads = activeLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
-    return matchesDate && matchesPhone
+    const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
+    return matchesDate && matchesPhone && matchesStatus
   })
 
   // Calcular leads en el rango de fechas para exportación
@@ -69,7 +72,7 @@ const Leads = () => {
     if (leadsToExport.length === 0) return
 
     // Crear CSV content
-    const headers = ['Fecha', 'Nombre', 'Teléfono', 'Plataforma']
+    const headers = ['Fecha', 'Nombre', 'Teléfono', 'Plataforma', 'Estado']
     if (user?.rol === 'administrador') {
       headers.push('Empresa')
     }
@@ -81,7 +84,8 @@ const Leads = () => {
           new Date(lead.fecha_entrada).toLocaleDateString('es-ES'),
           `"${lead.nombre_cliente}"`,
           lead.telefono,
-          lead.plataforma
+          lead.plataforma,
+          getStatusDisplayName(lead.estado_temporal || 'sin_tratar')
         ]
         if (user?.rol === 'administrador') {
           row.push(`"${lead.empresa_nombre || ''}"`)
@@ -121,16 +125,52 @@ const Leads = () => {
   const handleConfirmReturn = async () => {
     if (selectedLead && user?.id) {
       try {
-        await updateLeadStatus(selectedLead.id, 'devolucion', user.id)
+        // Usar la función específica para devoluciones
+        await returnLead(selectedLead.id, user.id)
         setShowReturnModal(false)
         setSelectedLead(null)
         
         // Recargar leads para actualizar la vista
         await refreshLeads()
       } catch (error) {
-        console.error('Error updating lead status:', error)
+        console.error('Error returning lead:', error)
       }
     }
+  }
+
+  const handleStatusChange = async (leadId: number, newStatus: string) => {
+    try {
+      await updateLeadStatus(leadId, newStatus)
+      // Recargar leads para actualizar la vista
+      await refreshLeads()
+    } catch (error) {
+      console.error('Error updating lead status:', error)
+    }
+  }
+
+  const getStatusDisplayName = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'sin_tratar': 'Sin Tratar',
+      'no_contesta': 'No Contesta',
+      'no_interesado': 'No Interesado',
+      'tratando': 'Tratando',
+      'convertido': 'Convertido',
+      'perdido': 'Perdido',
+      'devolucion': 'Devolución'
+    }
+    return statusMap[status] || status
+  }
+
+  const getStatusTextColor = (status: string) => {
+    const colorMap: Record<string, string> = {
+      'sin_tratar': 'text-gray-700',
+      'no_contesta': 'text-yellow-700',
+      'no_interesado': 'text-red-700',
+      'tratando': 'text-blue-700',
+      'convertido': 'text-green-700',
+      'perdido': 'text-red-700',
+    }
+    return colorMap[status] || 'text-gray-700'
   }
 
   if (loading) {
@@ -187,7 +227,7 @@ const Leads = () => {
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
           <div className="flex flex-col gap-4">
             {/* Filters Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="dateFilter" className="block text-sm font-medium text-[#373643] mb-2">
                   Filtrar por fecha
@@ -212,6 +252,25 @@ const Leads = () => {
                   onChange={(e) => setPhoneFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                 />
+              </div>
+              <div>
+                <label htmlFor="statusFilter" className="block text-sm font-medium text-[#373643] mb-2">
+                  Filtrar por estado
+                </label>
+                <select
+                  id="statusFilter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="sin_tratar">Sin Tratar</option>
+                  <option value="no_contesta">No Contesta</option>
+                  <option value="no_interesado">No Interesado</option>
+                  <option value="tratando">Tratando</option>
+                  <option value="convertido">Convertido</option>
+                  <option value="perdido">Perdido</option>
+                </select>
               </div>
             </div>
             
@@ -243,6 +302,19 @@ const Leads = () => {
                 <div className="space-y-1 text-xs text-gray-600">
                   <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                   <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                  <p><span className="font-medium">Estado:</span></p>
+                  <select
+                    value={lead.estado_temporal || 'sin_tratar'}
+                    onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                    className={`w-full px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
+                  >
+                    <option value="sin_tratar">Sin Tratar</option>
+                    <option value="no_contesta">No Contesta</option>
+                    <option value="no_interesado">No Interesado</option>
+                    <option value="tratando">Tratando</option>
+                    <option value="convertido">Convertido</option>
+                    <option value="perdido">Perdido</option>
+                  </select>
                   {user?.rol === 'administrador' && (
                     <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
                   )}
@@ -278,6 +350,9 @@ const Leads = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Plataforma
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Estado
+                  </th>
                   {user?.rol === 'administrador' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                       Empresa
@@ -306,6 +381,20 @@ const Leads = () => {
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
                         {lead.plataforma_lead}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={lead.estado_temporal || 'sin_tratar'}
+                        onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                        className={`px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
+                      >
+                        <option value="sin_tratar">Sin Tratar</option>
+                        <option value="no_contesta">No Contesta</option>
+                        <option value="no_interesado">No Interesado</option>
+                        <option value="tratando">Tratando</option>
+                        <option value="convertido">Convertido</option>
+                        <option value="perdido">Perdido</option>
+                      </select>
                     </td>
                     {user?.rol === 'administrador' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">

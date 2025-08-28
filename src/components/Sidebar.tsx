@@ -1,4 +1,3 @@
-
 import { NavLink } from 'react-router-dom'
 import CompanyName from './CompanyName'
 
@@ -20,7 +19,6 @@ const Sidebar = ({ onClose, onLogout, onAddUser }: SidebarProps) => {
     { id: 'home', label: 'Inicio', icon: '🏠', to: '/' },
     { id: 'dashboard', label: 'Dashboard', icon: '📊', to: '/dashboard' },
     { id: 'leads', label: 'Leads', icon: '👥', to: '/leads' },
-    { id: 'devoluciones', label: 'Devoluciones', icon: '📦', to: '/devoluciones' },
   ];
 
   const adminMenuItems = [

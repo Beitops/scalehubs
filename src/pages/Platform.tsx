@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import { useAuthStore } from '../store/authStore'
 import { userService } from '../services/userService'
 import type { NewUserData } from '../services/userService'
 import { supabase } from '../lib/supabase'
-import { useLeadsStore } from '../store/leadsStore'
 import { Outlet } from 'react-router-dom'
 
 
@@ -26,39 +25,7 @@ const Platform = () => {
 
 
 
-  const { user, logout, checkAuth } = useAuthStore()
-  const { loadInitialLeads, loadDevoluciones, isInitialized } = useLeadsStore()
-
-  // Cargar leads cuando el usuario esté autenticado
-  useEffect(() => {
-
-    if (!user) return
-
-    let isReady = true
-    const loadInitialLoadsAndDevoluciones = async () => {
-
-      if (isReady) {
-
-
-        try {
-
-          await loadInitialLeads()
-          loadDevoluciones()
-
-        } catch (error) {
-          console.error('Error loading data:', error)
-
-        }
-      }
-
-      return () => {
-        isReady = false
-      }
-
-    }
-
-    loadInitialLoadsAndDevoluciones()
-  }, [checkAuth, loadInitialLeads, loadDevoluciones, user])
+  const { logout } = useAuthStore()
 
 
 
@@ -180,14 +147,7 @@ const Platform = () => {
     setSidebarOpen(false);
   };
 
-  if (!isInitialized) {
-    return (
-      <div className="p-6 flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
-        <span className="ml-3 text-gray-600">Cargando datos...</span>
-      </div>
-    )
-  }
+
 
   return (
     <>

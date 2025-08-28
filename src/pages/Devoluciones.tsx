@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { LeadDevolucion } from '../services/leadsService'
@@ -277,17 +278,17 @@ const Devoluciones = () => {
           throw new Error('Error al rechazar definitivamente la devolución')
         }
 
-        // Actualizar el estado_temporal de lead a 'asignado'
+        // Actualizar el estado del lead a 'activo'
         const { error: updateLeadError } = await supabase
           .from('leads')
           .update({
-            estado_temporal: 'asignado'
+            estado: 'activo'
           })
           .eq('id', selectedLead.id)
 
         if (updateLeadError) {
           console.error('Error actualizando lead:', updateLeadError)
-          throw new Error('Error al actualizar el estado temporal del lead')
+          throw new Error('Error al actualizar el estado del lead')
         }
 
 
@@ -368,7 +369,17 @@ const Devoluciones = () => {
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 lg:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Devoluciones</h1>
+          <div className="flex items-center gap-3 mb-4">
+            <Link 
+              to="/leads"
+              className="text-[#18cb96] hover:text-[#15b885] transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">Devoluciones</h1>
+          </div>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
             {user?.rol === 'administrador'
               ? 'Gestiona las devoluciones de leads de todas las empresas'

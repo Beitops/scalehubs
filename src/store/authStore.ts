@@ -2,8 +2,11 @@ import { create } from 'zustand'
 import { persist, devtools } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
 import type { FrontendUser } from '../types/database'
-import { useLeadsStore } from './leadsStore'
 import type { Session } from '@supabase/supabase-js'
+
+
+
+
 
 interface AuthState {
     user: FrontendUser | null
@@ -204,7 +207,7 @@ export const useAuthStore = create<AuthState>()(
                             userEmpresaNombre: '',
                             session: null
                         })
-                        useLeadsStore.getState().resetInitialized()
+                        window.location.reload()
                     }
                 },
 
