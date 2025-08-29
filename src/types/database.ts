@@ -7,8 +7,10 @@ export interface DatabaseProfile {
   user_id: string // UUID que referencia auth.users(id)
   empresa_id: number | null // Integer que referencia empresas(id)
   nombre: string | null
-  es_admin: boolean // true = admin, false = client
-  fecha_creacion: string // timestamp without time zone
+  email: string | null // Campo email añadido
+  fecha_creacion: string,
+  rol_id: number | null // ID que referencia roles(id)
+  rol?: string // Nombre del rol obtenido desde la tabla roles
 }
 
 // Tabla empresas

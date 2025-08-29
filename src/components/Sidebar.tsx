@@ -7,10 +7,9 @@ interface SidebarProps {
   onClose: () => void
   sidebarOpen?: boolean
   onLogout?: () => void
-  onAddUser?: () => void
 }
 
-const Sidebar = ({ onClose, onLogout, onAddUser }: SidebarProps) => {
+const Sidebar = ({ onClose, onLogout }: SidebarProps) => {
 
   const { user } = useAuthStore()
 
@@ -26,8 +25,14 @@ const Sidebar = ({ onClose, onLogout, onAddUser }: SidebarProps) => {
     { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' },
   ];
 
+  const coordinadorMenuItems = [
+    { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' },
+  ];
+
   const menuItems = user?.rol === 'administrador'
     ? [...baseMenuItems, ...adminMenuItems]
+    : user?.rol === 'coordinador'
+    ? [...baseMenuItems, ...coordinadorMenuItems]
     : baseMenuItems;
 
   const handleMenuClick = () => {
@@ -77,18 +82,7 @@ const Sidebar = ({ onClose, onLogout, onAddUser }: SidebarProps) => {
         </ul>
       </nav>
 
-      {/* Add User Button (Admin Only) */}
-              {user?.rol === 'administrador' && onAddUser && (
-        <div className="px-4 mb-4">
-          <button
-            onClick={onAddUser}
-            className="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors bg-[#18cb96] text-white hover:bg-[#15b885]"
-          >
-            <span className="mr-3 text-3xl text-white">+</span>
-            <span className="font-medium">Añadir usuarios</span>
-          </button>
-        </div>
-      )}
+      {/* Add User Button removed - now in Usuarios.tsx */}
 
       {/* User Info */}
       <div className="p-4 border-t border-gray-200">

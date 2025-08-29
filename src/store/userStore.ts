@@ -35,8 +35,15 @@ export const useUserStore = create<UserState>((set, get) => ({
       let usersData: DatabaseProfile[]
       
       if (userRole === 'administrador') {
+        // Los administradores ven todos los usuarios
         usersData = await getAllUsers()
+      } else if (userRole === 'coordinador' && userEmpresaId) {
+        // Los coordinadores ven solo los usuarios de su empresa (agentes)
+        usersData = await getUsersByCompany(userEmpresaId)
+        // Filtrar para mostrar solo agentes (no coordinadores ni administradores)
+        usersData = usersData.filter(user => user.rol === 'agente')
       } else if (userEmpresaId) {
+        // Otros roles ven usuarios de su empresa
         usersData = await getUsersByCompany(userEmpresaId)
       } else {
         usersData = []

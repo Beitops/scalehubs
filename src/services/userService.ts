@@ -139,6 +139,10 @@ export const getAllUsers = async (): Promise<DatabaseProfile[]> => {
         id,
         nombre,
         cif
+      ),
+      rol:roles!profiles_rol_id_fkey (
+        id,
+        nombre
       )
     `)
       .order('fecha_creacion', { ascending: false })
@@ -148,7 +152,13 @@ export const getAllUsers = async (): Promise<DatabaseProfile[]> => {
       throw error
     }
 
-    return data || []
+    // Transformar los datos para incluir el nombre del rol
+    const transformedData = data?.map(user => ({
+      ...user,
+      rol: (user as any)?.rol?.nombre || null
+    })) || []
+
+    return transformedData
   } catch (error) {
     console.error('Error in getAllUsers:', error)
     throw error
@@ -160,7 +170,13 @@ export const getUsersByCompany = async (empresaId: number): Promise<DatabaseProf
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        *,
+        rol:roles!profiles_rol_id_fkey (
+          id,
+          nombre
+        )
+      `)
       .eq('empresa_id', empresaId)
       .order('fecha_creacion', { ascending: false })
 
@@ -169,7 +185,13 @@ export const getUsersByCompany = async (empresaId: number): Promise<DatabaseProf
       throw error
     }
 
-    return data || []
+    // Transformar los datos para incluir el nombre del rol
+    const transformedData = data?.map(user => ({
+      ...user,
+      rol: (user as any)?.rol?.nombre || null
+    })) || []
+
+    return transformedData
   } catch (error) {
     console.error('Error in getUsersByCompany:', error)
     throw error
