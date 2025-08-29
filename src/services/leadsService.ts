@@ -37,9 +37,9 @@ export interface LeadDevolucion extends Lead {
 }
 
 class LeadsService {
-  async getLeadsByCompany(empresaId: number): Promise<Lead[]> {
+  async getLeadsByCompany(empresaId: number, estado?: string): Promise<Lead[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -50,6 +50,13 @@ class LeadsService {
         `)
         .eq('empresa_id', empresaId)
         .order('fecha_entrada', { ascending: false })
+      
+      // Filtrar por estado si se especifica
+      if (estado) {
+        query = query.eq('estado', estado)
+      }
+
+      const { data, error } = await query
       if (error) {
         console.error('Error fetching leads by company:', error)
         throw error
@@ -66,9 +73,9 @@ class LeadsService {
     }
   }
 
-  async getLeadsByCompanyAndUser(empresaId: number, userId: string): Promise<Lead[]> {
+  async getLeadsByCompanyAndUser(empresaId: number, userId: string, estado?: string): Promise<Lead[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -80,6 +87,13 @@ class LeadsService {
         .eq('empresa_id', empresaId)
         .eq('user_id', userId)
         .order('fecha_entrada', { ascending: false })
+      
+      // Filtrar por estado si se especifica
+      if (estado) {
+        query = query.eq('estado', estado)
+      }
+
+      const { data, error } = await query
       if (error) {
         console.error('Error fetching leads by company and user:', error)
         throw error
@@ -96,9 +110,9 @@ class LeadsService {
     }
   }
 
-  async getAllLeads(): Promise<Lead[]> {
+  async getAllLeads(estado?: string): Promise<Lead[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -108,6 +122,13 @@ class LeadsService {
           )
         `)
         .order('fecha_entrada', { ascending: false })
+      
+      // Filtrar por estado si se especifica
+      if (estado) {
+        query = query.eq('estado', estado)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching all leads:', error)
@@ -205,7 +226,7 @@ class LeadsService {
     }
   }
 
-  async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number): Promise<Lead[]> {
+    async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estado?: string): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -222,6 +243,11 @@ class LeadsService {
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
+      }
+
+      // Filtrar por estado si se especifica
+      if (estado) {
+        query = query.eq('estado', estado)
       }
 
       const { data, error } = await query

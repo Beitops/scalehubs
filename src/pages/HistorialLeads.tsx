@@ -19,15 +19,12 @@ const HistorialLeads = () => {
     loading, 
     error,
     getLeadsInDateRange,
-    leads
+    leadsHistorial
   } = useLeadsStore()
 
-  // Filtrar leads por estado (devolucion o devuelto)
-  const historialLeads = leads.filter(lead => 
-    lead.estado === 'devolucion' || lead.estado === 'devuelto'
-  )
 
-  const filteredLeads = historialLeads.filter(lead => {
+
+  const filteredLeads = leadsHistorial.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
     const matchesStatus = !statusFilter || lead.estado === statusFilter
@@ -42,15 +39,20 @@ const HistorialLeads = () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          const leadsInRange = await getLeadsInDateRange(
+          // Cargar leads de devolucion y devuelto por separado para el rango de fechas
+          const leadsDevolucion = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
-            empresaId || undefined
+            empresaId || undefined,
+            'devolucion'
           )
-          // Filtrar solo los del historial
-          const historialInRange = leadsInRange.filter(lead => 
-            lead.estado === 'devolucion' || lead.estado === 'devuelto'
+          const leadsDevueltos = await getLeadsInDateRange(
+            exportDateRange.startDate, 
+            exportDateRange.endDate, 
+            empresaId || undefined,
+            'devuelto'
           )
+          const historialInRange = [...leadsDevolucion, ...leadsDevueltos]
           setLeadsToExport(historialInRange)
         } catch (error) {
           console.error('Error fetching leads in date range:', error)
@@ -344,7 +346,7 @@ const HistorialLeads = () => {
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{historialLeads.length}</span> leads en historial
+                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{leadsHistorial.length}</span> leads en historial
                 {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}

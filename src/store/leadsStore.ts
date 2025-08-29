@@ -26,6 +26,7 @@ interface Devolucion {
 
 interface LeadsState {
   leads: Lead[]
+  leadsHistorial: Lead[]
   activeLeads: Lead[]
   loading: boolean
   error: string | null
@@ -40,8 +41,9 @@ interface LeadsState {
   returnLead: (leadId: number, userId: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
+  loadHistorialLeads: (empresaId?: number) => Promise<void>
   loadInitialLeads: () => Promise<void>
-  getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number) => Promise<Lead[]>
+  getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estado?: string) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
   triggerReload: () => void
   loadDevoluciones: () => Promise<void>
@@ -58,6 +60,7 @@ interface LeadsState {
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
   leads: [],
+  leadsHistorial: [],
   activeLeads: [],
   loading: false,
   error: null,
@@ -147,12 +150,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const leads = empresaId 
-        ? await leadsService.getLeadsByCompany(empresaId)
-        : await leadsService.getAllLeads()
+        ? await leadsService.getLeadsByCompany(empresaId, 'activo')
+        : await leadsService.getAllLeads('activo')
       
-
-      const newActiveLeads = leads.filter(lead => lead.estado === 'activo')
-      set({ leads, activeLeads: newActiveLeads, loading: false })
+      set({ leads, activeLeads: leads, loading: false })
     } catch (error) {
       console.error('Error loading leads:', error)
       set({ 
@@ -165,14 +166,40 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   loadLeadsByUser: async (empresaId: number, userId: string) => {
     set({ loading: true, error: null })
     try {
-      const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId)
+      const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId, 'activo')
       
-      const newActiveLeads = leads.filter(lead => lead.estado === 'activo')
-      set({ leads, activeLeads: newActiveLeads, loading: false })
+      set({ activeLeads: leads, loading: false })
     } catch (error) {
       console.error('Error loading leads by user:', error)
       set({ 
         error: error instanceof Error ? error.message : 'Error al cargar los leads del usuario',
+        loading: false 
+      })
+    }
+  },
+
+  loadHistorialLeads: async (empresaId?: number) => {
+    set({ loading: true, error: null })
+    try {
+      let historialLeads: Lead[] = []
+      
+      if (empresaId) {
+        // Para usuarios no admin, cargar solo leads de su empresa con estado devolucion o devuelto
+        const leadsDevolucion = await leadsService.getLeadsByCompany(empresaId, 'devolucion')
+        const leadsDevueltos = await leadsService.getLeadsByCompany(empresaId, 'devuelto')
+        historialLeads = [...leadsDevolucion, ...leadsDevueltos]
+      } else {
+        // Para admin, cargar todos los leads con estado devolucion o devuelto
+        const leadsDevolucion = await leadsService.getAllLeads('devolucion')
+        const leadsDevueltos = await leadsService.getAllLeads('devuelto')
+        historialLeads = [...leadsDevolucion, ...leadsDevueltos]
+      }
+      
+      set({ leadsHistorial: historialLeads, loading: false })
+    } catch (error) {
+      console.error('Error loading historial leads:', error)
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar el historial de leads',
         loading: false 
       })
     }
@@ -216,9 +243,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  getLeadsInDateRange: async (startDate: string, endDate: string, empresaId?: number) => {
+  getLeadsInDateRange: async (startDate: string, endDate: string, empresaId?: number, estado?: string) => {
     try {
-      return await leadsService.getLeadsInDateRange(startDate, endDate, empresaId)
+      return await leadsService.getLeadsInDateRange(startDate, endDate, empresaId, estado)
     } catch (error) {
       console.error('Error getting leads in date range:', error)
       throw error

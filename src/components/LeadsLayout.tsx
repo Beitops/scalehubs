@@ -4,8 +4,8 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 
 const LeadsLayout = () => {
-  const { user, userEmpresaNombre } = useAuthStore()
-  const { loadInitialLeads, loadDevoluciones } = useLeadsStore()
+  const { user, userEmpresaNombre, userEmpresaId } = useAuthStore()
+  const { loadInitialLeads, loadDevoluciones, loadHistorialLeads } = useLeadsStore()
 
   // Cargar leads cuando el componente se monte
   useEffect(() => {
@@ -17,6 +17,9 @@ const LeadsLayout = () => {
         try {
           await loadInitialLeads()
           loadDevoluciones()
+          // Cargar también el historial para que esté disponible en todas las rutas
+          const empresaId = user?.rol !== 'administrador' ? userEmpresaId || undefined : undefined
+          await loadHistorialLeads(empresaId)
         } catch (error) {
           console.error('Error loading data:', error)
         }
