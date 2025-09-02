@@ -24,6 +24,11 @@ export interface RegisterResponse {
   userId?: string
 }
 
+export interface DeleteUserResponse {
+  success: boolean
+  message: string
+}
+
 export const userService = {
   /**
    * Registra un nuevo usuario enviando una invitación por email
@@ -124,6 +129,63 @@ export const userService = {
       return response.data
     } catch (error: any) {
       throw new Error('Error al obtener usuarios: ' + (error.message || 'Error desconocido'))
+    }
+  },
+
+  /**
+   * Elimina un usuario del sistema
+   * @param userId - ID del usuario a eliminar
+   * @returns Promise con la respuesta del servidor
+   */
+  deleteUser: async (userId: string): Promise<DeleteUserResponse> => {
+    try {
+      // Obtener la sesión actual para obtener el JWT
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        throw new Error('Error al obtener la sesión: ' + sessionError.message)
+      }
+
+      if (!session) {
+        throw new Error('No hay sesión activa. Debes estar autenticado para eliminar usuarios.')
+      }
+
+      // Obtener el token de acceso
+      const accessToken = session.access_token
+
+      // Realizar la petición DELETE con el header Bearer
+      const response = await axiosInstance.delete(
+        `${import.meta.env.VITE_SUPABASE_URL_DELETE_USER}/${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      return response.data
+    } catch (error: any) {
+      console.error('Error completo:', error)
+      
+      // Manejar errores específicos
+      if (error.message?.includes('sesión')) {
+        throw new Error(error.message)
+      } else if (error.response?.status === 404) {
+        throw new Error('Usuario no encontrado')
+      } else if (error.response?.status === 400) {
+        throw new Error(error.response.data.error || 'Datos inválidos')
+      } else if (error.response?.status === 401) {
+        throw new Error('No tienes permisos para realizar esta acción. Verifica que seas administrador.')
+      } else if (error.response?.status === 403) {
+        throw new Error('Acceso denegado. No tienes permisos para eliminar usuarios.')
+      } else if (error.response?.status === 500) {
+        throw new Error('Error interno del servidor')
+      } else if (error.code === 'ERR_NETWORK') {
+        throw new Error('Error de conexión. Verifica tu conexión a internet.')
+      } else {
+        throw new Error('Error al eliminar el usuario: ' + (error.message || 'Error desconocido'))
+      }
     }
   }
 } 

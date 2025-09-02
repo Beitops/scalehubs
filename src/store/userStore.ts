@@ -12,6 +12,7 @@ interface UserState {
   
   // Lógica de negocio esencial
   loadUsers: (userRole: string, userEmpresaId?: number) => Promise<void>
+  deleteUser: (userId: string) => Promise<void>
   
   // Utilidades
   getUserById: (userId: string) => DatabaseProfile | undefined
@@ -53,6 +54,30 @@ export const useUserStore = create<UserState>((set, get) => ({
     } catch (err) {
       console.error('Error loading users:', err)
       set({ error: 'Error al cargar los usuarios' })
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  // Función para eliminar usuario
+  deleteUser: async (userId: string) => {
+    try {
+      set({ loading: true, error: null })
+      
+      // Importar userService dinámicamente para evitar dependencias circulares
+      const { userService } = await import('../services/userService')
+      
+      // Eliminar usuario del backend
+      await userService.deleteUser(userId)
+      
+      // Eliminar usuario del estado local
+      set(state => ({
+        users: state.users.filter(user => user.user_id !== userId)
+      }))
+      
+    } catch (err) {
+      console.error('Error deleting user:', err)
+      set({ error: 'Error al eliminar el usuario' })
     } finally {
       set({ loading: false })
     }
