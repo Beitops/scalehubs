@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
+import { ActionMenu } from '../components/ActionMenu'
 
 
 
@@ -12,7 +13,9 @@ const Leads = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [observations, setObservations] = useState('')
   const [exportDateRange, setExportDateRange] = useState({
     startDate: '',
     endDate: ''
@@ -24,6 +27,7 @@ const Leads = () => {
     error, 
     refreshLeads, 
     updateLeadStatus, 
+    updateLeadObservations,
     returnLead,
     getLeadsInDateRange,
     activeLeads
@@ -63,6 +67,8 @@ const Leads = () => {
 
     fetchLeadsInRange()
   }, [exportDateRange])
+
+
 
   const handleExport = () => {
     setShowExportModal(true)
@@ -122,6 +128,53 @@ const Leads = () => {
     setShowReturnModal(true)
   }
 
+  const handleViewDetails = (lead: Lead) => {
+    setSelectedLead(lead)
+    setObservations(lead.observaciones || '')
+    setShowDetailsModal(true)
+  }
+
+  const handleUpdateObservations = async () => {
+    if (selectedLead) {
+      try {
+        await updateLeadObservations(selectedLead.id, observations)
+        setShowDetailsModal(false)
+        setSelectedLead(null)
+        setObservations('')
+        
+        // Recargar leads para actualizar la vista
+        await refreshLeads()
+      } catch (error) {
+        console.error('Error updating observations:', error)
+      }
+    }
+  }
+
+  const getActionMenuItems = (lead: Lead) => [
+    {
+      label: 'Ver detalles',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      ),
+      onClick: () => handleViewDetails(lead)
+    },
+    {
+      label: 'Devolver lead',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-5a2 2 0 00-2-2H6a2 2 0 00-2 2v5a2 2 0 002 2h12a2 2 0 002-2z" />
+        </svg>
+      ),
+      onClick: () => handleReturnLead(lead),
+      className: 'text-red-600 hover:bg-red-50'
+    }
+  ]
+
+
+
   const handleConfirmReturn = async () => {
     if (selectedLead && user?.id) {
       try {
@@ -152,10 +205,10 @@ const Leads = () => {
     const statusMap: Record<string, string> = {
       'sin_tratar': 'Sin Tratar',
       'no_contesta': 'No Contesta',
-      'no_interesado': 'No Interesado',
-      'tratando': 'Tratando',
+      'no_valido': 'No Valido',
+      'gestion': 'En gestión',
       'convertido': 'Convertido',
-      'perdido': 'Perdido',
+      'no_cerrado': 'No Cerrado',
       'devolucion': 'Devolución'
     }
     return statusMap[status] || status
@@ -165,10 +218,10 @@ const Leads = () => {
     const colorMap: Record<string, string> = {
       'sin_tratar': 'text-gray-700',
       'no_contesta': 'text-yellow-700',
-      'no_interesado': 'text-red-700',
-      'tratando': 'text-blue-700',
+      'no_valido': 'text-red-700',
+      'gestion': 'text-blue-700',
       'convertido': 'text-green-700',
-      'perdido': 'text-red-700',
+      'no_cerrado': 'text-red-700',
     }
     return colorMap[status] || 'text-gray-700'
   }
@@ -259,10 +312,10 @@ const Leads = () => {
                   <option value="">Todos los estados</option>
                   <option value="sin_tratar">Sin Tratar</option>
                   <option value="no_contesta">No Contesta</option>
-                  <option value="no_interesado">No Interesado</option>
-                  <option value="tratando">Tratando</option>
+                  <option value="no_valido">No Valido</option>
+                  <option value="gestion">En gestión</option>
                   <option value="convertido">Convertido</option>
-                  <option value="perdido">Perdido</option>
+                  <option value="no_cerrado">No Cerrado</option>
                 </select>
               </div>
             </div>
@@ -303,10 +356,10 @@ const Leads = () => {
                   >
                     <option value="sin_tratar">Sin Tratar</option>
                     <option value="no_contesta">No Contesta</option>
-                    <option value="no_interesado">No Interesado</option>
-                    <option value="tratando">Tratando</option>
+                    <option value="no_valido">No Valido</option>
+                    <option value="gestion">En gestión</option>
                     <option value="convertido">Convertido</option>
-                    <option value="perdido">Perdido</option>
+                    <option value="no_cerrado">No Cerrado</option>
                   </select>
                   {user?.rol === 'administrador' && (
                     <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
@@ -314,12 +367,12 @@ const Leads = () => {
                 </div>
                 <div className="flex gap-2 mt-3">
                   {user?.rol !== 'administrador' && (
-                    <button 
-                      onClick={() => handleReturnLead(lead)}
-                      className="text-red-400 hover:text-red-600 text-xs font-medium transition-colors"
-                    >
-                      Devolver
-                    </button>
+                    <ActionMenu
+                      items={getActionMenuItems(lead)}
+                      triggerLabel="Más acciones"
+                      size="sm"
+                      className="text-xs font-medium"
+                    />
                   )}
                 </div>
               </div>
@@ -353,7 +406,7 @@ const Leads = () => {
                   )}
                   {user?.rol !== 'administrador' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                      Devoluciones
+                      Acciones
                     </th>
                   )}
                 </tr>
@@ -383,10 +436,10 @@ const Leads = () => {
                       >
                         <option value="sin_tratar">Sin Tratar</option>
                         <option value="no_contesta">No Contesta</option>
-                        <option value="no_interesado">No Interesado</option>
-                        <option value="tratando">Tratando</option>
+                        <option value="no_valido">No Valido</option>
+                        <option value="gestion">En gestión</option>
                         <option value="convertido">Convertido</option>
-                        <option value="perdido">Perdido</option>
+                        <option value="no_cerrado">No Cerrado</option>
                       </select>
                     </td>
                     {user?.rol === 'administrador' && (
@@ -396,12 +449,11 @@ const Leads = () => {
                     )}
                     {user?.rol !== 'administrador' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button 
-                          onClick={() => handleReturnLead(lead)}
-                          className="text-red-400 hover:text-red-600 transition-colors"
-                        >
-                          Devolver
-                        </button>
+                        <ActionMenu
+                          items={getActionMenuItems(lead)}
+                          triggerLabel="Más acciones"
+                          size="md"
+                        />
                       </td>
                     )}
                   </tr>
@@ -573,6 +625,97 @@ const Leads = () => {
                   className="flex-1 px-4 py-2 bg-red-400 text-white rounded-lg hover:bg-red-500 transition-colors"
                 >
                   Confirmar Devolución
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details Modal overlay */}
+      {showDetailsModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowDetailsModal(false)}
+        />
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedLead && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">Detalles del Lead</h2>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Lead Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Nombre del Cliente</label>
+                  <p className="text-sm text-gray-700">{selectedLead.nombre_cliente}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Teléfono</label>
+                  <p className="text-sm text-gray-700">{selectedLead.telefono}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Plataforma</label>
+                  <p className="text-sm text-gray-700">{selectedLead.plataforma_lead}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Fecha de Entrada</label>
+                  <p className="text-sm text-gray-700">{new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Estado Actual</label>
+                  <p className="text-sm text-gray-700">{getStatusDisplayName(selectedLead.estado_temporal || 'sin_tratar')}</p>
+                </div>
+                {user?.rol === 'administrador' && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <label className="block text-sm font-medium text-[#373643] mb-1">Empresa</label>
+                    <p className="text-sm text-gray-700">{selectedLead.empresa_nombre || '-'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Observations Section */}
+              <div>
+                <label htmlFor="observations" className="block text-sm font-medium text-[#373643] mb-2">
+                  Observaciones
+                </label>
+                <textarea
+                  id="observations"
+                  value={observations}
+                  onChange={(e) => setObservations(e.target.value)}
+                  placeholder="Añade observaciones sobre este lead..."
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm resize-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowDetailsModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={handleUpdateObservations}
+                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors"
+                >
+                  Actualizar Lead
                 </button>
               </div>
             </div>

@@ -38,6 +38,7 @@ interface LeadsState {
   getLeadsByCompany: (empresaId: number) => Promise<Lead[]>
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
+  updateLeadObservations: (leadId: number, observaciones: string) => Promise<void>
   returnLead: (leadId: number, userId: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
@@ -55,6 +56,7 @@ interface LeadsState {
     fecha_subida: string
     tipo: string
   }>>,
+  cancelDevolucion: (devolucionId: number, leadId: number) => Promise<void>,
   resetInitialized: () => void
 }
 
@@ -234,6 +236,15 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
+  updateLeadObservations: async (leadId: number, observaciones: string) => {
+    try {
+      await leadsService.updateLeadObservations(leadId, observaciones)
+    } catch (error) {
+      console.error('Error updating lead observations:', error)
+      throw error
+    }
+  },
+
   returnLead: async (leadId: number, userId: string) => {
     try {
       await leadsService.returnLead(leadId, userId)
@@ -371,6 +382,43 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     } catch (error) {
       console.error('Error in loadDevolucionArchivos:', error)
       return []
+    }
+  },
+
+  cancelDevolucion: async (devolucionId: number, leadId: number) => {
+    try {
+      // Actualizar el estado de la devolución a 'cancelado'
+      const { error: updateDevolucionError } = await supabase
+        .from('devoluciones')
+        .update({
+          estado: 'cancelado',
+          fecha_resolucion: new Date().toISOString()
+        })
+        .eq('id', devolucionId)
+
+      if (updateDevolucionError) {
+        console.error('Error updating devolucion:', updateDevolucionError)
+        throw updateDevolucionError
+      }
+
+      // Actualizar el estado del lead a 'activo'
+      const { error: updateLeadError } = await supabase
+        .from('leads')
+        .update({
+          estado: 'activo'
+        })
+        .eq('id', leadId)
+
+      if (updateLeadError) {
+        console.error('Error updating lead:', updateLeadError)
+        throw updateLeadError
+      }
+
+      // Recargar devoluciones después de la actualización exitosa
+      await get().loadDevoluciones()
+    } catch (error) {
+      console.error('Error in cancelDevolucion:', error)
+      throw error
     }
   },
 

@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { LeadDevolucion } from '../services/leadsService'
 import { supabase } from '../lib/supabase'
+import { ActionMenu } from '../components/ActionMenu'
 
 
 const Devoluciones = () => {
@@ -28,8 +29,9 @@ const Devoluciones = () => {
     urlTemporal: string | null
   }>>([])
   const [cargandoArchivos, setCargandoArchivos] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const { user } = useAuthStore()
-  const { loadDevoluciones, loadDevolucionArchivos, leadsInDevolucion, leadsInTramite } = useLeadsStore()
+  const { loadDevoluciones, loadDevolucionArchivos, leadsInDevolucion, leadsInTramite, cancelDevolucion } = useLeadsStore()
 
 
 
@@ -362,6 +364,61 @@ const Devoluciones = () => {
     }
   }
 
+  const handleCancelDevolucion = (lead: LeadDevolucion) => {
+    setSelectedLead(lead)
+    setShowCancelModal(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (selectedLead && selectedLead.devolucion_id) {
+      try {
+        await cancelDevolucion(selectedLead.devolucion_id, selectedLead.id)
+        setShowCancelModal(false)
+        setSelectedLead(null)
+      } catch (error) {
+        console.error('Error canceling devolucion:', error)
+      }
+    }
+  }
+
+  // Función para generar items del menú para devoluciones pendientes (coordinadores y agentes)
+  const getDevolucionPendienteMenuItems = (lead: LeadDevolucion) => [
+    {
+      label: 'Tramitar Devolución',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      onClick: () => handleFinishDevolucion(lead),
+      className: 'text-green-600 hover:bg-green-50'
+    },
+    {
+      label: 'Cancelar Devolución',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      ),
+      onClick: () => handleCancelDevolucion(lead),
+      className: 'text-red-600 hover:bg-red-50'
+    }
+  ]
+
+  // Función para generar items del menú para devoluciones en trámite (administradores)
+  const getDevolucionTramiteMenuItems = (lead: LeadDevolucion) => [
+    {
+      label: 'Tramitar',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      onClick: () => handleProcessDevolucion(lead),
+      className: 'text-blue-600 hover:bg-blue-50'
+    }
+  ]
+
 
 
   return (
@@ -449,12 +506,12 @@ const Devoluciones = () => {
                     )}
                   </div>
                   <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => handleFinishDevolucion(lead)}
-                      className="text-green-600 hover:text-green-700 text-xs font-medium transition-colors"
-                    >
-                      Tramitar Devolución
-                    </button>
+                    <ActionMenu
+                      items={getDevolucionPendienteMenuItems(lead)}
+                      triggerLabel="Acciones"
+                      size="sm"
+                      className="text-xs font-medium"
+                    />
                   </div>
                 </div>
               ))}
@@ -481,7 +538,7 @@ const Devoluciones = () => {
                       Estado
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                      Acción
+                      Acciones
                     </th>
                   </tr>
                 </thead>
@@ -508,12 +565,11 @@ const Devoluciones = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleFinishDevolucion(lead)}
-                          className="text-green-600 hover:text-green-700 transition-colors"
-                        >
-                          Tramitar Devolución
-                        </button>
+                        <ActionMenu
+                          items={getDevolucionPendienteMenuItems(lead)}
+                          triggerLabel="Acciones"
+                          size="md"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -547,12 +603,12 @@ const Devoluciones = () => {
                     <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre}</p>
                   </div>
                   <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => handleProcessDevolucion(lead)}
-                      className="text-blue-600 hover:text-blue-700 text-xs font-medium transition-colors"
-                    >
-                      Tramitar
-                    </button>
+                    <ActionMenu
+                      items={getDevolucionTramiteMenuItems(lead)}
+                      triggerLabel="Acciones"
+                      size="sm"
+                      className="text-xs font-medium"
+                    />
                   </div>
                 </div>
               ))}
@@ -582,7 +638,7 @@ const Devoluciones = () => {
                       Estado
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                      Acción
+                      Acciones
                     </th>
                   </tr>
                 </thead>
@@ -612,12 +668,11 @@ const Devoluciones = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleProcessDevolucion(lead)}
-                          className="text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          Tramitar
-                        </button>
+                        <ActionMenu
+                          items={getDevolucionTramiteMenuItems(lead)}
+                          triggerLabel="Acciones"
+                          size="md"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -901,6 +956,70 @@ const Devoluciones = () => {
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Modal overlay */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowCancelModal(false)}
+        />
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#373643]">Cancelar Devolución</h2>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-[#373643] mb-2">
+                  ¿Estás seguro de que quieres cancelar esta devolución?
+                </p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+                  <p className="text-yellow-800 text-xs">
+                    ⚠️ <strong>Importante:</strong> Esta acción cancelará la devolución y el lead volverá a estar activo.
+                  </p>
+                </div>
+                {selectedLead && (
+                  <div className="text-xs text-gray-600 mt-3">
+                    <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
+                    <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
+                    <p><strong>Plataforma:</strong> {selectedLead.plataforma_lead}</p>
+                    <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmCancel}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Confirmar Cancelación
                 </button>
               </div>
             </div>

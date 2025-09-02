@@ -16,6 +16,7 @@ export interface Lead {
   plataforma_lead_id?: string
   fecha_asignacion?: string
   plataforma_lead?: string
+  observaciones?: string
 }
 
 export interface CreateLeadData {
@@ -160,6 +161,24 @@ class LeadsService {
       }
     } catch (error) {
       console.error('Error in updateLeadStatus:', error)
+      throw error
+    }
+  }
+
+  async updateLeadObservations(leadId: number, observaciones: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ observaciones })
+        .eq('id', leadId)
+        .select()
+
+      if (error) {
+        console.error('Error updating lead observations:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in updateLeadObservations:', error)
       throw error
     }
   }
