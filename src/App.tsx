@@ -9,6 +9,7 @@ import MenuLeads from './pages/MenuLeads'
 import Leads from './pages/Leads'
 import HistorialLeads from './pages/HistorialLeads'
 import Devoluciones from './pages/Devoluciones'
+import AsignacionLeads from './pages/AsignacionLeads'
 import Empresas from './pages/Empresas'
 import Usuarios from './pages/Usuarios'
 import Home from './pages/Home'
@@ -45,6 +46,7 @@ function App() {
             <Route path="activos" element={<Leads />} />
             <Route path="historial" element={<HistorialLeads />} />
             <Route path="devoluciones" element={<Devoluciones />} />
+            <Route path="asignacion" element={<AsignacionLeads />} />
           </Route>
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/usuarios" element={<Usuarios />} />

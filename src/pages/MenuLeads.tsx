@@ -124,6 +124,45 @@ const MenuLeads = () => {
             </div>
           </div>
         </Link>
+
+        {/* Asignación de Leads */}
+        {(user?.rol === 'administrador' || user?.rol === 'coordinador') && (
+          <Link 
+            to="/leads/asignacion"
+            className="group block h-full"
+          >
+            <div className="bg-white rounded-xl shadow-md p-6 border-2 border-transparent hover:border-[#18cb96] hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-[#18cb96] rounded-lg flex items-center justify-center">
+                  <span className="text-2xl text-white">👥</span>
+                </div>
+                <div className="text-right">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-[#18cb96] bg-[#18cb96]/10">
+                    Asignación
+                  </span>
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-bold text-[#373643] mb-2 group-hover:text-[#18cb96] transition-colors">
+                Asignación de Leads
+              </h3>
+              
+              <p className="text-gray-600 text-sm mb-4 flex-grow">
+                {user?.rol === 'administrador' 
+                  ? 'Asigna leads sin empresa a diferentes empresas'
+                  : 'Asigna leads de tu empresa a agentes disponibles'
+                }
+              </p>
+              
+              <div className="flex items-center text-[#18cb96] font-medium text-sm group-hover:text-[#15b885] transition-colors mt-auto">
+                Gestionar asignaciones
+                <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   )

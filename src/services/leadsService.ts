@@ -285,6 +285,110 @@ class LeadsService {
       throw error
     }
   }
+
+  // Obtener leads sin empresa asignada (para administradores)
+  async getUnassignedLeads(): Promise<Lead[]> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          )
+        `)
+        .is('empresa_id', null)
+        .eq('estado', 'activo')
+        .order('fecha_entrada', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching unassigned leads:', error)
+        throw error
+      }
+
+      return data?.map(lead => ({
+        ...lead,
+        empresa_nombre: lead.empresas?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma || '')
+      })) || []
+    } catch (error) {
+      console.error('Error in getUnassignedLeads:', error)
+      throw error
+    }
+  }
+
+  // Obtener leads de una empresa sin agente asignado (para coordinadores)
+  async getUnassignedLeadsByCompany(empresaId: number): Promise<Lead[]> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .is('user_id', null)
+        .eq('estado', 'activo')
+        .order('fecha_entrada', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching unassigned leads by company:', error)
+        throw error
+      }
+
+      return data?.map(lead => ({
+        ...lead,
+        empresa_nombre: lead.empresas?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma || '')
+      })) || []
+    } catch (error) {
+      console.error('Error in getUnassignedLeadsByCompany:', error)
+      throw error
+    }
+  }
+
+  // Asignar lead a una empresa (para administradores)
+  async assignLeadToCompany(leadId: number, empresaId: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ empresa_id: empresaId })
+        .eq('id', leadId)
+
+      if (error) {
+        console.error('Error assigning lead to company:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in assignLeadToCompany:', error)
+      throw error
+    }
+  }
+
+  // Asignar lead a un agente (para coordinadores)
+  async assignLeadToAgent(leadId: number, userId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ 
+          user_id: userId,
+          fecha_asignacion: new Date().toISOString()
+        })
+        .eq('id', leadId)
+
+      if (error) {
+        console.error('Error assigning lead to agent:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in assignLeadToAgent:', error)
+      throw error
+    }
+  }
 }
 
 export const leadsService = new LeadsService() 

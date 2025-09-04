@@ -28,6 +28,7 @@ interface LeadsState {
   leads: Lead[]
   leadsHistorial: Lead[]
   activeLeads: Lead[]
+  unassignedLeads: Lead[]
   loading: boolean
   error: string | null
   isInitialized: boolean
@@ -57,6 +58,10 @@ interface LeadsState {
     tipo: string
   }>>,
   cancelDevolucion: (devolucionId: number, leadId: number) => Promise<void>,
+  loadUnassignedLeads: () => Promise<void>
+  loadUnassignedLeadsByCompany: (empresaId: number) => Promise<void>
+  assignLeadToCompany: (leadId: number, empresaId: number) => Promise<void>
+  assignLeadToAgent: (leadId: number, userId: string) => Promise<void>
   resetInitialized: () => void
 }
 
@@ -64,6 +69,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   leads: [],
   leadsHistorial: [],
   activeLeads: [],
+  unassignedLeads: [],
   loading: false,
   error: null,
   isInitialized: false,
@@ -422,7 +428,60 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
+  loadUnassignedLeads: async () => {
+    set({ loading: true, error: null })
+    try {
+      const leads = await leadsService.getUnassignedLeads()
+      set({ unassignedLeads: leads, loading: false })
+    } catch (error) {
+      console.error('Error loading unassigned leads:', error)
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar los leads sin asignar',
+        loading: false 
+      })
+    }
+  },
+
+  loadUnassignedLeadsByCompany: async (empresaId: number) => {
+    set({ loading: true, error: null })
+    try {
+      const leads = await leadsService.getUnassignedLeadsByCompany(empresaId)
+      set({ unassignedLeads: leads, loading: false })
+    } catch (error) {
+      console.error('Error loading unassigned leads by company:', error)
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar los leads sin asignar de la empresa',
+        loading: false 
+      })
+    }
+  },
+
+  assignLeadToCompany: async (leadId: number, empresaId: number) => {
+    try {
+      await leadsService.assignLeadToCompany(leadId, empresaId)
+      // Recargar leads sin asignar después de la asignación
+      await get().loadUnassignedLeads()
+    } catch (error) {
+      console.error('Error assigning lead to company:', error)
+      throw error
+    }
+  },
+
+  assignLeadToAgent: async (leadId: number, userId: string) => {
+    try {
+      await leadsService.assignLeadToAgent(leadId, userId)
+      // Recargar leads sin asignar después de la asignación
+      const { userEmpresaId } = useAuthStore.getState()
+      if (userEmpresaId) {
+        await get().loadUnassignedLeadsByCompany(userEmpresaId)
+      }
+    } catch (error) {
+      console.error('Error assigning lead to agent:', error)
+      throw error
+    }
+  },
+
   resetInitialized: () => {
-    set({ leads: [], devoluciones: [], isInitialized: false })
+    set({ leads: [], devoluciones: [], unassignedLeads: [], isInitialized: false })
   }
 })) 
