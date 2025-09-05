@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 import { ActionMenu } from '../components/ActionMenu'
+import { leadSolicitudesService } from '../services/leadSolicitudesService'
 
 
 
@@ -20,6 +21,13 @@ const Leads = () => {
     startDate: '',
     endDate: ''
   })
+  const [showSolicitudModal, setShowSolicitudModal] = useState(false)
+  const [solicitudLoading, setSolicitudLoading] = useState(false)
+  const [notification, setNotification] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error' | 'info'
+  }>({ show: false, message: '', type: 'info' })
   
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const {
@@ -32,6 +40,21 @@ const Leads = () => {
     getLeadsInDateRange,
     activeLeads
   } = useLeadsStore()
+
+  // Función para mostrar notificaciones
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ show: true, message, type })
+  }
+
+  // Auto-ocultar notificación después de 4 segundos
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }))
+      }, 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [notification.show])
 
 
 
@@ -201,6 +224,24 @@ const Leads = () => {
     }
   }
 
+  const handleSolicitarLead = async () => {
+    if (!user?.id) return
+
+    setSolicitudLoading(true)
+    try {
+      await leadSolicitudesService.createSolicitud({
+        solicitante_user_id: user.id
+      })
+      showNotification('Solicitud enviada correctamente. El coordinador revisará tu solicitud.', 'success')
+      setShowSolicitudModal(false)
+    } catch (error) {
+      console.error('Error creating solicitud:', error)
+      showNotification('Error al enviar la solicitud. Inténtalo de nuevo.', 'error')
+    } finally {
+      setSolicitudLoading(false)
+    }
+  }
+
   const getStatusDisplayName = (status: string) => {
     const statusMap: Record<string, string> = {
       'sin_tratar': 'Sin Tratar',
@@ -247,6 +288,58 @@ const Leads = () => {
 
   return (
     <>
+      {/* Notification */}
+      {notification.show && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] max-w-md w-full mx-4">
+          <div className={`rounded-lg shadow-lg p-4 flex items-center justify-between ${
+            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
+            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
+            'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className="flex items-center">
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                notification.type === 'success' ? 'bg-green-100' :
+                notification.type === 'error' ? 'bg-red-100' :
+                'bg-blue-100'
+              }`}>
+                {notification.type === 'success' ? (
+                  <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : notification.type === 'error' ? (
+                  <svg className="w-3 h-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <p className={`ml-3 text-sm font-medium ${
+                notification.type === 'success' ? 'text-green-800' :
+                notification.type === 'error' ? 'text-red-800' :
+                'text-blue-800'
+              }`}>
+                {notification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+              className={`ml-4 flex-shrink-0 ${
+                notification.type === 'success' ? 'text-green-400 hover:text-green-600' :
+                notification.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                'text-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 lg:mb-8">
@@ -268,6 +361,27 @@ const Leads = () => {
             }
           </p>
         </div>
+
+        {/* Solicitar Lead Button - Solo para agentes */}
+        {user?.rol === 'agente' && (
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-[#373643] mb-1">Solicitar Lead</h3>
+                <p className="text-sm text-gray-600">
+                  ¿Necesitas más leads para trabajar? Solicita leads adicionales a tu coordinador.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSolicitudModal(true)}
+                className="px-6 py-2 bg-[#18cb96] text-white font-medium rounded-lg hover:bg-[#15b885] transition-colors flex items-center"
+              >
+                <span className="mr-2">📝</span>
+                Solicitar Lead
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters and Export */}
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
@@ -716,6 +830,88 @@ const Leads = () => {
                   className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors"
                 >
                   Actualizar Lead
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Solicitud Modal overlay */}
+      {showSolicitudModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowSolicitudModal(false)}
+        />
+      )}
+
+      {/* Solicitud Confirmation Modal */}
+      {showSolicitudModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#373643]">Solicitar Lead</h2>
+              <button
+                onClick={() => setShowSolicitudModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">
+                      Información importante
+                    </h3>
+                    <div className="mt-2 text-sm text-blue-700">
+                      <p>
+                        Al solicitar un lead, tu coordinador recibirá una notificación y podrá asignarte 
+                        un lead adicional cuando esté disponible. La solicitud será revisada en breve.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Agente:</strong> {user?.nombre || user?.email}<br />
+                  <strong>Empresa:</strong> {userEmpresaNombre || 'No asignada'}<br />
+                  <strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowSolicitudModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSolicitarLead}
+                  disabled={solicitudLoading}
+                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {solicitudLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Enviando...
+                    </>
+                  ) : (
+                    'Confirmar Solicitud'
+                  )}
                 </button>
               </div>
             </div>
