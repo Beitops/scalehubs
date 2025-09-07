@@ -8,6 +8,11 @@ import type { Session } from '@supabase/supabase-js'
 
 
 
+interface EmpresaConfiguracion {
+    maxSolicitudesPorAgente: number
+    solicitudesAutomaticas: boolean
+}
+
 interface AuthState {
     user: FrontendUser | null
     isAuthenticated: boolean
@@ -15,6 +20,7 @@ interface AuthState {
     error: string | null
     userEmpresaId: number | null
     userEmpresaNombre: string
+    userEmpresaConfiguracion: EmpresaConfiguracion | null
     session: Session | null
     login: (email: string, password: string) => Promise<void>
     signup: (email: string, password: string, userData: any) => Promise<void>
@@ -22,6 +28,8 @@ interface AuthState {
     clearError: () => void
     checkAuth: (session: Session | null) => Promise<void>
     getUserEmpresaInfo: () => Promise<{ userEmpresaId: number | null; userEmpresaNombre: string }>
+    updateEmpresaConfiguracion: (config: EmpresaConfiguracion) => Promise<void>
+    updatePassword: (newPassword: string) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -34,6 +42,7 @@ export const useAuthStore = create<AuthState>()(
                 error: null,
                 userEmpresaId: null,
                 userEmpresaNombre: '',
+                userEmpresaConfiguracion: null,
                 session: null,
 
                 getUserEmpresaInfo: async () => {
@@ -161,6 +170,20 @@ export const useAuthStore = create<AuthState>()(
                         const userEmpresaId = empresa?.id || null
                         const userEmpresaNombre = empresa?.nombre || ''
 
+                        // Cargar configuración de la empresa si existe
+                        let empresaConfiguracion = null
+                        if (userEmpresaId) {
+                            const { data: configData } = await supabase
+                                .from('configuraciones_empresa')
+                                .select('configuraciones')
+                                .eq('empresa_id', userEmpresaId)
+                                .single()
+                            
+                            if (configData?.configuraciones) {
+                                empresaConfiguracion = configData.configuraciones as EmpresaConfiguracion
+                            }
+                        }
+
                         // Crear objeto de usuario para el store
                         const frontendUser: FrontendUser = {
                             id: updatedUser.id,
@@ -176,7 +199,8 @@ export const useAuthStore = create<AuthState>()(
                             isLoading: false,
                             error: null,
                             userEmpresaId: userEmpresaId,
-                            userEmpresaNombre: userEmpresaNombre
+                            userEmpresaNombre: userEmpresaNombre,
+                            userEmpresaConfiguracion: empresaConfiguracion
                         })
                     } catch (error) {
                         set({
@@ -205,6 +229,7 @@ export const useAuthStore = create<AuthState>()(
                             error: null,
                             userEmpresaId: null,
                             userEmpresaNombre: '',
+                            userEmpresaConfiguracion: null,
                             session: null
                         })
                         window.location.reload()
@@ -213,6 +238,45 @@ export const useAuthStore = create<AuthState>()(
 
                 clearError: () => {
                     set({ error: null })
+                },
+
+                updateEmpresaConfiguracion: async (config: EmpresaConfiguracion) => {
+                    const { userEmpresaId } = get()
+                    if (!userEmpresaId) {
+                        throw new Error('No se encontró la empresa del usuario')
+                    }
+
+                    try {
+                        const { error } = await supabase
+                            .from('configuraciones_empresa')
+                            .upsert({
+                                empresa_id: userEmpresaId,
+                                configuraciones: config,
+                                fecha_modificacion: new Date().toISOString()
+                            })
+
+                        if (error) {
+                            throw new Error(error.message)
+                        }
+
+                        set({ userEmpresaConfiguracion: config })
+                    } catch (error) {
+                        throw error
+                    }
+                },
+
+                updatePassword: async (newPassword: string) => {
+                    try {
+                        const { error } = await supabase.auth.updateUser({
+                            password: newPassword
+                        })
+
+                        if (error) {
+                            throw new Error(error.message)
+                        }
+                    } catch (error) {
+                        throw error
+                    }
                 },
 
                 // Función para verificar el estado de autenticación al cargar la app
@@ -267,6 +331,20 @@ export const useAuthStore = create<AuthState>()(
                             const empresaId = empresa?.id || null
                             const empresaNombre = empresa?.nombre || ''
 
+                            // Cargar configuración de la empresa si existe
+                            let empresaConfiguracion = null
+                            if (empresaId) {
+                                const { data: configData } = await supabase
+                                    .from('configuraciones_empresa')
+                                    .select('configuraciones')
+                                    .eq('empresa_id', empresaId)
+                                    .single()
+                                
+                                if (configData?.configuraciones) {
+                                    empresaConfiguracion = configData.configuraciones as EmpresaConfiguracion
+                                }
+                            }
+
                             const frontendUser: FrontendUser = {
                                 id: profileWithEmpresa.user_id,
                                 nombre: profileWithEmpresa.nombre || 'Usuario',
@@ -281,6 +359,7 @@ export const useAuthStore = create<AuthState>()(
                                 isLoading: false,
                                 userEmpresaId: empresaId,
                                 userEmpresaNombre: empresaNombre,
+                                userEmpresaConfiguracion: empresaConfiguracion,
                                 session: session
                             })
                         }
@@ -297,6 +376,7 @@ export const useAuthStore = create<AuthState>()(
                     isAuthenticated: state.isAuthenticated,
                     userEmpresaId: state.userEmpresaId,
                     userEmpresaNombre: state.userEmpresaNombre,
+                    userEmpresaConfiguracion: state.userEmpresaConfiguracion,
                     session: state.session
                 }), // persist these fields
             }

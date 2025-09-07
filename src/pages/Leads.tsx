@@ -146,7 +146,7 @@ const Leads = () => {
   }>({ show: false, message: '', type: 'info' })
   const [localActiveLeads, setLocalActiveLeads] = useState<Lead[]>([])
   
-  const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
+  const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
     loading, 
     error, 
@@ -354,18 +354,70 @@ const Leads = () => {
   }
 
   const handleSolicitarLead = async () => {
-    if (!user?.id) return
+    if (!user?.id || !userEmpresaId) return
 
     setSolicitudLoading(true)
     try {
-      await leadSolicitudesService.createSolicitud({
-        solicitante_user_id: user.id
-      })
-      showNotification('Solicitud enviada correctamente. El coordinador revisará tu solicitud.', 'success')
+      // Obtener configuración de empresa
+      const configuracion = userEmpresaConfiguracion || {
+        maxSolicitudesPorAgente: 1,
+        solicitudesAutomaticas: false
+      }
+
+      // Verificar si el agente puede solicitar más leads
+      const puedeSolicitar = await leadSolicitudesService.puedeSolicitarLead(
+        user.id, 
+        userEmpresaId, 
+        configuracion.maxSolicitudesPorAgente
+      )
+
+      if (!puedeSolicitar) {
+        showNotification(
+          `No puedes solicitar más leads. Ya tienes el máximo permitido (${configuracion.maxSolicitudesPorAgente}) con estado 'sin tratar'.`, 
+          'error'
+        )
+        setSolicitudLoading(false)
+        return
+      }
+
+      // Si la asignación es automática
+      if (configuracion.solicitudesAutomaticas) {
+        // Intentar asignar lead automáticamente
+        const resultado = await leadSolicitudesService.asignarLeadAutomaticamente(user.id, userEmpresaId)
+        
+        if (resultado.success) {
+          // Crear solicitud con el agente como receptor (para registro)
+          await leadSolicitudesService.createSolicitud({
+            solicitante_user_id: user.id
+          })
+          
+          // Aprobar automáticamente la solicitud
+          const solicitudes = await leadSolicitudesService.getSolicitudesByAgente(user.id)
+          const ultimaSolicitud = solicitudes.find(s => s.estado === 'pendiente')
+          
+          if (ultimaSolicitud && resultado.leadId) {
+            await leadSolicitudesService.aprobarSolicitud(ultimaSolicitud.id, resultado.leadId, user.id)
+          }
+          
+          showNotification('¡Lead asignado automáticamente! Ya tienes un nuevo lead para trabajar.', 'success')
+          
+          // Recargar leads para mostrar el nuevo lead
+          await refreshLeads()
+        } else {
+          showNotification(resultado.message, 'error')
+        }
+      } else {
+        // Asignación manual - crear solicitud normal
+        await leadSolicitudesService.createSolicitud({
+          solicitante_user_id: user.id
+        })
+        showNotification('Solicitud enviada correctamente. El coordinador revisará tu solicitud.', 'success')
+      }
+      
       setShowSolicitudModal(false)
     } catch (error) {
       console.error('Error creating solicitud:', error)
-      showNotification('Error al enviar la solicitud. Inténtalo de nuevo.', 'error')
+      showNotification('Error al procesar la solicitud. Inténtalo de nuevo.', 'error')
     } finally {
       setSolicitudLoading(false)
     }
@@ -952,6 +1004,15 @@ const Leads = () => {
                   <strong>Empresa:</strong> {userEmpresaNombre || 'No asignada'}<br />
                   <strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}
                 </p>
+                {userEmpresaConfiguracion && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-600">
+                      <strong>Configuración de empresa:</strong><br />
+                      • Máximo de leads simultáneos: {userEmpresaConfiguracion.maxSolicitudesPorAgente}<br />
+                      • Asignación: {userEmpresaConfiguracion.solicitudesAutomaticas ? 'Automática' : 'Manual'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">

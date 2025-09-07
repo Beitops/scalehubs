@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import Sidebar from '../components/Sidebar'
+import SettingsModal from '../components/SettingsModal'
 import { useAuthStore } from '../store/authStore'
 import { Outlet } from 'react-router-dom'
 
 const Platform = () => {
   
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
   const { logout } = useAuthStore()
 
@@ -15,6 +17,14 @@ const Platform = () => {
 
   const handleCloseSidebar = () => {
     setSidebarOpen(false);
+  };
+
+  const handleOpenSettings = () => {
+    setIsSettingsOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setIsSettingsOpen(false);
   };
 
   return (
@@ -35,6 +45,7 @@ const Platform = () => {
             onClose={handleCloseSidebar}
             sidebarOpen={sidebarOpen}
             onLogout={logout}
+            onOpenSettings={handleOpenSettings}
           />
         </div>
 
@@ -63,6 +74,12 @@ const Platform = () => {
           </main>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={handleCloseSettings}
+      />
     </>
   )
 }

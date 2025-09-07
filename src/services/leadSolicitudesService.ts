@@ -247,6 +247,91 @@ class LeadSolicitudesService {
       throw error
     }
   }
+
+  // Verificar si un agente puede solicitar más leads según la configuración de empresa
+  async puedeSolicitarLead(agenteUserId: string, _empresaId: number, maxSolicitudes: number): Promise<boolean> {
+    try {
+      // Contar leads activos del agente con estado 'sin_tratar'
+      const { data: leadsActivos, error } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('user_id', agenteUserId)
+        .eq('estado', 'activo')
+        .eq('estado_temporal', 'sin_tratar')
+
+      if (error) {
+        console.error('Error checking active leads:', error)
+        throw error
+      }
+
+      return (leadsActivos?.length || 0) < maxSolicitudes
+    } catch (error) {
+      console.error('Error in puedeSolicitarLead:', error)
+      throw error
+    }
+  }
+
+  // Asignar lead automáticamente a un agente (para asignación automática)
+  async asignarLeadAutomaticamente(agenteUserId: string, empresaId: number): Promise<{ success: boolean; leadId?: number; message: string }> {
+    try {
+      // Buscar el primer lead disponible
+      const { data: leadsDisponibles, error: leadsError } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .is('user_id', null)
+        .eq('estado', 'activo')
+        .order('fecha_entrada', { ascending: true })
+        .limit(1)
+
+      if (leadsError) {
+        console.error('Error fetching available leads:', leadsError)
+        throw leadsError
+      }
+
+      if (!leadsDisponibles || leadsDisponibles.length === 0) {
+        return {
+          success: false,
+          message: 'No hay leads disponibles para asignar en este momento'
+        }
+      }
+
+      const leadId = leadsDisponibles[0].id
+
+      // Intentar asignar el lead usando una condición WHERE para evitar race conditions
+      const { data: updateResult, error: updateError } = await supabase
+        .from('leads')
+        .update({
+          user_id: agenteUserId,
+          fecha_asignacion: new Date().toISOString()
+        })
+        .eq('id', leadId)
+        .is('user_id', null) // Solo actualizar si aún no está asignado
+        .select('id')
+
+      if (updateError) {
+        console.error('Error assigning lead:', updateError)
+        throw updateError
+      }
+
+      // Si no se actualizó ninguna fila, significa que otro agente ya lo tomó
+      if (!updateResult || updateResult.length === 0) {
+        return {
+          success: false,
+          message: 'El lead ya fue asignado a otro agente. Inténtalo de nuevo.'
+        }
+      }
+
+      return {
+        success: true,
+        leadId: leadId,
+        message: 'Lead asignado automáticamente'
+      }
+    } catch (error) {
+      console.error('Error in asignarLeadAutomaticamente:', error)
+      throw error
+    }
+  }
 }
 
 export const leadSolicitudesService = new LeadSolicitudesService()

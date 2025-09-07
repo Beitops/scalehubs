@@ -7,10 +7,10 @@ interface SidebarProps {
   onClose: () => void
   sidebarOpen?: boolean
   onLogout?: () => void
+  onOpenSettings?: () => void
 }
 
-const Sidebar = ({ onClose, onLogout }: SidebarProps) => {
-
+const Sidebar = ({ onClose, onLogout, onOpenSettings }: SidebarProps) => {
   const { user } = useAuthStore()
 
   // Menú base para todos los usuarios
@@ -99,19 +99,29 @@ const Sidebar = ({ onClose, onLogout }: SidebarProps) => {
               </p>
             )}
             <p className="text-xs text-[#18cb96] font-medium capitalize">
-              {user?.rol === 'administrador' ? '👑 Administrador' : '👤 Cliente'}
+              {user?.rol === 'administrador' ? '👑 Administrador' : `👤 ${user?.rol ? user.rol.charAt(0).toUpperCase() + user.rol.slice(1) : 'Usuario'}`}
             </p>
           </div>
         </div>
 
-        {/* Logout Button */}
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <span className="mr-2">🚪</span>
-          Cerrar sesión
-        </button>
+        {/* Settings and Logout Buttons */}
+        <div className="space-y-2">
+          <button
+            onClick={onOpenSettings}
+            className="w-full flex items-center px-3 py-2 text-sm text-[#373643] hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <span className="mr-2">⚙️</span>
+            Configuración
+          </button>
+          
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <span className="mr-2">🚪</span>
+            Cerrar sesión
+          </button>
+        </div>
       </div>
     </div>
   )
