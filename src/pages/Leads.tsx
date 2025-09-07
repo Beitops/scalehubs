@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
@@ -6,7 +6,123 @@ import type { Lead } from '../services/leadsService'
 import { ActionMenu } from '../components/ActionMenu'
 import { leadSolicitudesService } from '../services/leadSolicitudesService'
 
+// Componente optimizado para fila móvil
+const LeadMobileCard = memo(({ 
+  lead, 
+  onStatusChange, 
+  getStatusTextColor, 
+  getActionMenuItems, 
+  user 
+}: {
+  lead: Lead
+  onStatusChange: (leadId: number, newStatus: string) => void
+  getStatusTextColor: (status: string) => string
+  getActionMenuItems: (lead: Lead) => any[]
+  user: any
+}) => {
+  return (
+    <div className="p-4 border-b border-gray-200 last:border-b-0">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
+          {lead.plataforma_lead}
+        </span>
+      </div>
+      <div className="space-y-1 text-xs text-gray-600">
+        <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
+        <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+        <p><span className="font-medium">Estado:</span></p>
+        <select
+          value={lead.estado_temporal || 'sin_tratar'}
+          onChange={(e) => onStatusChange(lead.id, e.target.value)}
+          className={`w-full px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
+        >
+          <option value="sin_tratar">Sin Tratar</option>
+          <option value="no_contesta">No Contesta</option>
+          <option value="no_valido">No Valido</option>
+          <option value="gestion">En gestión</option>
+          <option value="convertido">Convertido</option>
+          <option value="no_cerrado">No Cerrado</option>
+        </select>
+        {user?.rol === 'administrador' && (
+          <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
+        )}
+      </div>
+      <div className="flex gap-2 mt-3">
+        {user?.rol !== 'administrador' && (
+          <ActionMenu
+            items={getActionMenuItems(lead)}
+            triggerLabel="Más acciones"
+            size="sm"
+            className="text-xs font-medium"
+          />
+        )}
+      </div>
+    </div>
+  )
+})
 
+// Componente optimizado para fila de escritorio
+const LeadDesktopRow = memo(({ 
+  lead, 
+  onStatusChange, 
+  getStatusTextColor, 
+  getActionMenuItems, 
+  user 
+}: {
+  lead: Lead
+  onStatusChange: (leadId: number, newStatus: string) => void
+  getStatusTextColor: (status: string) => string
+  getActionMenuItems: (lead: Lead) => any[]
+  user: any
+}) => {
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+        {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+        {lead.telefono}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
+          {lead.plataforma_lead}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <select
+          value={lead.estado_temporal || 'sin_tratar'}
+          onChange={(e) => onStatusChange(lead.id, e.target.value)}
+          className={`px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
+        >
+          <option value="sin_tratar">Sin Tratar</option>
+          <option value="no_contesta">No Contesta</option>
+          <option value="no_valido">No Valido</option>
+          <option value="gestion">En gestión</option>
+          <option value="convertido">Convertido</option>
+          <option value="no_cerrado">No Cerrado</option>
+        </select>
+      </td>
+      {user?.rol === 'administrador' && (
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+          {lead.empresa_nombre || '-'}
+        </td>
+      )}
+      {user?.rol !== 'administrador' && (
+        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+          <ActionMenu
+            items={getActionMenuItems(lead)}
+            triggerLabel="Más acciones"
+            size="md"
+          />
+        </td>
+      )}
+    </tr>
+  )
+})
 
 const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
@@ -28,6 +144,7 @@ const Leads = () => {
     message: string
     type: 'success' | 'error' | 'info'
   }>({ show: false, message: '', type: 'info' })
+  const [localActiveLeads, setLocalActiveLeads] = useState<Lead[]>([])
   
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const {
@@ -56,9 +173,14 @@ const Leads = () => {
     }
   }, [notification.show])
 
+  // Sincronizar estado local con el estado global
+  useEffect(() => {
+    setLocalActiveLeads(activeLeads)
+  }, [activeLeads])
 
 
-  const filteredLeads = activeLeads.filter(lead => {
+
+  const filteredLeads = localActiveLeads.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
     const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
@@ -217,10 +339,17 @@ const Leads = () => {
   const handleStatusChange = async (leadId: number, newStatus: string) => {
     try {
       await updateLeadStatus(leadId, newStatus)
-      // Recargar leads para actualizar la vista
-      await refreshLeads()
+      // Actualizar solo el lead específico en el estado local
+      setLocalActiveLeads(prevLeads => 
+        prevLeads.map(lead => 
+          lead.id === leadId 
+            ? { ...lead, estado_temporal: newStatus }
+            : lead
+        )
+      )
     } catch (error) {
       console.error('Error updating lead status:', error)
+      showNotification('Error al actualizar el estado del lead', 'error')
     }
   }
 
@@ -452,44 +581,14 @@ const Leads = () => {
           {/* Mobile Cards View */}
           <div className="lg:hidden">
             {filteredLeads.map((lead) => (
-              <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                    {lead.plataforma_lead}
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-gray-600">
-                  <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
-                  <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                  <p><span className="font-medium">Estado:</span></p>
-                  <select
-                    value={lead.estado_temporal || 'sin_tratar'}
-                    onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                    className={`w-full px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
-                  >
-                    <option value="sin_tratar">Sin Tratar</option>
-                    <option value="no_contesta">No Contesta</option>
-                    <option value="no_valido">No Valido</option>
-                    <option value="gestion">En gestión</option>
-                    <option value="convertido">Convertido</option>
-                    <option value="no_cerrado">No Cerrado</option>
-                  </select>
-                  {user?.rol === 'administrador' && (
-                    <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  {user?.rol !== 'administrador' && (
-                    <ActionMenu
-                      items={getActionMenuItems(lead)}
-                      triggerLabel="Más acciones"
-                      size="sm"
-                      className="text-xs font-medium"
-                    />
-                  )}
-                </div>
-              </div>
+              <LeadMobileCard
+                key={lead.id}
+                lead={lead}
+                onStatusChange={handleStatusChange}
+                getStatusTextColor={getStatusTextColor}
+                getActionMenuItems={getActionMenuItems}
+                user={user}
+              />
             ))}
           </div>
 
@@ -527,50 +626,14 @@ const Leads = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                      {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                      {lead.telefono}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                        {lead.plataforma_lead}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={lead.estado_temporal || 'sin_tratar'}
-                        onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                        className={`px-2 py-1 text-xs border-2 border-[#18cb96] rounded-md focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent bg-white ${getStatusTextColor(lead.estado_temporal || 'sin_tratar')}`}
-                      >
-                        <option value="sin_tratar">Sin Tratar</option>
-                        <option value="no_contesta">No Contesta</option>
-                        <option value="no_valido">No Valido</option>
-                        <option value="gestion">En gestión</option>
-                        <option value="convertido">Convertido</option>
-                        <option value="no_cerrado">No Cerrado</option>
-                      </select>
-                    </td>
-                    {user?.rol === 'administrador' && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                        {lead.empresa_nombre || '-'}
-                      </td>
-                    )}
-                    {user?.rol !== 'administrador' && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <ActionMenu
-                          items={getActionMenuItems(lead)}
-                          triggerLabel="Más acciones"
-                          size="md"
-                        />
-                      </td>
-                    )}
-                  </tr>
+                  <LeadDesktopRow
+                    key={lead.id}
+                    lead={lead}
+                    onStatusChange={handleStatusChange}
+                    getStatusTextColor={getStatusTextColor}
+                    getActionMenuItems={getActionMenuItems}
+                    user={user}
+                  />
                 ))}
               </tbody>
             </table>
@@ -580,7 +643,7 @@ const Leads = () => {
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{activeLeads.length}</span> leads
+                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{localActiveLeads.length}</span> leads
                 {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
