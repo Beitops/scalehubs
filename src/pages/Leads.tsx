@@ -417,16 +417,23 @@ const Leads = () => {
     try {
       await leadsService.rehusarLead(lead.id, user.id)
       
-      // Actualizar el lead en el estado local
-      setLocalActiveLeads(prevLeads => 
-        prevLeads.map(l => 
-          l.id === lead.id 
-            ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion: undefined }
-            : l
+      // Si es un agente rehusando su propio lead, eliminarlo de la lista
+      if (user?.rol === 'agente' && user.id === lead.user_id) {
+        setLocalActiveLeads(prevLeads => 
+          prevLeads.filter(l => l.id !== lead.id)
         )
-      )
-      
-      showNotification('Lead rehusado correctamente', 'success')
+        showNotification('Lead rehusado correctamente. Ya no aparece en tu lista.', 'success')
+      } else {
+        // Si es un coordinador, solo actualizar el estado del lead
+        setLocalActiveLeads(prevLeads => 
+          prevLeads.map(l => 
+            l.id === lead.id 
+              ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion: undefined }
+              : l
+          )
+        )
+        showNotification('Lead rehusado correctamente', 'success')
+      }
     } catch (error) {
       console.error('Error rehusing lead:', error)
       showNotification(error instanceof Error ? error.message : 'Error al rehusar el lead', 'error')
