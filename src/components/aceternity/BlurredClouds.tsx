@@ -9,14 +9,14 @@ export const BlurredClouds: React.FC<BlurredCloudsProps> = ({
 }) => {
   return (
     <div className={`absolute inset-0 left-30 ${className}`}>
-      {/* Nubes borrosas animadas detrás del contenido */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* Nubes borrosas animadas detrás del contenido - solo en desktop y tablet */}
+      <div className="absolute inset-0 hidden md:flex items-center justify-center pointer-events-none">
         <div className="relative w-full h-full flex items-center justify-center">
           {/* Contenedor centrado para las nubes - mismo tamaño que el formulario */}
           <div className="relative w-full max-w-md h-auto flex items-center justify-center" style={{ transform: 'translateX(-20px)' }}>
         {/* Nube principal - más grande y centrada detrás del formulario */}
         <div 
-          className="absolute w-[800px] h-[800px] bg-[#18cb96] rounded-full opacity-20 blur-3xl"
+          className="absolute w-[800px] h-[800px] md:w-[700px] md:h-[700px] lg:w-[800px] lg:h-[800px] bg-[#18cb96] rounded-full opacity-20 blur-3xl"
           style={{
             animation: 'floatMain 6s ease-in-out infinite',
             left: '50%',
@@ -27,7 +27,7 @@ export const BlurredClouds: React.FC<BlurredCloudsProps> = ({
         
         {/* Nube secundaria - más pequeña y desplazada */}
         <div 
-          className="absolute w-[700px] h-[700px] bg-[#15b885] rounded-full opacity-15 blur-2xl"
+          className="absolute w-[700px] h-[700px] md:w-[600px] md:h-[600px] lg:w-[700px] lg:h-[700px] bg-[#15b885] rounded-full opacity-15 blur-2xl"
           style={{
             animation: 'floatSecondary 8s ease-in-out infinite',
             animationDelay: '1s',
@@ -39,7 +39,7 @@ export const BlurredClouds: React.FC<BlurredCloudsProps> = ({
         
         {/* Nube terciaria - aún más pequeña */}
         <div 
-          className="absolute w-[600px] h-[600px] bg-[#1ae6a8] rounded-full opacity-25 blur-xl"
+          className="absolute w-[600px] h-[600px] md:w-[500px] md:h-[500px] lg:w-[600px] lg:h-[600px] bg-[#1ae6a8] rounded-full opacity-25 blur-xl"
           style={{
             animation: 'floatTertiary 10s ease-in-out infinite',
             animationDelay: '2s',
@@ -51,7 +51,7 @@ export const BlurredClouds: React.FC<BlurredCloudsProps> = ({
         
         {/* Nube adicional para más dinamismo */}
         <div 
-          className="absolute w-[750px] h-[750px] bg-[#18cb96] rounded-full opacity-10 blur-2xl"
+          className="absolute w-[750px] h-[750px] md:w-[650px] md:h-[650px] lg:w-[750px] lg:h-[750px] bg-[#18cb96] rounded-full opacity-10 blur-2xl"
           style={{
             animation: 'floatAdditional 7s ease-in-out infinite',
             animationDelay: '3s',

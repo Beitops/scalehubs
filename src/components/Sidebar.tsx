@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import CompanyName from './CompanyName'
 
 import { useAuthStore } from '../store/authStore'
@@ -12,6 +12,7 @@ interface SidebarProps {
 
 const Sidebar = ({ onClose, onLogout, onOpenSettings }: SidebarProps) => {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
 
   // Menú base para todos los usuarios
   const baseMenuItems = [
@@ -40,13 +41,25 @@ const Sidebar = ({ onClose, onLogout, onOpenSettings }: SidebarProps) => {
     onClose()
   }
 
+  const handleLogoClick = () => {
+    navigate('/')
+    onClose() // Close sidebar on mobile after logo click
+  }
+
   return (
     <div className="w-64 bg-white shadow-lg h-full flex flex-col">
       {/* Header with close button for mobile */}
-      <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#373643]">
-          <span className="text-[#18cb96]">Scale</span>Hubs
-        </h1>
+      <div className="p-6 pb-3 border-b border-gray-200 flex items-center justify-between md:justify-center">
+        <button
+          onClick={handleLogoClick}
+          className="group cursor-pointer transition-all duration-300 hover:scale-110 hover:rotate-3"
+        >
+          <img 
+            src="/logo.png" 
+            alt="ScaleHubs" 
+            className="h-12 transition-all duration-300 group-hover:brightness-110"
+          />
+        </button>
         {/* Close button for mobile */}
         <button
           onClick={onClose}

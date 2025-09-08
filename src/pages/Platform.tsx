@@ -62,9 +62,11 @@ const Platform = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <h1 className="text-xl font-bold text-[#373643]">
-                <span className="text-[#18cb96]">Scale</span>Hubs
-              </h1>
+              <img 
+                src="/logo.png" 
+                alt="ScaleHubs" 
+                className="h-10"
+              />
               <div className="w-6"></div> {/* Spacer for centering */}
             </div>
           </header>

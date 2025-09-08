@@ -43,13 +43,15 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#03002b] to-[#05003e] flex items-center justify-center p-4 overflow-hidden">
-      <BlurredClouds className="inset-0" />
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 relative z-10">
+      <BlurredClouds/>
+      <div className="max-w-md md:max-w-sm lg:max-w-md w-full bg-white rounded-2xl shadow-xl p-8 relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#050137]">
-            <span className="text-[#18cb96]">Scale</span>Hubs
-          </h1>
+          <img 
+            src="/logo.png" 
+            alt="ScaleHubs" 
+            className="h-16 mx-auto mb-4"
+          />
           <p className="text-gray-600 mt-2">
             Inicia sesión en tu cuenta
           </p>
