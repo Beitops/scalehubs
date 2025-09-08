@@ -39,7 +39,8 @@ const AsignacionLeads = () => {
     loadUnassignedLeads,
     loadUnassignedLeadsByCompany,
     assignLeadToCompany,
-    assignLeadToAgent
+    assignLeadToAgent,
+    refreshLeads
   } = useLeadsStore()
 
   // Función para mostrar notificaciones
@@ -255,7 +256,7 @@ const AsignacionLeads = () => {
         }
         await assignLeadToAgent(selectedLead.id, selectedUser)
       }
-
+      refreshLeads()
       setShowAssignModal(false)
       setSelectedLead(null)
       setSelectedCompany(null)

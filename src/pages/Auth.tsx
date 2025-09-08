@@ -41,11 +41,11 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#18cb96] to-[#15b885] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#03002b] to-[#05003e] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#373643]">
+          <h1 className="text-3xl font-bold text-[#050137]">
             <span className="text-[#18cb96]">Scale</span>Hubs
           </h1>
           <p className="text-gray-600 mt-2">
