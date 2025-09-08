@@ -28,6 +28,8 @@ const AsignacionLeads = () => {
     message: string
     type: 'success' | 'error' | 'info'
   }>({ show: false, message: '', type: 'info' })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   const { user, userEmpresaId } = useAuthStore()
   const {
@@ -115,6 +117,30 @@ const AsignacionLeads = () => {
 
   // Get selected user name
   const selectedUserName = users.find(u => u.user_id === selectedUser)?.nombre || ''
+
+  // Calcular paginación para leads sin asignar
+  const totalPages = Math.ceil(unassignedLeads.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedLeads = unassignedLeads.slice(startIndex, endIndex)
+
+  // Detectar si es móvil y ajustar items por página
+  useEffect(() => {
+    const checkIsMobile = () => {
+      const mobile = window.innerWidth < 1024 // lg breakpoint
+      setItemsPerPage(mobile ? 6 : 10)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
+
+  // Resetear página cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [companyFilter, userFilter])
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company.id)
@@ -429,7 +455,7 @@ const AsignacionLeads = () => {
 
         {/* Leads Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {unassignedLeads.length === 0 ? (
+          {paginatedLeads.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-gray-400">✅</span>
@@ -451,7 +477,7 @@ const AsignacionLeads = () => {
             <>
               {/* Mobile Cards View */}
               <div className="lg:hidden">
-                {unassignedLeads.map((lead) => (
+                {paginatedLeads.map((lead) => (
                   <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
@@ -505,8 +531,8 @@ const AsignacionLeads = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {unassignedLeads.map((lead) => (
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedLeads.map((lead) => (
                       <tr key={lead.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                           {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
@@ -544,9 +570,34 @@ const AsignacionLeads = () => {
               {/* Table Footer */}
               <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs sm:text-sm text-gray-700">
-                    Mostrando <span className="font-medium">{unassignedLeads.length}</span> leads sin asignar
+                  <div className="hidden lg:block text-xs sm:text-sm text-gray-700">
+                    Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, unassignedLeads.length)}</span> de <span className="font-medium">{unassignedLeads.length}</span> leads sin asignar
                   </div>
+                  
+                  {/* Paginación */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Anterior
+                      </button>
+                      
+                      <span className="text-sm text-gray-700">
+                        Página {currentPage} de {totalPages}
+                      </span>
+                      
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </>

@@ -3,8 +3,16 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
+import { leadsService } from '../services/leadsService'
 import { ActionMenu } from '../components/ActionMenu'
 import { leadSolicitudesService } from '../services/leadSolicitudesService'
+
+interface ActionMenuItem {
+  label: string
+  icon: React.ReactNode
+  onClick: () => void
+  className?: string
+}
 
 // Componente optimizado para fila móvil
 const LeadMobileCard = memo(({ 
@@ -17,7 +25,7 @@ const LeadMobileCard = memo(({
   lead: Lead
   onStatusChange: (leadId: number, newStatus: string) => void
   getStatusTextColor: (status: string) => string
-  getActionMenuItems: (lead: Lead) => any[]
+  getActionMenuItems: (lead: Lead) => ActionMenuItem[]
   user: any
 }) => {
   return (
@@ -30,7 +38,11 @@ const LeadMobileCard = memo(({
       </div>
       <div className="space-y-1 text-xs text-gray-600">
         <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
-        <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+        {user?.rol === 'coordinador' ? (
+          <p><span className="font-medium">Asignado a:</span> {lead.usuario_nombre || 'Sin asignar'}</p>
+        ) : (
+          <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+        )}
         <p><span className="font-medium">Estado:</span></p>
         <select
           value={lead.estado_temporal || 'sin_tratar'}
@@ -73,13 +85,13 @@ const LeadDesktopRow = memo(({
   lead: Lead
   onStatusChange: (leadId: number, newStatus: string) => void
   getStatusTextColor: (status: string) => string
-  getActionMenuItems: (lead: Lead) => any[]
+  getActionMenuItems: (lead: Lead) => ActionMenuItem[]
   user: any
 }) => {
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-        {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
+        {user?.rol === 'coordinador' ? (lead.usuario_nombre || 'Sin asignar') : new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
@@ -145,6 +157,8 @@ const Leads = () => {
     type: 'success' | 'error' | 'info'
   }>({ show: false, message: '', type: 'info' })
   const [localActiveLeads, setLocalActiveLeads] = useState<Lead[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
@@ -178,6 +192,19 @@ const Leads = () => {
     setLocalActiveLeads(activeLeads)
   }, [activeLeads])
 
+  // Detectar si es móvil y ajustar items por página
+  useEffect(() => {
+    const checkIsMobile = () => {
+      const mobile = window.innerWidth < 1024 // lg breakpoint
+      setItemsPerPage(mobile ? 6 : 10)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
+
 
 
   const filteredLeads = localActiveLeads.filter(lead => {
@@ -186,6 +213,17 @@ const Leads = () => {
     const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
     return matchesDate && matchesPhone && matchesStatus
   })
+
+  // Calcular paginación
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
+
+  // Resetear página cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [dateFilter, phoneFilter, statusFilter])
 
   // Calcular leads en el rango de fechas para exportación
   const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
@@ -295,18 +333,36 @@ const Leads = () => {
     }
   }
 
-  const getActionMenuItems = (lead: Lead) => [
-    {
-      label: 'Ver detalles',
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        </svg>
-      ),
-      onClick: () => handleViewDetails(lead)
-    },
-    {
+  const getActionMenuItems = (lead: Lead): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = [
+      {
+        label: 'Ver detalles',
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        ),
+        onClick: () => handleViewDetails(lead)
+      }
+    ]
+
+    // Agregar opción de rehusar lead si el usuario es coordinador o agente
+    if (user?.rol === 'coordinador' || user?.rol === 'agente') {
+      items.push({
+        label: 'Rehusar lead',
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ),
+        onClick: () => handleRehusarLead(lead),
+        className: 'text-orange-600 hover:bg-orange-50'
+      })
+    }
+
+    // Agregar opción de devolver lead
+    items.push({
       label: 'Devolver lead',
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -315,8 +371,10 @@ const Leads = () => {
       ),
       onClick: () => handleReturnLead(lead),
       className: 'text-red-600 hover:bg-red-50'
-    }
-  ]
+    })
+
+    return items
+  }
 
 
 
@@ -350,6 +408,28 @@ const Leads = () => {
     } catch (error) {
       console.error('Error updating lead status:', error)
       showNotification('Error al actualizar el estado del lead', 'error')
+    }
+  }
+
+  const handleRehusarLead = async (lead: Lead) => {
+    if (!user?.id) return
+
+    try {
+      await leadsService.rehusarLead(lead.id, user.id)
+      
+      // Actualizar el lead en el estado local
+      setLocalActiveLeads(prevLeads => 
+        prevLeads.map(l => 
+          l.id === lead.id 
+            ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion: undefined }
+            : l
+        )
+      )
+      
+      showNotification('Lead rehusado correctamente', 'success')
+    } catch (error) {
+      console.error('Error rehusing lead:', error)
+      showNotification(error instanceof Error ? error.message : 'Error al rehusar el lead', 'error')
     }
   }
 
@@ -632,7 +712,7 @@ const Leads = () => {
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Mobile Cards View */}
           <div className="lg:hidden">
-            {filteredLeads.map((lead) => (
+            {paginatedLeads.map((lead) => (
               <LeadMobileCard
                 key={lead.id}
                 lead={lead}
@@ -650,7 +730,7 @@ const Leads = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Fecha Entrada
+                    {user?.rol === 'coordinador' ? 'Asignado a' : 'Fecha Entrada'}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Nombre
@@ -677,7 +757,7 @@ const Leads = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLeads.map((lead) => (
+                {paginatedLeads.map((lead) => (
                   <LeadDesktopRow
                     key={lead.id}
                     lead={lead}
@@ -694,12 +774,37 @@ const Leads = () => {
           {/* Table Footer */}
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
-              <div className="text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{localActiveLeads.length}</span> leads
+              <div className="hidden lg:block text-xs sm:text-sm text-gray-700">
+                Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredLeads.length)}</span> de <span className="font-medium">{filteredLeads.length}</span> leads
                 {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
               </div>
+              
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Anterior
+                  </button>
+                  
+                  <span className="text-sm text-gray-700">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

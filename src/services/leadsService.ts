@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { platformConverter } from '../utils/platformConverter'
+import { useAuthStore } from '../store/authStore'
 
 export interface Lead {
   id: number
@@ -17,6 +18,8 @@ export interface Lead {
   fecha_asignacion?: string
   plataforma_lead?: string
   observaciones?: string
+  user_id?: string
+  usuario_nombre?: string
 }
 
 export interface CreateLeadData {
@@ -47,6 +50,10 @@ class LeadsService {
           empresas!leads_empresa_id_fkey (
             id,
             nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
           )
         `)
         .eq('empresa_id', empresaId)
@@ -66,6 +73,7 @@ class LeadsService {
       return data?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
+        usuario_nombre: lead.profiles?.nombre,
         plataforma_lead: platformConverter(lead.plataforma|| '')
       })) || []
     } catch (error) {
@@ -82,6 +90,10 @@ class LeadsService {
           *,
           empresas!leads_empresa_id_fkey (
             id,
+            nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
             nombre
           )
         `)
@@ -103,6 +115,7 @@ class LeadsService {
       return data?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
+        usuario_nombre: lead.profiles?.nombre,
         plataforma_lead: platformConverter(lead.plataforma|| '')
       })) || []
     } catch (error) {
@@ -119,6 +132,10 @@ class LeadsService {
           *,
           empresas!leads_empresa_id_fkey (
             id,
+            nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
             nombre
           )
         `)
@@ -139,6 +156,7 @@ class LeadsService {
       return data?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
+        usuario_nombre: lead.profiles?.nombre,
         plataforma_lead: platformConverter(lead.plataforma|| '')
       })) || []
     } catch (error) {
@@ -386,6 +404,55 @@ class LeadsService {
       }
     } catch (error) {
       console.error('Error in assignLeadToAgent:', error)
+      throw error
+    }
+  }
+
+  // Rehusar lead (quitar asignación de usuario)
+  async rehusarLead(leadId: number, currentUserId: string): Promise<void> {
+    try {
+      // Primero verificar que el lead existe y obtener información del usuario asignado
+      const { data: leadData, error: fetchError } = await supabase
+        .from('leads')
+        .select('user_id')
+        .eq('id', leadId)
+        .single()
+
+      if (fetchError) {
+        console.error('Error fetching lead:', fetchError)
+        throw fetchError
+      }
+
+      if (!leadData) {
+        throw new Error('Lead no encontrado')
+      }
+
+      // Si el lead no tiene usuario asignado, no se puede rehusar
+      if (!leadData.user_id) {
+        throw new Error('Este lead no está asignado a ningún usuario')
+      }
+
+      // Si el usuario actual es un agente, verificar que sea el mismo usuario asignado
+      const { user } = useAuthStore.getState()
+      if (user?.rol === 'agente' && leadData.user_id !== currentUserId) {
+        throw new Error('No tienes permisos para rehusar este lead')
+      }
+
+      // Quitar la asignación del lead
+      const { error } = await supabase
+        .from('leads')
+        .update({ 
+          user_id: null,
+          fecha_asignacion: null
+        })
+        .eq('id', leadId)
+
+      if (error) {
+        console.error('Error rehusing lead:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in rehusarLead:', error)
       throw error
     }
   }
