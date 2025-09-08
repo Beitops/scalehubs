@@ -56,7 +56,7 @@ export const userService = {
         name: userData.nombre,
         email: userData.email,
         rol: userData.rol,
-        redirectTo: 'http://localhost:5173/set-password'
+        redirectTo: 'https://scalehubs.vercel.app/set-password'
       }
 
       // Solo incluir empresa_id si NO es administrador y tiene empresa
