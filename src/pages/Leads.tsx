@@ -307,6 +307,12 @@ const Leads = () => {
   }
 
   const handleReturnLead = (lead: Lead) => {
+    // Verificar que el lead tenga estado_temporal 'no_valido'
+    if (lead.estado_temporal !== 'no_valido') {
+      showNotification('Solo se pueden devolver leads con estado "No Válido". Por favor, tipifica el lead como "No Válido" antes de devolverlo.', 'error')
+      return
+    }
+    
     setSelectedLead(lead)
     setShowReturnModal(true)
   }
@@ -380,6 +386,14 @@ const Leads = () => {
 
   const handleConfirmReturn = async () => {
     if (selectedLead && user?.id) {
+      // Verificar nuevamente que el lead tenga estado_temporal 'no_valido'
+      if (selectedLead.estado_temporal !== 'no_valido') {
+        showNotification('Solo se pueden devolver leads con estado "No Válido". Por favor, tipifica el lead como "No Válido" antes de devolverlo.', 'error')
+        setShowReturnModal(false)
+        setSelectedLead(null)
+        return
+      }
+
       try {
         // Usar la función específica para devoluciones
         await returnLead(selectedLead.id, user.id)
@@ -388,8 +402,15 @@ const Leads = () => {
         
         // Recargar leads para actualizar la vista
         await refreshLeads()
+        
+        // También recargar devoluciones para sincronizar con la página de devoluciones
+        const { loadDevoluciones } = useLeadsStore.getState()
+        await loadDevoluciones()
+        
+        showNotification('Lead devuelto correctamente. Aparecerá en la sección de devoluciones.', 'success')
       } catch (error) {
         console.error('Error returning lead:', error)
+        showNotification('Error al devolver el lead. Inténtalo de nuevo.', 'error')
       }
     }
   }

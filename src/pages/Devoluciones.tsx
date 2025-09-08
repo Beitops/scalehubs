@@ -221,6 +221,10 @@ const Devoluciones = () => {
 
         // Recargar devoluciones después de la actualización exitosa
         await loadDevoluciones()
+        
+        // También recargar leads activos para sincronizar con la página de leads
+        const { refreshLeads } = useLeadsStore.getState()
+        await refreshLeads()
 
         setShowFinishModal(false)
         setSelectedLead(null)
@@ -267,7 +271,10 @@ const Devoluciones = () => {
 
         // Recargar devoluciones después de la actualización exitosa
         await loadDevoluciones()
-
+        
+        // También recargar leads activos para sincronizar con la página de leads
+        const { refreshLeads } = useLeadsStore.getState()
+        await refreshLeads()
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -327,6 +334,10 @@ const Devoluciones = () => {
 
         // Recargar devoluciones después de la actualización exitosa
         await loadDevoluciones()
+        
+        // También recargar leads activos para sincronizar con la página de leads
+        const { refreshLeads } = useLeadsStore.getState()
+        await refreshLeads()
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -373,6 +384,10 @@ const Devoluciones = () => {
 
         // Recargar devoluciones después de la actualización exitosa
         await loadDevoluciones()
+        
+        // También recargar leads activos para sincronizar con la página de leads
+        const { refreshLeads } = useLeadsStore.getState()
+        await refreshLeads()
 
         setShowProcessModal(false)
         setSelectedLead(null)
@@ -405,6 +420,10 @@ const Devoluciones = () => {
         await cancelDevolucion(selectedLead.devolucion_id, selectedLead.id)
         setShowCancelModal(false)
         setSelectedLead(null)
+        
+        // También recargar leads activos para sincronizar con la página de leads
+        const { refreshLeads } = useLeadsStore.getState()
+        await refreshLeads()
       } catch (error) {
         console.error('Error canceling devolucion:', error)
       }
