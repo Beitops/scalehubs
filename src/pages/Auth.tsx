@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { BlurredClouds } from '../components/aceternity/BlurredClouds'
+import { MobileFloatingBall } from '../components/aceternity/MobileFloatingBall'
 
 const Auth = () => {
   const navigate = useNavigate()
@@ -44,9 +45,10 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#03002b] to-[#05003e] flex items-center justify-center p-4 overflow-hidden">
       <BlurredClouds/>
-      <div className="max-w-md md:max-w-sm lg:max-w-md w-full bg-white rounded-2xl shadow-xl p-8 relative z-10">
+      <div className="max-w-md md:max-w-sm lg:max-w-md w-full bg-white rounded-2xl shadow-xl p-8 relative z-10 overflow-hidden">
+        <MobileFloatingBall/>
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative z-20">
           <img 
             src="/logo.png" 
             alt="ScaleHubs" 
@@ -59,13 +61,13 @@ const Auth = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg relative z-20">
             <p className="text-red-600 text-sm">{error}</p>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 relative z-20">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-[#373643] mb-2">
               Email
@@ -120,7 +122,7 @@ const Auth = () => {
         </form>
 
         {/* Features */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="mt-8 pt-6 border-t border-gray-200 relative z-20">
           <h3 className="text-sm font-medium text-[#373643] mb-3">¿Por qué ScaleHubs?</h3>
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-center">
