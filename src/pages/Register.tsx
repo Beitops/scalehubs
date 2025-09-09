@@ -23,47 +23,45 @@ const Register = () => {
 
   const { signup, isLoading, error, clearError } = useAuthStore()
 
+
+  const getTokensFromUrl = () => {
+    const raw = window.location.hash?.substring(1) || window.location.search?.substring(1) || ''
+    const params = new URLSearchParams(raw)
+    return {
+      access_token: params.get('access_token') || undefined,
+      refresh_token: params.get('refresh_token') || undefined,
+    }
+  }
   // Verificar si hay hash en la URL y obtener metadata
   useEffect(() => {
-    const hash = window.location.hash
-    if (!hash || hash === '') {
-      navigate('/auth')
-      return
-    }
-    
+
+
     const getSessionAndMetadata = async () => {
       try {
         setIsLoadingMetadata(true)
-        
-        // Capturar los parámetros de la URL
-        const urlParams = new URLSearchParams(hash.substring(1))
-        const accessToken = urlParams.get('access_token')
-        const refreshToken = urlParams.get('refresh_token')
-        
-        if (!accessToken || !refreshToken) {
+
+        // 1) Obtener tokens desde hash o query
+        const { access_token, refresh_token } = getTokensFromUrl()
+
+        if (!access_token || !refresh_token) {
           navigate('/auth')
           return
         }
 
-        // Usar refresh token para hacer refresh session
-        const { data, error } = await supabase.auth.refreshSession({
-          refresh_token: refreshToken
+        // 2) ESTABLECER sesión (no refresh)
+        const { data: setData, error: setErr } = await supabase.auth.setSession({
+          access_token,
+          refresh_token
         })
-        
-        if (error) {
-          console.error('Error refreshing session:', error)
-          navigate('/auth')
-          return
-        }
-
-        if (!data.session) {
+        if (setErr || !setData.session) {
+          console.error('Error setSession:', setErr)
           navigate('/auth')
           return
         }
 
         // Obtener metadata del usuario invitado
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError || !user) {
           console.error('Error getting user:', userError)
           navigate('/auth')
@@ -91,7 +89,7 @@ const Register = () => {
             .select('nombre, cif')
             .eq('id', profile.empresa_id)
             .single()
-          
+
           if (!empresaError && empresa) {
             nombreEmpresa = empresa.nombre
           }
@@ -127,7 +125,7 @@ const Register = () => {
         setIsLoadingMetadata(false)
       }
     }
-    
+
     getSessionAndMetadata()
   }, [navigate, clearError])
 
@@ -155,12 +153,8 @@ const Register = () => {
 
     try {
       // Solo actualizar la contraseña del usuario
-      await signup(formData.email, formData.password, {
-        nombre: formData.name,
-        empresa: formData.company,
-        rol: userMetadata.rol
-      })
-      
+      await signup(formData.email, formData.password)
+
       // Redirigir después del signup exitoso
       navigate('/')
     } catch (error) {

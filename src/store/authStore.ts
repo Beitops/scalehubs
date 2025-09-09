@@ -23,7 +23,7 @@ interface AuthState {
     userEmpresaConfiguracion: EmpresaConfiguracion | null
     session: Session | null
     login: (email: string, password: string) => Promise<void>
-    signup: (email: string, password: string, userData: any) => Promise<void>
+    signup: (email: string, password: string) => Promise<void>
     logout: () => void
     clearError: () => void
     checkAuth: (session: Session | null) => Promise<void>
