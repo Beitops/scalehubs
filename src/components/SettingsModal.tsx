@@ -108,15 +108,15 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       />
       
       {/* Modal */}
-      <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex">
+      <div className="fixed inset-0 flex items-center justify-center z-[9999] p-2 sm:p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[90vh] sm:h-[80vh] flex flex-col sm:flex-row">
         {/* Sidebar izquierdo */}
-        <div className="w-64 bg-gray-50 border-r border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-[#373643] mb-6">Configuración</h2>
-          <nav className="space-y-2">
+        <div className="w-full sm:w-64 bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200 p-4 rounded-t-2xl sm:rounded-t-none sm:rounded-l-2xl">
+          <h2 className="text-lg font-semibold text-[#373643] mb-4 sm:mb-6">Configuración</h2>
+          <nav className="space-y-1 sm:space-y-2">
             <button
               onClick={() => setActiveSection('personal')}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+              className={`w-full text-left px-3 py-2 sm:py-2 rounded-xl transition-colors text-sm sm:text-base ${
                 activeSection === 'personal'
                   ? 'bg-[#18cb96] text-white'
                   : 'text-[#373643] hover:bg-gray-200'
@@ -126,7 +126,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             </button>
             <button
               onClick={() => setActiveSection('privacidad')}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+              className={`w-full text-left px-3 py-2 sm:py-2 rounded-xl transition-colors text-sm sm:text-base ${
                 activeSection === 'privacidad'
                   ? 'bg-[#18cb96] text-white'
                   : 'text-[#373643] hover:bg-gray-200'
@@ -137,7 +137,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             {isCoordinador && (
               <button
                 onClick={() => setActiveSection('empresa')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                className={`w-full text-left px-3 py-2 sm:py-2 rounded-xl transition-colors text-sm sm:text-base ${
                   activeSection === 'empresa'
                     ? 'bg-[#18cb96] text-white'
                     : 'text-[#373643] hover:bg-gray-200'
@@ -150,9 +150,9 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         </div>
 
         {/* Contenido principal */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-[#373643]">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto rounded-b-2xl sm:rounded-b-none sm:rounded-r-2xl">
+          <div className="flex justify-between items-center mb-4 sm:mb-6">
+            <h3 className="text-lg sm:text-xl font-semibold text-[#373643]">
               {activeSection === 'personal' ? 'Datos Personales' : 
                activeSection === 'privacidad' ? 'Privacidad' : 
                'Configuración de Empresa'}
@@ -169,12 +169,12 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
           {/* Mensajes de error y éxito */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl">
               {error}
             </div>
           )}
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl">
               {success}
             </div>
           )}
@@ -182,14 +182,14 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           {/* Sección de datos personales */}
           {activeSection === 'personal' && (
             <div className="space-y-6">
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
                 <h4 className="text-lg font-medium text-[#373643] mb-4">Información Personal</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre
                     </label>
-                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-[#373643]">
+                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-[#373643]">
                       {user?.nombre || 'No especificado'}
                     </div>
                   </div>
@@ -198,7 +198,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Email
                     </label>
-                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-[#373643]">
+                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-[#373643]">
                       {user?.email || 'No especificado'}
                     </div>
                   </div>
@@ -217,7 +217,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Empresa
                       </label>
-                      <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-[#373643]">
+                      <div className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-[#373643]">
                         {user.empresa}
                       </div>
                     </div>
@@ -225,7 +225,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 </div>
               </div>
               
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
                     <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
@@ -248,7 +248,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           {/* Sección de privacidad */}
           {activeSection === 'privacidad' && (
             <form onSubmit={handlePrivacidadSubmit} className="space-y-6">
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
                 <h4 className="text-lg font-medium text-[#373643] mb-4">Cambiar Contraseña</h4>
                 <p className="text-sm text-gray-600 mb-6">
                   Para cambiar tu contraseña, ingresa tu contraseña actual y la nueva contraseña que deseas usar.
@@ -263,7 +263,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       type="password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                       placeholder="Ingresa tu contraseña actual"
                     />
                   </div>
@@ -276,7 +276,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                       placeholder="Ingresa tu nueva contraseña"
                       minLength={6}
                     />
@@ -293,7 +293,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                       placeholder="Confirma tu nueva contraseña"
                       minLength={6}
                     />
@@ -303,7 +303,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <button
                   type="submit"
                   disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
-                  className="w-full mt-6 bg-[#18cb96] text-white py-2 px-4 rounded-lg hover:bg-[#15b085] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full mt-6 bg-[#18cb96] text-white py-2 px-4 rounded-xl hover:bg-[#15b085] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
                 </button>
@@ -321,7 +321,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <select
                   value={maxSolicitudes}
                   onChange={(e) => setMaxSolicitudes(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                 >
                   <option value={1}>1 solicitud</option>
                   <option value={2}>2 solicitudes</option>
@@ -352,7 +352,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#18cb96] text-white py-2 px-4 rounded-lg hover:bg-[#15b085] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-[#18cb96] text-white py-2 px-4 rounded-xl hover:bg-[#15b085] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? 'Guardando...' : 'Guardar Configuración'}
               </button>
