@@ -6,6 +6,7 @@ import type { Lead } from '../services/leadsService'
 import { leadsService } from '../services/leadsService'
 import { ActionMenu } from '../components/ActionMenu'
 import { leadSolicitudesService } from '../services/leadSolicitudesService'
+import { archivosAdjuntosService, type ArchivoAdjunto } from '../services/archivosAdjuntosService'
 
 interface ActionMenuItem {
   label: string
@@ -159,6 +160,13 @@ const Leads = () => {
   const [localActiveLeads, setLocalActiveLeads] = useState<Lead[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [showArchivosModal, setShowArchivosModal] = useState(false)
+  const [archivosAdjuntos, setArchivosAdjuntos] = useState<ArchivoAdjunto[]>([])
+  const [archivosLoading, setArchivosLoading] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<ArchivoAdjunto | null>(null)
+  const [archivosCurrentPage, setArchivosCurrentPage] = useState(1)
+  const archivosPerPage = 5
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
@@ -350,6 +358,16 @@ const Leads = () => {
           </svg>
         ),
         onClick: () => handleViewDetails(lead)
+      },
+      {
+        label: 'Archivos adjuntos',
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+        ),
+        onClick: () => handleVerArchivosAdjuntos(lead),
+        className: 'text-blue-600 hover:bg-blue-50'
       }
     ]
 
@@ -530,6 +548,56 @@ const Leads = () => {
       setSolicitudLoading(false)
     }
   }
+
+  const handleVerArchivosAdjuntos = async (lead: Lead) => {
+    setSelectedLead(lead)
+    setArchivosLoading(true)
+    setShowArchivosModal(true)
+    setArchivosCurrentPage(1)
+    
+    try {
+      const archivos = await archivosAdjuntosService.getArchivosByLeadId(lead.id)
+      setArchivosAdjuntos(archivos)
+    } catch (error) {
+      console.error('Error loading archivos adjuntos:', error)
+      showNotification('Error al cargar los archivos adjuntos', 'error')
+      setArchivosAdjuntos([])
+    } finally {
+      setArchivosLoading(false)
+    }
+  }
+
+  const handleVerImagen = (archivo: ArchivoAdjunto) => {
+    setSelectedImage(archivo)
+    setShowImageViewer(true)
+  }
+
+  const handleAbrirPdf = (archivo: ArchivoAdjunto) => {
+    if (archivo.url) {
+      window.open(archivo.url, '_blank')
+    }
+  }
+
+  const handleDescargarArchivo = async (archivo: ArchivoAdjunto) => {
+    try {
+      await archivosAdjuntosService.downloadArchivo(archivo.bucket, archivo.path, archivo.filename)
+      showNotification('Archivo descargado correctamente', 'success')
+    } catch (error) {
+      console.error('Error downloading file:', error)
+      showNotification('Error al descargar el archivo', 'error')
+    }
+  }
+
+  const handleCerrarImageViewer = () => {
+    setShowImageViewer(false)
+    setSelectedImage(null)
+  }
+
+  // Calcular paginación para archivos adjuntos
+  const archivosTotalPages = Math.ceil(archivosAdjuntos.length / archivosPerPage)
+  const archivosStartIndex = (archivosCurrentPage - 1) * archivosPerPage
+  const archivosEndIndex = archivosStartIndex + archivosPerPage
+  const paginatedArchivos = archivosAdjuntos.slice(archivosStartIndex, archivosEndIndex)
 
   const getStatusDisplayName = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -1172,6 +1240,206 @@ const Leads = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archivos Adjuntos Modal overlay */}
+      {showArchivosModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999]"
+          onClick={() => setShowArchivosModal(false)}
+        />
+      )}
+
+      {/* Archivos Adjuntos Modal */}
+      {showArchivosModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">
+                Archivos Adjuntos - {selectedLead?.nombre_cliente}
+              </h2>
+              <button
+                onClick={() => setShowArchivosModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              {archivosLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
+                  <span className="ml-3 text-gray-600">Cargando archivos...</span>
+                </div>
+              ) : archivosAdjuntos.length === 0 ? (
+                <div className="text-center py-8">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No hay archivos adjuntos</h3>
+                  <p className="mt-1 text-sm text-gray-500">Este lead no tiene archivos adjuntos.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Grid de archivos */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+                    {paginatedArchivos.map((archivo) => (
+                      <div
+                        key={archivo.id}
+                        className="relative group cursor-pointer"
+                        onClick={() => {
+                          if (archivosAdjuntosService.isImage(archivo.mime_type)) {
+                            handleVerImagen(archivo)
+                          } else if (archivosAdjuntosService.isPdf(archivo.mime_type)) {
+                            handleAbrirPdf(archivo)
+                          }
+                        }}
+                      >
+                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-[#18cb96] hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 relative">
+                          {archivosAdjuntosService.isImage(archivo.mime_type) ? (
+                            <img
+                              src={archivo.url}
+                              alt={archivo.filename}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                target.nextElementSibling?.classList.remove('hidden')
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-4xl">
+                              {archivosAdjuntosService.getFileIcon(archivo.mime_type)}
+                            </div>
+                          )}
+                          
+                          {/* Fallback para imágenes que no cargan */}
+                          {archivosAdjuntosService.isImage(archivo.mime_type) && (
+                            <div className="hidden w-full h-full items-center justify-center text-4xl">
+                              {archivosAdjuntosService.getFileIcon(archivo.mime_type)}
+                            </div>
+                          )}
+                          
+                          {/* Overlay con acciones - solo cubre el contenido interno */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDescargarArchivo(archivo)
+                                }}
+                                className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                                title="Descargar"
+                              >
+                                <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </button>
+                              {archivosAdjuntosService.isImage(archivo.mime_type) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleVerImagen(archivo)
+                                  }}
+                                  className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                                  title="Ver imagen"
+                                >
+                                  <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Paginación */}
+                  {archivosTotalPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+                      <div className="text-sm text-gray-700">
+                        Mostrando {archivosStartIndex + 1}-{Math.min(archivosEndIndex, archivosAdjuntos.length)} de {archivosAdjuntos.length} archivos
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setArchivosCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={archivosCurrentPage === 1}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Anterior
+                        </button>
+                        
+                        <span className="text-sm text-gray-700">
+                          Página {archivosCurrentPage} de {archivosTotalPages}
+                        </span>
+                        
+                        <button
+                          onClick={() => setArchivosCurrentPage(prev => Math.min(prev + 1, archivosTotalPages))}
+                          disabled={archivosCurrentPage === archivosTotalPages}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Siguiente
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal overlay */}
+      {showImageViewer && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[10001]"
+          onClick={handleCerrarImageViewer}
+        />
+      )}
+
+      {/* Image Viewer Modal */}
+      {showImageViewer && selectedImage && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4">
+          <div className="relative max-w-4xl max-h-[90vh] w-full">
+            {/* Botón de cerrar */}
+            <button
+              onClick={handleCerrarImageViewer}
+              className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Botón de descargar */}
+            <button
+              onClick={() => handleDescargarArchivo(selectedImage)}
+              className="absolute top-4 right-16 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
+              title="Descargar imagen"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+
+            {/* Imagen */}
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.filename}
+              className="w-full h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -13,5 +13,7 @@ export const platformConverter = (platform: string) => {
       return 'X'
     case 'tiktok':
       return 'TikTok'
+    case 'callbell':
+      return 'CallBell'
   }
 }
