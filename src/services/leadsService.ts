@@ -20,7 +20,9 @@ export interface Lead {
   observaciones?: string
   user_id?: string
   usuario_nombre?: string
+  calidad?: number
 }
+
 
 export interface CreateLeadData {
   nombre_cliente: string
@@ -31,6 +33,27 @@ export interface CreateLeadData {
   hub_id?: number
   plataforma_lead_id?: string
   estado_temporal?: string
+}
+
+export interface ImportLeadData {
+  nombre_cliente: string
+  telefono: string
+  plataforma: string
+  empresa_id?: number
+  campaña_id?: number
+  hub_id?: number
+  plataforma_lead_id?: string
+  estado_temporal?: string
+  estado?: string
+  observaciones?: string
+  calidad?: number
+}
+
+export interface ImportResult {
+  success: boolean
+  created: number
+  errors: string[]
+  duplicatePhones: string[]
 }
 export interface LeadDevolucion extends Lead {
   audio_devolucion?: string
@@ -70,11 +93,12 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         usuario_nombre: lead.profiles?.nombre,
-        plataforma_lead: platformConverter(lead.plataforma|| '')
+        plataforma_lead: platformConverter(lead.plataforma|| ''),
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getLeadsByCompany:', error)
@@ -112,11 +136,12 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         usuario_nombre: lead.profiles?.nombre,
-        plataforma_lead: platformConverter(lead.plataforma|| '')
+        plataforma_lead: platformConverter(lead.plataforma|| ''),
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getLeadsByCompanyAndUser:', error)
@@ -153,11 +178,12 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         usuario_nombre: lead.profiles?.nombre,
-        plataforma_lead: platformConverter(lead.plataforma|| '')
+        plataforma_lead: platformConverter(lead.plataforma|| ''),
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getAllLeads:', error)
@@ -268,7 +294,20 @@ class LeadsService {
       let query = supabase
         .from('leads')
         .select(`
-          *,
+          id,
+          fecha_entrada,
+          nombre_cliente,
+          telefono,
+          plataforma,
+          empresa_id,
+          estado_temporal,
+          estado,
+          campaña_id,
+          hub_id,
+          plataforma_lead_id,
+          user_id,
+          observaciones,
+          calidad,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
@@ -294,9 +333,10 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
-        empresa_nombre: lead.empresas?.nombre
+        empresa_nombre: lead.empresas?.nombre,
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getLeadsInDateRange:', error)
@@ -310,7 +350,20 @@ class LeadsService {
       const { data, error } = await supabase
         .from('leads')
         .select(`
-          *,
+          id,
+          fecha_entrada,
+          nombre_cliente,
+          telefono,
+          plataforma,
+          empresa_id,
+          estado_temporal,
+          estado,
+          campaña_id,
+          hub_id,
+          plataforma_lead_id,
+          user_id,
+          observaciones,
+          calidad,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
@@ -325,10 +378,11 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
-        plataforma_lead: platformConverter(lead.plataforma || '')
+        plataforma_lead: platformConverter(lead.plataforma || ''),
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getUnassignedLeads:', error)
@@ -342,7 +396,20 @@ class LeadsService {
       const { data, error } = await supabase
         .from('leads')
         .select(`
-          *,
+          id,
+          fecha_entrada,
+          nombre_cliente,
+          telefono,
+          plataforma,
+          empresa_id,
+          estado_temporal,
+          estado,
+          campaña_id,
+          hub_id,
+          plataforma_lead_id,
+          user_id,
+          observaciones,
+          calidad,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
@@ -358,10 +425,11 @@ class LeadsService {
         throw error
       }
 
-      return data?.map(lead => ({
+      return (data as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
-        plataforma_lead: platformConverter(lead.plataforma || '')
+        plataforma_lead: platformConverter(lead.plataforma || ''),
+        calidad: lead.calidad || 1
       })) || []
     } catch (error) {
       console.error('Error in getUnassignedLeadsByCompany:', error)
@@ -453,6 +521,158 @@ class LeadsService {
       }
     } catch (error) {
       console.error('Error in rehusarLead:', error)
+      throw error
+    }
+  }
+
+  // Crear lead individual para importación manual
+  async createImportLead(leadData: ImportLeadData): Promise<Lead> {
+    try {
+      const leadToCreate = {
+        nombre_cliente: leadData.nombre_cliente,
+        telefono: leadData.telefono,
+        plataforma: leadData.plataforma || 'ScaleHubs',
+        empresa_id: leadData.empresa_id || null,
+        campaña_id: leadData.campaña_id || null,
+        hub_id: leadData.hub_id || null,
+        plataforma_lead_id: leadData.plataforma_lead_id || null,
+        estado_temporal: leadData.estado_temporal || 'sin_tratar',
+        estado: leadData.estado || 'activo',
+        observaciones: leadData.observaciones || null,
+        calidad: leadData.calidad || 1,
+        fecha_entrada: new Date().toISOString(),
+        user_id: null,
+        fecha_asignacion: null
+      }
+
+      const { data, error } = await supabase
+        .from('leads')
+        .insert([leadToCreate])
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          )
+        `)
+        .single()
+
+      if (error) {
+        console.error('Error creating import lead:', error)
+        throw error
+      }
+
+      return {
+        ...data,
+        empresa_nombre: data.empresas?.nombre,
+        plataforma_lead: platformConverter(data.plataforma || '')
+      }
+    } catch (error) {
+      console.error('Error in createImportLead:', error)
+      throw error
+    }
+  }
+
+  // Importar leads en lote desde CSV
+  async importLeadsFromCSV(leadsData: ImportLeadData[], checkDuplicates: boolean = true): Promise<ImportResult> {
+    try {
+      const result: ImportResult = {
+        success: true,
+        created: 0,
+        errors: [],
+        duplicatePhones: []
+      }
+
+      // Verificar teléfonos duplicados si es necesario
+      if (checkDuplicates && leadsData.length > 0) {
+        const phones = leadsData.map(lead => lead.telefono)
+        const { data: existingLeads, error: fetchError } = await supabase
+          .from('leads')
+          .select('telefono')
+          .in('telefono', phones)
+
+        if (fetchError) {
+          console.error('Error checking duplicate phones:', fetchError)
+          result.errors.push('Error al verificar teléfonos duplicados')
+          return result
+        }
+
+        const existingPhones = new Set(existingLeads?.map(lead => lead.telefono) || [])
+        result.duplicatePhones = phones.filter(phone => existingPhones.has(phone))
+      }
+
+      // Filtrar leads que no tienen teléfonos duplicados
+      const leadsToCreate = leadsData.filter(lead => 
+        !checkDuplicates || !result.duplicatePhones.includes(lead.telefono)
+      )
+
+      if (leadsToCreate.length === 0) {
+        result.success = false
+        result.errors.push('Todos los leads tienen teléfonos duplicados')
+        return result
+      }
+
+      // Preparar datos para inserción
+      const leadsForInsert = leadsToCreate.map(lead => ({
+        nombre_cliente: lead.nombre_cliente,
+        telefono: lead.telefono,
+        plataforma: lead.plataforma || 'ScaleHubs',
+        empresa_id: lead.empresa_id || null,
+        campaña_id: lead.campaña_id || null,
+        hub_id: lead.hub_id || null,
+        plataforma_lead_id: lead.plataforma_lead_id || null,
+        estado_temporal: lead.estado_temporal || 'sin_tratar',
+        estado: lead.estado || 'activo',
+        observaciones: lead.observaciones || null,
+        calidad: lead.calidad || 1,
+        fecha_entrada: new Date().toISOString(),
+        user_id: null,
+        fecha_asignacion: null
+      }))
+
+      // Insertar leads en lote
+      const { data, error } = await supabase
+        .from('leads')
+        .insert(leadsForInsert)
+        .select('id')
+
+      if (error) {
+        console.error('Error importing leads:', error)
+        result.success = false
+        result.errors.push(`Error al importar leads: ${error.message}`)
+        return result
+      }
+
+      result.created = data?.length || 0
+      return result
+    } catch (error) {
+      console.error('Error in importLeadsFromCSV:', error)
+      return {
+        success: false,
+        created: 0,
+        errors: [error instanceof Error ? error.message : 'Error desconocido'],
+        duplicatePhones: []
+      }
+    }
+  }
+
+  // Verificar si un teléfono ya existe
+  async checkPhoneExists(telefono: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('telefono', telefono)
+        .single()
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error checking phone:', error)
+        throw error
+      }
+
+      return !!data
+    } catch (error) {
+      console.error('Error in checkPhoneExists:', error)
       throw error
     }
   }

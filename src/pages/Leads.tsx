@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
-import { leadsService } from '../services/leadsService'
+import { leadsService, type ImportLeadData } from '../services/leadsService'
 import { ActionMenu } from '../components/ActionMenu'
 import { leadSolicitudesService } from '../services/leadSolicitudesService'
 import { archivosAdjuntosService, type ArchivoAdjunto } from '../services/archivosAdjuntosService'
+import { companyService } from '../services/companyService'
 
 interface ActionMenuItem {
   label: string
@@ -39,6 +40,16 @@ const LeadMobileCard = memo(({
       </div>
       <div className="space-y-1 text-xs text-gray-600">
         <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
+        <p><span className="font-medium">Calidad:</span> 
+          <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white ${
+            lead.calidad == 1 ? 'bg-green-800' :
+            lead.calidad == 2 ? 'bg-green-600' :
+            lead.calidad == 3 ? 'bg-[#18cb96]' :
+            'bg-gray-500'
+          }`}>
+            {lead.calidad || 1}
+          </span>
+        </p>
         {user?.rol === 'coordinador' ? (
           <p><span className="font-medium">Asignado a:</span> {lead.usuario_nombre || 'Sin asignar'}</p>
         ) : (
@@ -99,6 +110,16 @@ const LeadDesktopRow = memo(({
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
         {lead.telefono}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white ${
+          lead.calidad == 1 ? 'bg-green-800' :
+          lead.calidad == 2 ? 'bg-green-600' :
+          lead.calidad == 3 ? 'bg-[#18cb96]' :
+          'bg-gray-500'
+        }`}>
+          {lead.calidad || 1}
+        </span>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
@@ -168,6 +189,18 @@ const Leads = () => {
   const [archivosCurrentPage, setArchivosCurrentPage] = useState(1)
   const archivosPerPage = 5
   
+  // Estados para importación
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importMode, setImportMode] = useState<'manual' | 'csv'>('manual')
+  const [importLoading, setImportLoading] = useState(false)
+  const [companies, setCompanies] = useState<Array<{id: number, nombre: string}>>([])
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [manualFormData, setManualFormData] = useState({
+    nombre_cliente: '',
+    telefono: '',
+    empresa_id: ''
+  })
+  
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
     loading, 
@@ -212,6 +245,13 @@ const Leads = () => {
     
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
+
+  // Cargar empresas cuando se abra el modal de importación
+  useEffect(() => {
+    if (showImportModal) {
+      loadCompanies()
+    }
+  }, [showImportModal])
 
 
 
@@ -593,6 +633,158 @@ const Leads = () => {
     setSelectedImage(null)
   }
 
+  // Funciones para importación
+  const handleImport = () => {
+    setShowImportModal(true)
+    setImportMode('manual')
+    setManualFormData({ nombre_cliente: '', telefono: '', empresa_id: '' })
+    setCsvFile(null)
+  }
+
+  const loadCompanies = async () => {
+    try {
+      const companiesData = await companyService.getCompanies()
+      setCompanies(companiesData.map(company => ({ id: company.id, nombre: company.nombre })))
+    } catch (error) {
+      console.error('Error loading companies:', error)
+    }
+  }
+
+  const handleManualFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setManualFormData({
+      ...manualFormData,
+      [e.target.name]: e.target.value
+    })
+  }
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file)
+    } else {
+      showNotification('Por favor selecciona un archivo CSV válido', 'error')
+    }
+  }
+
+  const parseCSV = (csvText: string): ImportLeadData[] => {
+    const lines = csvText.split('\n').filter(line => line.trim())
+    if (lines.length < 2) {
+      throw new Error('El archivo CSV debe tener al menos una fila de datos')
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const requiredHeaders = ['nombre_cliente', 'telefono']
+    
+    // Verificar que estén los headers requeridos
+    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header))
+    if (missingHeaders.length > 0) {
+      throw new Error(`Faltan las siguientes columnas requeridas: ${missingHeaders.join(', ')}`)
+    }
+
+    const leads: ImportLeadData[] = []
+    const errors: string[] = []
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+      
+      if (values.length !== headers.length) {
+        errors.push(`Fila ${i + 1}: Número de columnas incorrecto`)
+        continue
+      }
+
+      const lead: ImportLeadData = {
+        nombre_cliente: values[headers.indexOf('nombre_cliente')] || '',
+        telefono: values[headers.indexOf('telefono')] || '',
+        plataforma: values[headers.indexOf('plataforma')] || 'ScaleHubs',
+        empresa_id: values[headers.indexOf('empresa_id')] ? parseInt(values[headers.indexOf('empresa_id')]) : undefined,
+        estado_temporal: values[headers.indexOf('estado_temporal')] || 'sin_tratar',
+        estado: values[headers.indexOf('estado')] || 'activo',
+        observaciones: values[headers.indexOf('observaciones')] || undefined,
+        calidad: values[headers.indexOf('calidad')] ? parseInt(values[headers.indexOf('calidad')]) : 1
+      }
+
+      // Validar campos requeridos
+      if (!lead.nombre_cliente) {
+        errors.push(`Fila ${i + 1}: Nombre del cliente es requerido`)
+        continue
+      }
+      if (!lead.telefono) {
+        errors.push(`Fila ${i + 1}: Teléfono es requerido`)
+        continue
+      }
+
+      leads.push(lead)
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Errores encontrados:\n${errors.join('\n')}`)
+    }
+
+    return leads
+  }
+
+  const handleManualImport = async () => {
+    if (!manualFormData.nombre_cliente || !manualFormData.telefono) {
+      showNotification('Por favor completa todos los campos requeridos', 'error')
+      return
+    }
+
+    setImportLoading(true)
+    try {
+      const leadData: ImportLeadData = {
+        nombre_cliente: manualFormData.nombre_cliente,
+        telefono: manualFormData.telefono,
+        plataforma: 'ScaleHubs',
+        empresa_id: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : undefined,
+        estado_temporal: 'sin_tratar',
+        estado: 'activo',
+        calidad: 1
+      }
+
+      await leadsService.createImportLead(leadData)
+      showNotification('Lead importado correctamente', 'success')
+      setShowImportModal(false)
+      await refreshLeads()
+    } catch (error) {
+      console.error('Error importing lead:', error)
+      showNotification('Error al importar el lead', 'error')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const handleCsvImport = async () => {
+    if (!csvFile) {
+      showNotification('Por favor selecciona un archivo CSV', 'error')
+      return
+    }
+
+    setImportLoading(true)
+    try {
+      const csvText = await csvFile.text()
+      const leadsData = parseCSV(csvText)
+      
+      const result = await leadsService.importLeadsFromCSV(leadsData, true)
+      
+      if (result.success) {
+        let message = `Se importaron ${result.created} leads correctamente`
+        if (result.duplicatePhones.length > 0) {
+          message += `. ${result.duplicatePhones.length} leads no se importaron por teléfonos duplicados`
+        }
+        showNotification(message, 'success')
+        setShowImportModal(false)
+        await refreshLeads()
+      } else {
+        showNotification(`Error al importar: ${result.errors.join(', ')}`, 'error')
+      }
+    } catch (error) {
+      console.error('Error importing CSV:', error)
+      showNotification(error instanceof Error ? error.message : 'Error al procesar el archivo CSV', 'error')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   // Calcular paginación para archivos adjuntos
   const archivosTotalPages = Math.ceil(archivosAdjuntos.length / archivosPerPage)
   const archivosStartIndex = (archivosCurrentPage - 1) * archivosPerPage
@@ -791,8 +983,17 @@ const Leads = () => {
               </div>
             </div>
             
-            {/* Export Button */}
-            <div className="flex justify-end">
+            {/* Export and Import Buttons */}
+            <div className="flex justify-end gap-3">
+              {user?.rol === 'administrador' && (
+                <button
+                  onClick={handleImport}
+                  className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                >
+                  <span className="mr-2">📥</span>
+                  Importar
+                </button>
+              )}
               <button
                 onClick={handleExport}
                 className="w-full sm:w-auto px-6 py-2 bg-[#18cb96] text-white font-medium rounded-lg hover:bg-[#15b885] transition-colors flex items-center justify-center"
@@ -833,6 +1034,9 @@ const Leads = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Teléfono
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Calidad
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Plataforma
@@ -1440,6 +1644,218 @@ const Leads = () => {
               className="w-full h-full object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal overlay */}
+      {showImportModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999]"
+          onClick={() => setShowImportModal(false)}
+        />
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">Importar Leads</h2>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Toggle Buttons */}
+              <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setImportMode('manual')}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    importMode === 'manual'
+                      ? 'bg-white text-[#373643] shadow-sm'
+                      : 'text-gray-600 hover:text-[#373643]'
+                  }`}
+                >
+                  Importar Manual
+                </button>
+                <button
+                  onClick={() => setImportMode('csv')}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    importMode === 'csv'
+                      ? 'bg-white text-[#373643] shadow-sm'
+                      : 'text-gray-600 hover:text-[#373643]'
+                  }`}
+                >
+                  Importar por CSV
+                </button>
+              </div>
+
+              {/* Manual Import Form */}
+              {importMode === 'manual' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="nombre_cliente" className="block text-sm font-medium text-[#373643] mb-2">
+                      Nombre del Cliente *
+                    </label>
+                    <input
+                      type="text"
+                      id="nombre_cliente"
+                      name="nombre_cliente"
+                      value={manualFormData.nombre_cliente}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      placeholder="Ingresa el nombre del cliente"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="telefono" className="block text-sm font-medium text-[#373643] mb-2">
+                      Teléfono *
+                    </label>
+                    <input
+                      type="tel"
+                      id="telefono"
+                      name="telefono"
+                      value={manualFormData.telefono}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      placeholder="Ingresa el teléfono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="empresa_id" className="block text-sm font-medium text-[#373643] mb-2">
+                      Empresa (Opcional)
+                    </label>
+                    <select
+                      id="empresa_id"
+                      name="empresa_id"
+                      value={manualFormData.empresa_id}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    >
+                      <option value="">Selecciona una empresa</option>
+                      {companies.map(company => (
+                        <option key={company.id} value={company.id}>
+                          {company.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">Información automática</h3>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• Plataforma: ScaleHubs</p>
+                      <p>• Estado: Activo</p>
+                      <p>• Estado Temporal: Sin Tratar</p>
+                      <p>• Calidad: 1</p>
+                      <p>• Fecha de entrada: Ahora</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleManualImport}
+                      disabled={importLoading}
+                      className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {importLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Importando...
+                        </>
+                      ) : (
+                        'Importar Lead'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CSV Import Form */}
+              {importMode === 'csv' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="csvFile" className="block text-sm font-medium text-[#373643] mb-2">
+                      Archivo CSV *
+                    </label>
+                    <input
+                      type="file"
+                      id="csvFile"
+                      accept=".csv"
+                      onChange={handleCsvFileChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    />
+                    {csvFile && (
+                      <p className="mt-2 text-sm text-green-600">
+                        Archivo seleccionado: {csvFile.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-yellow-800 mb-2">Formato requerido del CSV</h3>
+                    <div className="text-sm text-yellow-700 space-y-1">
+                      <p><strong>Columnas requeridas:</strong> nombre_cliente, telefono</p>
+                      <p><strong>Columnas opcionales:</strong> plataforma, empresa_id, estado_temporal, estado, observaciones, calidad</p>
+                      <p><strong>Nota:</strong> Los teléfonos duplicados no se importarán</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">Valores por defecto</h3>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• Plataforma: ScaleHubs (si no se especifica)</p>
+                      <p>• Estado: Activo (si no se especifica)</p>
+                      <p>• Estado Temporal: Sin Tratar (si no se especifica)</p>
+                      <p>• Calidad: 1 (si no se especifica)</p>
+                      <p>• Fecha de entrada: Ahora</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleCsvImport}
+                      disabled={importLoading || !csvFile}
+                      className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {importLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Importando...
+                        </>
+                      ) : (
+                        'Importar CSV'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

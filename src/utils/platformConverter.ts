@@ -15,5 +15,9 @@ export const platformConverter = (platform: string) => {
       return 'TikTok'
     case 'callbell':
       return 'CallBell'
+    case 'ScaleHubs':
+      return 'ScaleHubs'
+    default:
+      return platform
   }
 }
