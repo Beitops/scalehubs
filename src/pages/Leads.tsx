@@ -41,13 +41,12 @@ const LeadMobileCard = memo(({
       <div className="space-y-1 text-xs text-gray-600">
         <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
         <p><span className="font-medium">Calidad:</span> 
-          <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white ${
-            lead.calidad == 1 ? 'bg-green-800' :
-            lead.calidad == 2 ? 'bg-green-600' :
-            lead.calidad == 3 ? 'bg-[#18cb96]' :
-            'bg-gray-500'
-          }`}>
-            {lead.calidad || 1}
+          <span className="ml-2 inline-flex items-center">
+            <img 
+              src={`/calidadLead/${lead.calidad || 1}.png`} 
+              alt={`Calidad ${lead.calidad || 1}`}
+              className="w-8 h-8 object-contain"
+            />
           </span>
         </p>
         {user?.rol === 'coordinador' ? (
@@ -112,13 +111,12 @@ const LeadDesktopRow = memo(({
         {lead.telefono}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white ${
-          lead.calidad == 1 ? 'bg-green-800' :
-          lead.calidad == 2 ? 'bg-green-600' :
-          lead.calidad == 3 ? 'bg-[#18cb96]' :
-          'bg-gray-500'
-        }`}>
-          {lead.calidad || 1}
+        <span className="inline-flex items-center">
+          <img 
+            src={`/calidadLead/${lead.calidad || 1}.png`} 
+            alt={`Calidad ${lead.calidad || 1}`}
+            className="w-18 h-18 object-contain"
+          />
         </span>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
