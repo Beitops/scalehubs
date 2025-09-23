@@ -39,16 +39,17 @@ const LeadMobileCard = memo(({
         </span>
       </div>
       <div className="space-y-1 text-xs text-gray-600">
-        <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
-        <p><span className="font-medium">Calidad:</span> 
-          <span className="ml-2 inline-flex items-center">
+        <p className="flex items-center">
+          <span className="font-medium">Calidad:</span> 
+          <span className="ml-2 inline-flex items-center justify-center w-8 h-8 sm:w-11 sm:h-11">
             <img 
               src={`/calidadLead/${lead.calidad || 1}.png`} 
               alt={`Calidad ${lead.calidad || 1}`}
-              className="w-8 h-8 object-contain"
+              className="w-8 h-8 sm:w-11 sm:h-11 object-contain"
             />
           </span>
         </p>
+        <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
         {user?.rol === 'coordinador' ? (
           <p><span className="font-medium">Asignado a:</span> {lead.usuario_nombre || 'Sin asignar'}</p>
         ) : (
@@ -105,19 +106,19 @@ const LeadDesktopRow = memo(({
         {user?.rol === 'coordinador' ? (lead.usuario_nombre || 'Sin asignar') : new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-        {lead.telefono}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className="inline-flex items-center">
+        <span className="inline-flex items-center justify-center w-18 h-18">
           <img 
             src={`/calidadLead/${lead.calidad || 1}.png`} 
             alt={`Calidad ${lead.calidad || 1}`}
             className="w-18 h-18 object-contain"
           />
         </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+        {lead.telefono}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
@@ -1028,13 +1029,13 @@ const Leads = () => {
                     {user?.rol === 'coordinador' ? 'Asignado a' : 'Fecha Entrada'}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Calidad
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Nombre
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Teléfono
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Calidad
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Plataforma
