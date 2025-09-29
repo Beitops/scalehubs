@@ -25,7 +25,7 @@ const Empresas = () => {
   const [nameFilter, setNameFilter] = useState('')
   const [cifFilter, setCifFilter] = useState('')
   
-  // Formulario nueva empresa
+  // Formulario para nueva empresa
   const [newCompany, setNewCompany] = useState({
     nombre: '',
     email: '',
