@@ -14,11 +14,12 @@ const Usuarios = ({}: UsuariosProps) => {
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [userToDelete, setUserToDelete] = useState<DatabaseProfile | null>(null)
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
-  const [showErrorMessage, setShowErrorMessage] = useState(false)
-  const [messageVisible, setMessageVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const [notification, setNotification] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error' | 'info'
+  }>({ show: false, message: '', type: 'info' })
   const [newUser, setNewUser] = useState({
     nombre: '',
     email: '',
@@ -44,6 +45,21 @@ const Usuarios = ({}: UsuariosProps) => {
     deleteUser,
     canAddAgente
   } = useUserStore()
+
+  // Función para mostrar notificaciones
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ show: true, message, type })
+  }
+
+  // Auto-ocultar notificación después de 4 segundos
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }))
+      }, 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [notification.show])
 
   useEffect(() => {
     if (user?.rol && (user.rol === 'administrador' || user.rol === 'coordinador' || userEmpresaId)) {
@@ -109,8 +125,6 @@ const Usuarios = ({}: UsuariosProps) => {
     e.preventDefault()
 
     setIsLoading(true)
-    setShowSuccessMessage(false)
-    setShowErrorMessage(false)
 
     try {
       let userData: NewUserData
@@ -193,9 +207,7 @@ const Usuarios = ({}: UsuariosProps) => {
           : `Usuario ${newUser.rol} invitado con éxito. Se ha enviado un email de registro.`
       }
 
-      setMessage(successMessage)
-      setShowSuccessMessage(true)
-      setTimeout(() => setMessageVisible(true), 100)
+      showNotification(successMessage, 'success')
 
       // Cerrar modal
       setShowAddUserModal(false)
@@ -215,20 +227,9 @@ const Usuarios = ({}: UsuariosProps) => {
 
     } catch (error) {
       // Mostrar mensaje de error
-      setMessage(error instanceof Error ? error.message : 'Error al invitar usuario')
-      setShowErrorMessage(true)
-      setTimeout(() => setMessageVisible(true), 100)
+      showNotification(error instanceof Error ? error.message : 'Error al invitar usuario', 'error')
     } finally {
       setIsLoading(false)
-
-      // Ocultar mensaje después de 4 segundos
-      setTimeout(() => {
-        setMessageVisible(false)
-        setTimeout(() => {
-          setShowSuccessMessage(false)
-          setShowErrorMessage(false)
-        }, 300)
-      }, 4000)
     }
   }
 
@@ -261,16 +262,12 @@ const Usuarios = ({}: UsuariosProps) => {
 
     try {
       setIsLoading(true)
-      setShowSuccessMessage(false)
-      setShowErrorMessage(false)
 
       // Eliminar usuario usando el store
       await deleteUser(userToDelete.user_id)
 
       // Mostrar mensaje de éxito
-      setMessage(`Usuario ${userToDelete.nombre || userToDelete.email} eliminado con éxito`)
-      setShowSuccessMessage(true)
-      setTimeout(() => setMessageVisible(true), 100)
+      showNotification(`Usuario ${userToDelete.nombre || userToDelete.email} eliminado con éxito`, 'success')
 
       // Cerrar modal de confirmación
       setShowDeleteConfirmModal(false)
@@ -283,20 +280,9 @@ const Usuarios = ({}: UsuariosProps) => {
 
     } catch (error) {
       // Mostrar mensaje de error
-      setMessage(error instanceof Error ? error.message : 'Error al eliminar usuario')
-      setShowErrorMessage(true)
-      setTimeout(() => setMessageVisible(true), 100)
+      showNotification(error instanceof Error ? error.message : 'Error al eliminar usuario', 'error')
     } finally {
       setIsLoading(false)
-
-      // Ocultar mensaje después de 4 segundos
-      setTimeout(() => {
-        setMessageVisible(false)
-        setTimeout(() => {
-          setShowSuccessMessage(false)
-          setShowErrorMessage(false)
-        }, 300)
-      }, 4000)
     }
   }
 
@@ -903,22 +889,54 @@ const Usuarios = ({}: UsuariosProps) => {
         </div>
       )}
 
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <div className={`fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[9999] transition-all duration-300 ease-in-out transform ${messageVisible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
-          <div className="flex items-center">
-            <span className="mr-2">✅</span>
-            <span>{message}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error Message */}
-      {showErrorMessage && (
-        <div className={`fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-[9999] transition-all duration-300 ease-in-out transform ${messageVisible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
-          <div className="flex items-center">
-            <span className="mr-2">❌</span>
-            <span>{message}</span>
+      {/* Notification */}
+      {notification.show && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] max-w-md w-full mx-4">
+          <div className={`rounded-lg shadow-lg p-4 flex items-center justify-between ${
+            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
+            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
+            'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className="flex items-center">
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                notification.type === 'success' ? 'bg-green-100' :
+                notification.type === 'error' ? 'bg-red-100' :
+                'bg-blue-100'
+              }`}>
+                {notification.type === 'success' ? (
+                  <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : notification.type === 'error' ? (
+                  <svg className="w-3 h-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <p className={`ml-3 text-sm font-medium ${
+                notification.type === 'success' ? 'text-green-800' :
+                notification.type === 'error' ? 'text-red-800' :
+                'text-blue-800'
+              }`}>
+                {notification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+              className={`ml-4 flex-shrink-0 ${
+                notification.type === 'success' ? 'text-green-400 hover:text-green-600' :
+                notification.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                'text-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
