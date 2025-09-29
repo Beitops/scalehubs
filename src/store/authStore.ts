@@ -11,6 +11,7 @@ import type { Session } from '@supabase/supabase-js'
 interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
+    maximoAgentes: number
 }
 
 interface AuthState {
@@ -29,6 +30,8 @@ interface AuthState {
     checkAuth: (session: Session | null) => Promise<void>
     getUserEmpresaInfo: () => Promise<{ userEmpresaId: number | null; userEmpresaNombre: string }>
     updateEmpresaConfiguracion: (config: EmpresaConfiguracion) => Promise<void>
+    getEmpresaConfiguracion: (empresaId: number) => Promise<EmpresaConfiguracion | null>
+    updateEmpresaConfiguracionById: (empresaId: number, config: EmpresaConfiguracion) => Promise<void>
     updatePassword: (newPassword: string) => Promise<void>
 }
 
@@ -260,6 +263,64 @@ export const useAuthStore = create<AuthState>()(
                         }
 
                         set({ userEmpresaConfiguracion: config })
+                    } catch (error) {
+                        throw error
+                    }
+                },
+
+                getEmpresaConfiguracion: async (empresaId: number) => {
+                    try {
+                        const { data: configData, error } = await supabase
+                            .from('configuraciones_empresa')
+                            .select('configuraciones')
+                            .eq('empresa_id', empresaId)
+                            .single()
+                        
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                // No existe configuración, retornar valores por defecto
+                                return {
+                                    maxSolicitudesPorAgente: 1,
+                                    solicitudesAutomaticas: false,
+                                    maximoAgentes: 1
+                                }
+                            }
+                            throw new Error(error.message)
+                        }
+
+                        if (configData?.configuraciones) {
+                            const config = configData.configuraciones as EmpresaConfiguracion
+                            // Asegurar que el nuevo campo existe
+                            return {
+                                maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
+                                solicitudesAutomaticas: config.solicitudesAutomaticas || false,
+                                maximoAgentes: config.maximoAgentes || 1
+                            }
+                        }
+
+                        return {
+                            maxSolicitudesPorAgente: 1,
+                            solicitudesAutomaticas: false,
+                            maximoAgentes: 1
+                        }
+                    } catch (error) {
+                        throw error
+                    }
+                },
+
+                updateEmpresaConfiguracionById: async (empresaId: number, config: EmpresaConfiguracion) => {
+                    try {
+                        const { error } = await supabase
+                            .from('configuraciones_empresa')
+                            .upsert({
+                                empresa_id: empresaId,
+                                configuraciones: config,
+                                fecha_modificacion: new Date().toISOString()
+                            })
+
+                        if (error) {
+                            throw new Error(error.message)
+                        }
                     } catch (error) {
                         throw error
                     }

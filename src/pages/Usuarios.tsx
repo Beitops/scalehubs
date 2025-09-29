@@ -41,7 +41,8 @@ const Usuarios = ({}: UsuariosProps) => {
     loading,
     error,
     loadUsers,
-    deleteUser
+    deleteUser,
+    canAddAgente
   } = useUserStore()
 
   useEffect(() => {
@@ -120,6 +121,12 @@ const Usuarios = ({}: UsuariosProps) => {
           throw new Error('No se pudo identificar la empresa del coordinador.')
         }
 
+        // Validar límite de agentes para coordinadores
+        const agentesInfo = await canAddAgente(userEmpresaId)
+        if (!agentesInfo.canAdd) {
+          throw new Error(`No se pueden añadir más agentes. La empresa ya tiene ${agentesInfo.currentCount} de ${agentesInfo.maxAgentes} agentes permitidos. Contacta al administrador para aumentar el límite.`)
+        }
+
         userData = {
           nombre: newUser.nombre,
           email: newUser.email,
@@ -146,6 +153,14 @@ const Usuarios = ({}: UsuariosProps) => {
 
           if (empresaError || !empresa) {
             throw new Error('Empresa no encontrada con el CIF proporcionado. Verifica que el CIF sea correcto.')
+          }
+
+          // Validar límite de agentes si se está creando un agente
+          if (newUser.rol === 'agente') {
+            const agentesInfo = await canAddAgente(empresa.id)
+            if (!agentesInfo.canAdd) {
+              throw new Error(`No se pueden añadir más agentes a la empresa ${empresa.nombre}. Ya tiene ${agentesInfo.currentCount} de ${agentesInfo.maxAgentes} agentes permitidos.`)
+            }
           }
 
           userData = {

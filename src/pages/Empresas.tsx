@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { companyService } from '../services/companyService'
 import type { Company } from '../services/companyService'
+import { ActionMenu } from '../components/ActionMenu'
+import { useAuthStore } from '../store/authStore'
 
 const Empresas = () => {
   const [companies, setCompanies] = useState<Company[]>([])
@@ -13,6 +15,11 @@ const Empresas = () => {
   const [messageVisible, setMessageVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
+  const [configLoading, setConfigLoading] = useState(false)
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null)
   
   // Filtros
   const [nameFilter, setNameFilter] = useState('')
@@ -26,6 +33,15 @@ const Empresas = () => {
     prioridad: 1,
     cif: ''
   })
+
+  // Estados para configuraciones
+  const [empresaConfiguracion, setEmpresaConfiguracion] = useState({
+    maxSolicitudesPorAgente: 1,
+    solicitudesAutomaticas: false,
+    maximoAgentes: 1
+  })
+
+  const { getEmpresaConfiguracion, updateEmpresaConfiguracionById } = useAuthStore()
 
   // Cargar empresas
   useEffect(() => {
@@ -131,6 +147,69 @@ const Empresas = () => {
       [e.target.name]: e.target.type === 'number' ? Number(e.target.value) : e.target.value
     })
   }
+
+  const handleConfigurarEmpresa = async (company: Company) => {
+    setSelectedCompany(company)
+    setConfigError(null)
+    setConfigSuccess(null)
+    setConfigLoading(true)
+    setShowConfigModal(true)
+
+    try {
+      const config = await getEmpresaConfiguracion(company.id)
+      setEmpresaConfiguracion(config || {
+        maxSolicitudesPorAgente: 1,
+        solicitudesAutomaticas: false,
+        maximoAgentes: 1
+      })
+    } catch (error) {
+      console.error('Error loading company config:', error)
+      setConfigError('Error al cargar las configuraciones de la empresa')
+    } finally {
+      setConfigLoading(false)
+    }
+  }
+
+  const handleConfigSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedCompany) return
+
+    setConfigLoading(true)
+    setConfigError(null)
+    setConfigSuccess(null)
+
+    try {
+      await updateEmpresaConfiguracionById(selectedCompany.id, empresaConfiguracion)
+      setConfigSuccess('Configuraciones actualizadas correctamente')
+    } catch (error) {
+      console.error('Error updating company config:', error)
+      setConfigError('Error al actualizar las configuraciones')
+    } finally {
+      setConfigLoading(false)
+    }
+  }
+
+  const handleConfigInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target
+    setEmpresaConfiguracion(prev => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+    }))
+  }
+
+  const getActionMenuItems = (company: Company) => [
+    {
+      label: 'Configuraciones',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      onClick: () => handleConfigurarEmpresa(company),
+      className: 'text-blue-600 hover:bg-blue-50'
+    }
+  ]
 
   // Paginación
   const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage)
@@ -257,7 +336,7 @@ const Empresas = () => {
                       Prioridad
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
+                      Acciones
                     </th>
                   </tr>
                 </thead>
@@ -289,14 +368,12 @@ const Empresas = () => {
                           {getPriorityText(company.prioridad)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          company.activa 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {company.activa ? 'Activa' : 'Inactiva'}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <ActionMenu
+                          items={getActionMenuItems(company)}
+                          triggerLabel="Acciones"
+                          size="md"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -327,7 +404,7 @@ const Empresas = () => {
                         </span>
                       </div>
                       
-                      {/* CIF, Volumen y Estado abajo en grid */}
+                      {/* CIF, Volumen y Prioridad abajo en grid */}
                       <div className="grid grid-cols-3 gap-3 text-xs">
                         <div>
                           <span className="text-gray-500 block">CIF:</span>
@@ -342,15 +419,20 @@ const Empresas = () => {
                           </span>
                         </div>
                         <div>
-                          <span className="text-gray-500 block">Estado:</span>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            company.activa 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {company.activa ? 'Activa' : 'Inactiva'}
+                          <span className="text-gray-500 block">Prioridad:</span>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(company.prioridad)}`}>
+                            {getPriorityText(company.prioridad)}
                           </span>
                         </div>
+                      </div>
+                      
+                      {/* Acciones */}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <ActionMenu
+                          items={getActionMenuItems(company)}
+                          triggerLabel="Acciones"
+                          size="sm"
+                        />
                       </div>
                     </div>
                   </div>
@@ -581,6 +663,134 @@ const Empresas = () => {
           <div className="flex items-center">
             <span className="mr-2">✅</span>
             <span className="text-sm sm:text-base">{message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Configuraciones Modal overlay */}
+      {showConfigModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowConfigModal(false)}
+        />
+      )}
+
+      {/* Configuraciones Modal */}
+      {showConfigModal && selectedCompany && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">
+                Configuraciones - {selectedCompany.nombre}
+              </h2>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Mensajes de error y éxito */}
+              {configError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl">
+                  {configError}
+                </div>
+              )}
+              {configSuccess && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl">
+                  {configSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleConfigSubmit} className="space-y-6">
+                {/* Máximo de solicitudes por agente */}
+                <div>
+                  <label className="block text-sm font-medium text-[#373643] mb-2">
+                    Máximo de solicitudes por agente
+                  </label>
+                  <select
+                    name="maxSolicitudesPorAgente"
+                    value={empresaConfiguracion.maxSolicitudesPorAgente}
+                    onChange={handleConfigInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  >
+                    <option value={1}>1 solicitud</option>
+                    <option value={2}>2 solicitudes</option>
+                    <option value={3}>3 solicitudes</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Número máximo de solicitudes de leads que puede crear cada agente al mismo tiempo
+                  </p>
+                </div>
+
+                {/* Solicitudes automáticas */}
+                <div>
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      name="solicitudesAutomaticas"
+                      checked={empresaConfiguracion.solicitudesAutomaticas}
+                      onChange={handleConfigInputChange}
+                      className="h-4 w-4 text-[#18cb96] focus:ring-[#18cb96] border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-[#373643]">
+                      Aceptar solicitudes automáticamente
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-7">
+                    Si está activado, las solicitudes de leads se aprobarán automáticamente sin revisión manual
+                  </p>
+                </div>
+
+                {/* Máximo de agentes */}
+                <div>
+                  <label className="block text-sm font-medium text-[#373643] mb-2">
+                    Máximo de agentes
+                  </label>
+                  <input
+                    type="number"
+                    name="maximoAgentes"
+                    value={empresaConfiguracion.maximoAgentes}
+                    onChange={handleConfigInputChange}
+                    min="1"
+                    max="100"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Número máximo de agentes que puede tener esta empresa
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={configLoading}
+                    className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {configLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Guardando...
+                      </>
+                    ) : (
+                      'Guardar Configuraciones'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
