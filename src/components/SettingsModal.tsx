@@ -87,8 +87,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
       await updateEmpresaConfiguracion({
         maxSolicitudesPorAgente: maxSolicitudes,
-        solicitudesAutomaticas: solicitudesAutomaticas,
-        maximoAgentes: userEmpresaConfiguracion?.maximoAgentes || 1
+        solicitudesAutomaticas: solicitudesAutomaticas
       })
       setSuccess('Configuración de empresa actualizada correctamente')
     } catch (error) {

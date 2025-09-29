@@ -157,10 +157,10 @@ const Empresas = () => {
 
     try {
       const config = await getEmpresaConfiguracion(company.id)
-      setEmpresaConfiguracion(config || {
-        maxSolicitudesPorAgente: 1,
-        solicitudesAutomaticas: false,
-        maximoAgentes: 1
+      setEmpresaConfiguracion({
+        maxSolicitudesPorAgente: config?.maxSolicitudesPorAgente || 1,
+        solicitudesAutomaticas: config?.solicitudesAutomaticas || false,
+        maximoAgentes: config?.maximoAgentes || 1
       })
     } catch (error) {
       console.error('Error loading company config:', error)

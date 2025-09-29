@@ -11,7 +11,7 @@ import type { Session } from '@supabase/supabase-js'
 interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
-    maximoAgentes: number
+    maximoAgentes?: number
 }
 
 interface AuthState {
@@ -252,11 +252,17 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     try {
+                        // Si maximoAgentes no se proporciona, no se incluye en la actualización
+                        const configToSave = {
+                            ...config,
+                            ...(config.maximoAgentes !== undefined && { maximoAgentes: config.maximoAgentes })
+                        }
+
                         const { error } = await supabase
                             .from('configuraciones_empresa')
                             .upsert({
                                 empresa_id: userEmpresaId,
-                                configuraciones: config,
+                                configuraciones: configToSave,
                                 fecha_modificacion: new Date().toISOString()
                             })
 
@@ -264,7 +270,7 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error(error.message)
                         }
 
-                        set({ userEmpresaConfiguracion: config })
+                        set({ userEmpresaConfiguracion: configToSave })
                     } catch (error) {
                         throw error
                     }
