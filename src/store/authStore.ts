@@ -11,7 +11,7 @@ import type { Session } from '@supabase/supabase-js'
 interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
-    maximoAgentes: number
+    maximoAgentes?: number
 }
 
 interface AuthState {
