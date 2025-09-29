@@ -34,7 +34,7 @@ const Usuarios = ({}: UsuariosProps) => {
   const [companyFilter, setCompanyFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   
-  const { user, userEmpresaId } = useAuthStore()
+  const { user, userEmpresaId, canAddAgente } = useAuthStore()
   
   // Usar el store de usuarios solo para lo esencial
   const {
@@ -42,8 +42,7 @@ const Usuarios = ({}: UsuariosProps) => {
     loading,
     error,
     loadUsers,
-    deleteUser,
-    canAddAgente
+    deleteUser
   } = useUserStore()
 
   // Función para mostrar notificaciones

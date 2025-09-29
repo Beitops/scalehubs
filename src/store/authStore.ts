@@ -33,6 +33,8 @@ interface AuthState {
     getEmpresaConfiguracion: (empresaId: number) => Promise<EmpresaConfiguracion | null>
     updateEmpresaConfiguracionById: (empresaId: number, config: EmpresaConfiguracion) => Promise<void>
     updatePassword: (newPassword: string) => Promise<void>
+    getAgentesCountByEmpresa: (empresaId: number) => Promise<number>
+    canAddAgente: (empresaId: number) => Promise<{ canAdd: boolean; currentCount: number; maxAgentes: number }>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -334,6 +336,65 @@ export const useAuthStore = create<AuthState>()(
 
                         if (error) {
                             throw new Error(error.message)
+                        }
+                    } catch (error) {
+                        throw error
+                    }
+                },
+
+                getAgentesCountByEmpresa: async (empresaId: number) => {
+                    try {
+                        // Obtener el ID del rol 'agente'
+                        const { data: rolAgente, error: rolError } = await supabase
+                            .from('roles')
+                            .select('id')
+                            .eq('nombre', 'agente')
+                            .single()
+
+                        if (rolError || !rolAgente) {
+                            throw new Error('No se pudo obtener el rol de agente')
+                        }
+
+                        // Contar agentes de la empresa
+                        const { count, error: countError } = await supabase
+                            .from('profiles')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('empresa_id', empresaId)
+                            .eq('rol_id', rolAgente.id)
+
+                        if (countError) {
+                            throw new Error(countError.message)
+                        }
+
+                        return count || 0
+                    } catch (error) {
+                        throw error
+                    }
+                },
+
+                canAddAgente: async (empresaId: number) => {
+                    try {
+                        // Obtener configuración de la empresa
+                        const { data: configData, error: configError } = await supabase
+                            .from('configuraciones_empresa')
+                            .select('configuraciones')
+                            .eq('empresa_id', empresaId)
+                            .single()
+                        
+                        let maxAgentes = 1 // Valor por defecto
+                        
+                        if (!configError && configData?.configuraciones) {
+                            const config = configData.configuraciones as any
+                            maxAgentes = config.maximoAgentes || 1
+                        }
+
+                        // Contar agentes actuales
+                        const currentCount = await get().getAgentesCountByEmpresa(empresaId)
+
+                        return {
+                            canAdd: currentCount < maxAgentes,
+                            currentCount,
+                            maxAgentes
                         }
                     } catch (error) {
                         throw error
