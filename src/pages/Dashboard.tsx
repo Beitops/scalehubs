@@ -6,7 +6,15 @@ import { useDashboardStore } from '../store/dashboardStore'
 
 const Dashboard = () => {
   const { user, userEmpresaNombre } = useAuthStore()
-  const { loading, dashboardLeads, loadDashboardLeads, isInitialized } = useDashboardStore()
+  const { 
+    loading, 
+    dashboardLeads, 
+    stats, 
+    timeFilter,
+    loadDashboardData, 
+    setTimeFilter, 
+    isInitialized 
+  } = useDashboardStore()
 
   // Cargar datos del dashboard cuando el componente se monte
   useEffect(() => {
@@ -16,7 +24,7 @@ const Dashboard = () => {
     const loadData = async () => {
       if (isReady) {
         try {
-          await loadDashboardLeads()
+          await loadDashboardData()
         } catch (error) {
           console.error('Error loading dashboard data:', error)
         }
@@ -28,55 +36,41 @@ const Dashboard = () => {
     return () => {
       isReady = false
     }
-  }, [user, loadDashboardLeads])
+  }, [user, loadDashboardData])
 
-  // Calcular estadísticas basadas en los leads del dashboard
-  const totalLeads = dashboardLeads.length
-  const leadsThisMonth = dashboardLeads.filter(lead => {
-    const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const leadDate = new Date(lead.fecha_entrada).getTime()
-    return new Date(leadDate).getTime() >= hace30Dias.getTime() ? lead : null
-  }).length
-  const platformDistribution = dashboardLeads.reduce((acc, lead) => {
-    acc[lead.plataforma_lead || ''] = (acc[lead.plataforma_lead || ''] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  // Usar estadísticas del store
+  const { totalLeads, leadsDevueltos, leadsCerrados, platformDistribution } = stats
 
 
-  const stats = [
+  // Solo mostrar estadísticas para coordinadores y agentes
+  const shouldShowStats = user?.rol === 'coordinador' || user?.rol === 'agente'
+  
+  const statsCards = shouldShowStats ? [
     {
       title: 'Total de Leads',
       value: totalLeads.toString(),
-      change: `+${leadsThisMonth}`,
+      change: '',
       changeType: 'positive' as const,
       icon: '📈',
       color: 'bg-blue-500'
     },
     {
-      title: 'Leads este mes',
-      value: leadsThisMonth.toString(),
-      change: '+12%',
+      title: 'Leads Devueltos',
+      value: leadsDevueltos.toString(),
+      change: '',
       changeType: 'positive' as const,
-      icon: '📅',
-      color: 'bg-green-500'
-    },
-    {
-              title: user?.rol === 'administrador' ? 'Porcentaje Leads en Tramite' : 'Porcentaje Leads en Devolución',
-      value: `30%`,
-      change: '+2.1%',
-      changeType: 'positive' as const,
-      icon: '✅',
-      color: 'bg-[#18cb96]'
+      icon: '↩️',
+      color: 'bg-orange-500'
     },
     {
       title: 'Leads Cerrados',
-      value: Math.floor(totalLeads * 0.7).toString(),
-      change: '+8%',
+      value: leadsCerrados.toString(),
+      change: '',
       changeType: 'positive' as const,
       icon: '🎯',
       color: 'bg-purple-500'
     }
-  ]
+  ] : []
 
   // Obtener leads recientes (últimos 4)
   const recentLeads = dashboardLeads
@@ -112,9 +106,36 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* Filtros de tiempo para coordinadores y agentes */}
+      {shouldShowStats && (
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'hoy', label: 'Hoy' },
+              { key: 'semana', label: 'Semana' },
+              { key: 'mes', label: 'Mes' },
+              { key: 'año', label: 'Año' }
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTimeFilter(key as any)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  timeFilter === key
+                    ? 'bg-[#18cb96] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 lg:mb-8">
-        {stats.map((stat, index) => (
+      {shouldShowStats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 lg:mb-8">
+          {statsCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
@@ -126,15 +147,20 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="mt-3 sm:mt-4">
-              <span className={`text-xs sm:text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                {stat.change}
-              </span>
-              <span className="text-xs sm:text-sm text-gray-500 ml-1">vs mes anterior</span>
+              {stat.change && (
+                <>
+                  <span className={`text-xs sm:text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' : stat.changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
+                    }`}>
+                    {stat.change}
+                  </span>
+                  <span className="text-xs sm:text-sm text-gray-500 ml-1">vs período anterior</span>
+                </>
+              )}
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
@@ -154,7 +180,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
                     <span className="inline-block px-2 py-1 text-xs font-medium bg-[#18cb96] text-white rounded-full">
-                      {lead.plataforma_lead}
+                      {lead.plataforma || '-'}
                     </span>
                     <p className="text-xs text-gray-500 mt-1">{new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>
@@ -182,7 +208,10 @@ const Dashboard = () => {
                       <div className={`w-3 h-3 sm:w-4 sm:h-4 ${color} rounded-full mr-2 sm:mr-3`}></div>
                       <span className="text-[#373643] text-sm sm:text-base">{platform}</span>
                     </div>
-                    <span className="font-semibold text-[#373643] text-sm sm:text-base">{percentage}%</span>
+                    <div className="text-right">
+                      <span className="font-semibold text-[#373643] text-sm sm:text-base">{percentage}%</span>
+                      <span className="text-xs text-gray-500 ml-1">({count})</span>
+                    </div>
                   </div>
                 )
               })}
