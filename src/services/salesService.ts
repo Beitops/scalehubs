@@ -21,6 +21,22 @@ export interface DevolucionResuelta {
   motivo: string | null
 }
 
+export interface RankingVendedor {
+  empresa_id: number
+  empresa_nombre: string
+  user_id: string
+  nombre: string
+  ventas_hoy: number
+  ventas_semana: number
+  ventas_mes: number
+  ventas_anio: number
+  ultima_venta: string
+  rank_hoy: number
+  rank_semana: number
+  rank_mes: number
+  rank_anio: number
+}
+
 class SalesService {
   // Obtener ventas realizadas por empresa y usuario
   async getVentasByCompany(empresaId: number, startDate?: string, endDate?: string): Promise<VentaRealizada[]> {
@@ -241,6 +257,38 @@ class SalesService {
     } catch (error) {
       console.error('Error in getLeadsConvertidosConVenta:', error)
       throw error
+    }
+  }
+
+  // Obtener ranking de vendedores
+  async getRankingVendedores(empresaId?: number): Promise<RankingVendedor[]> {
+    try {
+      let query = supabase
+        .from('ranking_ventas_4periodos')
+        .select('*')
+        .order('rank_mes', { ascending: true })
+
+      if (empresaId) {
+        query = query.eq('empresa_id', empresaId)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        // Si la vista no existe (404), retornar array vacío sin error
+        if (error.code === 'PGRST204' || error.message?.includes('not found') || error.message?.includes('does not exist')) {
+          console.warn('Vista ranking_ventas_4periodos no encontrada. Retornando array vacío.')
+          return []
+        }
+        console.error('Error fetching ranking vendedores:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Error in getRankingVendedores:', error)
+      // No lanzar el error, solo retornar array vacío
+      return []
     }
   }
 }

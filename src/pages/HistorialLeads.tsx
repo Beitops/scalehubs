@@ -21,23 +21,29 @@ const HistorialLeads = () => {
     loading, 
     error,
     getLeadsInDateRange,
-    leadsHistorial
+    leadsHistorial,
+    loadHistorialLeads,
+    historialTotalCount,
+    historialCurrentPage,
+    historialTotalPages
   } = useLeadsStore()
 
+  // Cargar historial al entrar a la página
+  useEffect(() => {
+    const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
+    if (user) {
+      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage)
+    }
+  }, [user, userEmpresaId, loadHistorialLeads, statusFilter, currentPage, itemsPerPage])
 
 
+
+  // Filtrar solo por fecha y teléfono en el cliente (el estado se filtra en el servidor)
   const filteredLeads = leadsHistorial.filter(lead => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
-    const matchesStatus = !statusFilter || lead.estado === statusFilter
-    return matchesDate && matchesPhone && matchesStatus
+    return matchesDate && matchesPhone
   })
-
-  // Calcular paginación
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
 
   // Detectar si es móvil y ajustar items por página
   useEffect(() => {
@@ -57,6 +63,11 @@ const HistorialLeads = () => {
     setCurrentPage(1)
   }, [dateFilter, phoneFilter, statusFilter])
 
+  // Sincronizar currentPage con el store
+  useEffect(() => {
+    setCurrentPage(historialCurrentPage)
+  }, [historialCurrentPage])
+
   // Calcular leads en el rango de fechas para exportación
   const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
 
@@ -65,20 +76,26 @@ const HistorialLeads = () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          // Cargar leads de devolucion y devuelto por separado para el rango de fechas
-          const leadsDevolucion = await getLeadsInDateRange(
-            exportDateRange.startDate, 
-            exportDateRange.endDate, 
-            empresaId || undefined,
-            'devolucion'
-          )
+          // Cargar leads devuelto, perdido y convertido por separado para el rango de fechas
           const leadsDevueltos = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
             empresaId || undefined,
             'devuelto'
           )
-          const historialInRange = [...leadsDevolucion, ...leadsDevueltos]
+          const leadsPerdidos = await getLeadsInDateRange(
+            exportDateRange.startDate, 
+            exportDateRange.endDate, 
+            empresaId || undefined,
+            'perdido'
+          )
+          const leadsConvertidos = await getLeadsInDateRange(
+            exportDateRange.startDate, 
+            exportDateRange.endDate, 
+            empresaId || undefined,
+            'convertido'
+          )
+          const historialInRange = [...leadsDevueltos, ...leadsPerdidos, ...leadsConvertidos]
           setLeadsToExport(historialInRange)
         } catch (error) {
           console.error('Error fetching leads in date range:', error)
@@ -146,16 +163,22 @@ const HistorialLeads = () => {
   }
 
   const getStatusBadge = (status: string) => {
-    if (status === 'devolucion') {
+    if (status === 'devuelto') {
       return (
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
-          Devolución
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-blue-700 bg-blue-100">
+          Devuelto
         </span>
       )
-    } else if (status === 'devuelto') {
+    } else if (status === 'convertido') {
       return (
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-green-700 bg-green-100">
-          Devuelto
+          Convertido
+        </span>
+      )
+    } else if (status === 'perdido') {
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
+          Perdido
         </span>
       )
     }
@@ -251,8 +274,9 @@ const HistorialLeads = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                 >
                   <option value="">Todos los estados</option>
-                  <option value="devolucion">Devolución</option>
                   <option value="devuelto">Devuelto</option>
+                  <option value="convertido">Convertido</option>
+                  <option value="perdido">Perdido</option>
                 </select>
               </div>
             </div>
@@ -274,12 +298,12 @@ const HistorialLeads = () => {
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Mobile Cards View */}
           <div className="lg:hidden">
-            {paginatedLeads.length === 0 ? (
+            {filteredLeads.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <p>No hay leads en el historial con los filtros aplicados</p>
               </div>
             ) : (
-              paginatedLeads.map((lead) => (
+              filteredLeads.map((lead) => (
                 <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
@@ -287,7 +311,7 @@ const HistorialLeads = () => {
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
                         {lead.plataforma_lead}
                       </span>
-                      {getStatusBadge(lead.estado_temporal || '')}
+                      {getStatusBadge(lead.estado || '')}
                     </div>
                   </div>
                   <div className="space-y-1 text-xs text-gray-600">
@@ -337,7 +361,7 @@ const HistorialLeads = () => {
                     </td>
                   </tr>
                 ) : (
-                  paginatedLeads.map((lead) => (
+                  filteredLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                         {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
@@ -372,17 +396,22 @@ const HistorialLeads = () => {
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="hidden lg:block text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredLeads.length)}</span> de <span className="font-medium">{filteredLeads.length}</span> leads en historial
+                Mostrando <span className="font-medium">{filteredLeads.length}</span> de <span className="font-medium">{historialTotalCount}</span> leads en historial
                 {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
               </div>
               
               {/* Paginación */}
-              {totalPages > 1 && (
+              {historialTotalPages > 1 && (
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    onClick={() => {
+                      const newPage = Math.max(currentPage - 1, 1)
+                      setCurrentPage(newPage)
+                      const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
+                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage)
+                    }}
                     disabled={currentPage === 1}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -390,12 +419,17 @@ const HistorialLeads = () => {
                   </button>
                   
                   <span className="text-sm text-gray-700">
-                    Página {currentPage} de {totalPages}
+                    Página {currentPage} de {historialTotalPages}
                   </span>
                   
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => {
+                      const newPage = Math.min(currentPage + 1, historialTotalPages)
+                      setCurrentPage(newPage)
+                      const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
+                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage)
+                    }}
+                    disabled={currentPage === historialTotalPages}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Siguiente

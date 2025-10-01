@@ -64,7 +64,7 @@ export interface LeadDevolucion extends Lead {
 }
 
 class LeadsService {
-  async getLeadsByCompany(empresaId: number, estado?: string): Promise<Lead[]> {
+  async getLeadsByCompany(empresaId: number, estado?: string, page?: number, limit?: number): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -85,6 +85,13 @@ class LeadsService {
       // Filtrar por estado si se especifica
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Aplicar paginación si se especifica
+      if (page && limit) {
+        const from = (page - 1) * limit
+        const to = from + limit - 1
+        query = query.range(from, to)
       }
 
       const { data, error } = await query
@@ -193,9 +200,18 @@ class LeadsService {
 
   async updateLeadStatus(leadId: number, estadoTemporal: string): Promise<void> {
     try {
+      // Si el estado temporal es 'convertido' o 'no_cerrado', cambiar también el estado correspondiente
+      const updates: any = { estado_temporal: estadoTemporal }
+      
+      if (estadoTemporal === 'convertido') {
+        updates.estado = 'convertido'
+      } else if (estadoTemporal === 'no_cerrado') {
+        updates.estado = 'perdido'
+      }
+
       const { error } = await supabase
         .from('leads')
-        .update({ estado_temporal: estadoTemporal })
+        .update(updates)
         .eq('id', leadId)
         .select()
 
@@ -673,6 +689,88 @@ class LeadsService {
       return !!data
     } catch (error) {
       console.error('Error in checkPhoneExists:', error)
+      throw error
+    }
+  }
+
+  // Obtener conteo de leads en historial
+  async getHistorialLeadsCount(empresaId?: number, estado?: string): Promise<number> {
+    try {
+      let query = supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .in('estado', ['devuelto', 'perdido', 'convertido'])
+
+      if (empresaId) {
+        query = query.eq('empresa_id', empresaId)
+      }
+
+      if (estado) {
+        query = query.eq('estado', estado)
+      }
+
+      const { count, error } = await query
+
+      if (error) {
+        console.error('Error getting historial leads count:', error)
+        throw error
+      }
+
+      return count || 0
+    } catch (error) {
+      console.error('Error in getHistorialLeadsCount:', error)
+      throw error
+    }
+  }
+
+  // Obtener leads del historial con paginación
+  async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10): Promise<Lead[]> {
+    try {
+      let query = supabase
+        .from('leads')
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
+          )
+        `)
+        .in('estado', ['devuelto', 'perdido', 'convertido'])
+        .order('fecha_entrada', { ascending: false })
+
+      if (empresaId) {
+        query = query.eq('empresa_id', empresaId)
+      }
+
+      if (estado) {
+        query = query.eq('estado', estado)
+      }
+
+      // Aplicar paginación
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching historial leads:', error)
+        throw error
+      }
+
+      return (data as any[])?.map(lead => ({
+        ...lead,
+        empresa_nombre: lead.empresas?.nombre,
+        usuario_nombre: lead.profiles?.nombre,
+        plataforma_lead: platformConverter(lead.plataforma|| ''),
+        calidad: lead.calidad || 1
+      })) || []
+    } catch (error) {
+      console.error('Error in getHistorialLeads:', error)
       throw error
     }
   }

@@ -475,14 +475,24 @@ const Leads = () => {
   const handleStatusChange = async (leadId: number, newStatus: string) => {
     try {
       await updateLeadStatus(leadId, newStatus)
-      // Actualizar solo el lead específico en el estado local
-      setLocalActiveLeads(prevLeads => 
-        prevLeads.map(lead => 
-          lead.id === leadId 
-            ? { ...lead, estado_temporal: newStatus }
-            : lead
+      
+      // Si el estado es 'convertido' o 'no_cerrado', el lead debe desaparecer de la lista activa
+      if (newStatus === 'convertido' || newStatus === 'no_cerrado') {
+        // Eliminar el lead de la lista local
+        setLocalActiveLeads(prevLeads => 
+          prevLeads.filter(lead => lead.id !== leadId)
         )
-      )
+        showNotification('Lead movido al historial correctamente', 'success')
+      } else {
+        // Actualizar solo el estado temporal del lead en la lista local
+        setLocalActiveLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId 
+              ? { ...lead, estado_temporal: newStatus }
+              : lead
+          )
+        )
+      }
     } catch (error) {
       console.error('Error updating lead status:', error)
       showNotification('Error al actualizar el estado del lead', 'error')

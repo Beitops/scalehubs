@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { leadsService, type Lead } from '../services/leadsService'
-import { salesService, type VentaRealizada, type DevolucionResuelta } from '../services/salesService'
+import { salesService, type VentaRealizada, type DevolucionResuelta, type RankingVendedor } from '../services/salesService'
 import { useAuthStore } from './authStore'
 import { platformConverter } from '../utils/platformConverter'
 interface DashboardLead {
@@ -30,6 +30,7 @@ interface DashboardState {
   ventas: VentaRealizada[]
   devolucionesResueltas: DevolucionResuelta[]
   leadsConvertidos: number[]
+  rankingVendedores: RankingVendedor[]
   loading: boolean
   error: string | null
   isInitialized: boolean
@@ -74,6 +75,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   ventas: [],
   devolucionesResueltas: [],
   leadsConvertidos: [],
+  rankingVendedores: [],
   loading: false,
   error: null,
   isInitialized: false,
@@ -104,6 +106,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       let ventas: VentaRealizada[] = []
       let devolucionesResueltas: DevolucionResuelta[] = []
       let leadsConvertidos: number[] = []
+      let rankingVendedores: RankingVendedor[] = []
       
       if (user?.rol === 'administrador') {
         // Para administradores, mantener la lógica actual por ahora
@@ -116,6 +119,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           ventas = await salesService.getVentasByCompany(userEmpresaId, startDate, endDate)
           devolucionesResueltas = await salesService.getDevolucionesResueltasByCompany(userEmpresaId, startDate, endDate)
           leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, undefined, startDate, endDate)
+          rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
         } else if (user?.rol === 'agente') {
           // Agente solo ve los leads asignados a él
           Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, 'activo')
@@ -124,6 +128,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           ventas = await salesService.getVentasByUser(userEmpresaId, user.id, startDate, endDate)
           devolucionesResueltas = await salesService.getDevolucionesResueltasByUser(userEmpresaId, user.id, startDate, endDate)
           leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, user.id, startDate, endDate)
+          rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
         } else {
           // Rol no reconocido, mostrar error
           console.error('❌ Unknown user role:', user.rol)
@@ -147,7 +152,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         estado: lead.estado,
         plataforma_lead_id: lead.plataforma_lead_id
       }))
-      console.log(dashboardLeads)
 
 
       // Calcular estadísticas
@@ -174,6 +178,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         ventas,
         devolucionesResueltas,
         leadsConvertidos,
+        rankingVendedores,
         stats,
         timeFilter: filter,
         isInitialized: true, 
@@ -199,6 +204,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ventas: [],
       devolucionesResueltas: [],
       leadsConvertidos: [],
+      rankingVendedores: [],
       stats: {
         totalLeads: 0,
         leadsDevueltos: 0,

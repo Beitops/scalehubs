@@ -36,6 +36,9 @@ interface LeadsState {
   devoluciones: Devolucion[]
   leadsInDevolucion: LeadDevolucion[]
   leadsInTramite: LeadDevolucion[]
+  historialTotalCount: number
+  historialCurrentPage: number
+  historialTotalPages: number
   getLeadsByCompany: (empresaId: number) => Promise<Lead[]>
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
@@ -43,7 +46,7 @@ interface LeadsState {
   returnLead: (leadId: number, userId: string) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
-  loadHistorialLeads: (empresaId?: number) => Promise<void>
+  loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number) => Promise<void>
   loadInitialLeads: () => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estado?: string) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
@@ -77,6 +80,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   devoluciones: [],
   leadsInDevolucion: [],
   leadsInTramite: [],
+  historialTotalCount: 0,
+  historialCurrentPage: 1,
+  historialTotalPages: 0,
 
   loadInitialLeads: async () => {
     const { user, userEmpresaId } = useAuthStore.getState()
@@ -186,24 +192,25 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  loadHistorialLeads: async (empresaId?: number) => {
+  loadHistorialLeads: async (empresaId?: number, estado?: string, page: number = 1, limit: number = 10) => {
     set({ loading: true, error: null })
     try {
-      let historialLeads: Lead[] = []
+      // Obtener el conteo total
+      const totalCount = await leadsService.getHistorialLeadsCount(empresaId, estado)
       
-      if (empresaId) {
-        // Para usuarios no admin, cargar solo leads de su empresa con estado devolucion o devuelto
-        const leadsDevolucion = await leadsService.getLeadsByCompany(empresaId, 'devolucion')
-        const leadsDevueltos = await leadsService.getLeadsByCompany(empresaId, 'devuelto')
-        historialLeads = [...leadsDevolucion, ...leadsDevueltos]
-      } else {
-        // Para admin, cargar todos los leads con estado devolucion o devuelto
-        const leadsDevolucion = await leadsService.getAllLeads('devolucion')
-        const leadsDevueltos = await leadsService.getAllLeads('devuelto')
-        historialLeads = [...leadsDevolucion, ...leadsDevueltos]
-      }
+      // Obtener los leads paginados
+      const historialLeads = await leadsService.getHistorialLeads(empresaId, estado, page, limit)
       
-      set({ leadsHistorial: historialLeads, loading: false })
+      // Calcular total de páginas
+      const totalPages = Math.ceil(totalCount / limit)
+      
+      set({ 
+        leadsHistorial: historialLeads, 
+        historialTotalCount: totalCount,
+        historialCurrentPage: page,
+        historialTotalPages: totalPages,
+        loading: false 
+      })
     } catch (error) {
       console.error('Error loading historial leads:', error)
       set({ 

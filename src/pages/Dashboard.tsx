@@ -8,9 +8,9 @@ const Dashboard = () => {
   const { user, userEmpresaNombre } = useAuthStore()
   const { 
     loading, 
-    dashboardLeads, 
     stats, 
     timeFilter,
+    rankingVendedores,
     loadDashboardData, 
     setTimeFilter, 
     isInitialized 
@@ -41,9 +41,109 @@ const Dashboard = () => {
   // Usar estadísticas del store
   const { totalLeads, leadsDevueltos, leadsCerrados, platformDistribution } = stats
 
-
   // Solo mostrar estadísticas para coordinadores y agentes
   const shouldShowStats = user?.rol === 'coordinador' || user?.rol === 'agente'
+
+  // Obtener el texto del período de tiempo actual
+  const getTimeRangeText = () => {
+    const now = new Date()
+    
+    switch (timeFilter) {
+      case 'hoy': {
+        const day = now.getDate().toString().padStart(2, '0')
+        const month = (now.getMonth() + 1).toString().padStart(2, '0')
+        const year = now.getFullYear()
+        return `${day}/${month}/${year}`
+      }
+      case 'semana': {
+        const endDate = new Date(now)
+        const startDate = new Date(now)
+        startDate.setDate(now.getDate() - 7)
+        
+        const startDay = startDate.getDate().toString().padStart(2, '0')
+        const startMonth = (startDate.getMonth() + 1).toString().padStart(2, '0')
+        const startYear = startDate.getFullYear()
+        
+        const endDay = endDate.getDate().toString().padStart(2, '0')
+        const endMonth = (endDate.getMonth() + 1).toString().padStart(2, '0')
+        const endYear = endDate.getFullYear()
+        
+        return `${startDay}/${startMonth}/${startYear} - ${endDay}/${endMonth}/${endYear}`
+      }
+      case 'mes': {
+        const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        return monthNames[now.getMonth()]
+      }
+      case 'año': {
+        return now.getFullYear().toString()
+      }
+      default:
+        return ''
+    }
+  }
+
+  // Obtener el ranking según el filtro de tiempo
+  const getRankingByFilter = () => {
+    switch (timeFilter) {
+      case 'hoy':
+        return rankingVendedores
+          .filter(v => v.ventas_hoy > 0)
+          .sort((a, b) => a.rank_hoy - b.rank_hoy)
+          .slice(0, 5)
+      case 'semana':
+        return rankingVendedores
+          .filter(v => v.ventas_semana > 0)
+          .sort((a, b) => a.rank_semana - b.rank_semana)
+          .slice(0, 5)
+      case 'mes':
+        return rankingVendedores
+          .filter(v => v.ventas_mes > 0)
+          .sort((a, b) => a.rank_mes - b.rank_mes)
+          .slice(0, 5)
+      case 'año':
+        return rankingVendedores
+          .filter(v => v.ventas_anio > 0)
+          .sort((a, b) => a.rank_anio - b.rank_anio)
+          .slice(0, 5)
+      default:
+        return []
+    }
+  }
+
+  const rankingActual = getRankingByFilter()
+
+  // Función para obtener el número de ventas según el filtro
+  const getVentasByFilter = (vendedor: typeof rankingVendedores[0]) => {
+    switch (timeFilter) {
+      case 'hoy':
+        return vendedor.ventas_hoy
+      case 'semana':
+        return vendedor.ventas_semana
+      case 'mes':
+        return vendedor.ventas_mes
+      case 'año':
+        return vendedor.ventas_anio
+      default:
+        return 0
+    }
+  }
+
+  // Función para obtener el rank según el filtro
+  const getRankByFilter = (vendedor: typeof rankingVendedores[0]) => {
+    switch (timeFilter) {
+      case 'hoy':
+        return vendedor.rank_hoy
+      case 'semana':
+        return vendedor.rank_semana
+      case 'mes':
+        return vendedor.rank_mes
+      case 'año':
+        return vendedor.rank_anio
+      default:
+        return 0
+    }
+  }
   
   const statsCards = shouldShowStats ? [
     {
@@ -71,11 +171,6 @@ const Dashboard = () => {
       color: 'bg-purple-500'
     }
   ] : []
-
-  // Obtener leads recientes (últimos 4)
-  const recentLeads = dashboardLeads
-    .sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
-    .slice(0, 4)
 
   if (!isInitialized || loading) {
     return (
@@ -109,7 +204,7 @@ const Dashboard = () => {
       {/* Filtros de tiempo para coordinadores y agentes */}
       {shouldShowStats && (
         <div className="mb-6">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {[
               { key: 'hoy', label: 'Hoy' },
               { key: 'semana', label: 'Semana' },
@@ -128,6 +223,12 @@ const Dashboard = () => {
                 {label}
               </button>
             ))}
+            <div className="flex items-center gap-2 ml-2">
+              <span className="text-sm text-gray-500">•</span>
+              <span className="text-sm font-semibold text-[#373643]">
+                {getTimeRangeText()}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -164,33 +265,81 @@ const Dashboard = () => {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        {/* Recent Leads */}
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold text-[#373643] mb-4">Leads Recientes</h2>
-          {recentLeads.length > 0 ? (
-            <div className="space-y-3">
-              {recentLeads.map((lead) => (
-                <div key={lead.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-[#373643] text-sm sm:text-base truncate">{lead.nombre_cliente}</p>
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{lead.telefono}</p>
-                    {user?.rol === 'administrador' && (
-                      <p className="text-xs text-gray-500 truncate">{lead.empresa_nombre || '-'}</p>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-[#18cb96] text-white rounded-full">
-                      {lead.plataforma || '-'}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">{new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-sm">No hay leads recientes</p>
-          )}
-        </div>
+        {/* Ranking de Vendedores */}
+        {shouldShowStats && (
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-[#373643] mb-4">🏆 Ranking de Vendedores</h2>
+            {rankingActual.length > 0 ? (
+              <div className="space-y-3">
+                {rankingActual.map((vendedor) => {
+                  const rank = getRankByFilter(vendedor)
+                  const ventas = getVentasByFilter(vendedor)
+                  
+                  // Medallas para los 3 primeros
+                  const getMedal = (position: number) => {
+                    switch (position) {
+                      case 1:
+                        return '🥇'
+                      case 2:
+                        return '🥈'
+                      case 3:
+                        return '🥉'
+                      default:
+                        return `${position}º`
+                    }
+                  }
+
+                  // Estilos especiales para los 3 primeros
+                  const getCardStyle = (position: number) => {
+                    switch (position) {
+                      case 1:
+                        return 'bg-gradient-to-r from-green-50 to-emerald-100 border-2 border-[#18cb96]'
+                      case 2:
+                        return 'bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-400'
+                      case 3:
+                        return 'bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-400'
+                      default:
+                        return 'bg-gray-50'
+                    }
+                  }
+
+                  return (
+                    <div 
+                      key={vendedor.user_id} 
+                      className={`flex items-center justify-between p-3 rounded-lg transition-all ${getCardStyle(rank)}`}
+                    >
+                      <div className="flex items-center flex-1 min-w-0">
+                        <div className={`flex items-center justify-center ${rank <= 3 ? 'w-10 h-10 text-2xl' : 'w-8 h-8 text-sm bg-gray-200 rounded-full'}`}>
+                          <span className={rank <= 3 ? '' : 'font-semibold text-gray-600'}>
+                            {getMedal(rank)}
+                          </span>
+                        </div>
+                        <div className="ml-3 flex-1 min-w-0">
+                          <p className={`font-medium text-[#373643] text-sm sm:text-base truncate ${rank === 1 ? 'font-bold' : ''}`}>
+                            {vendedor.nombre}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {ventas} {ventas === 1 ? 'venta' : 'ventas'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <div className={`px-3 py-1 rounded-full ${rank === 1 ? 'bg-[#18cb96]' : 'bg-blue-500'} text-white`}>
+                          <span className="text-sm font-bold">{ventas}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-sm">No hay ventas en este período</p>
+                <p className="text-xs text-gray-400 mt-1">Cambia el filtro de tiempo para ver más datos</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Platform Distribution */}
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
