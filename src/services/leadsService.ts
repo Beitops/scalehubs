@@ -694,7 +694,7 @@ class LeadsService {
   }
 
   // Obtener conteo de leads en historial
-  async getHistorialLeadsCount(empresaId?: number, estado?: string): Promise<number> {
+  async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string): Promise<number> {
     try {
       let query = supabase
         .from('leads')
@@ -708,6 +708,13 @@ class LeadsService {
       if (estado) {
         query = query.eq('estado', estado)
       }
+
+      // Filtrar por usuario según el rol
+      if (userRole === 'agente' && userId) {
+        // Los agentes solo ven leads que les fueron asignados
+        query = query.eq('user_id', userId)
+      }
+      // Los coordinadores y administradores ven todos los leads de la empresa (sin filtro adicional)
 
       const { count, error } = await query
 
@@ -724,7 +731,7 @@ class LeadsService {
   }
 
   // Obtener leads del historial con paginación
-  async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10): Promise<Lead[]> {
+  async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -750,6 +757,13 @@ class LeadsService {
         query = query.eq('estado', estado)
       }
 
+      // Filtrar por usuario según el rol
+      if (userRole === 'agente' && userId) {
+        // Los agentes solo ven leads que les fueron asignados
+        query = query.eq('user_id', userId)
+      }
+      // Los coordinadores y administradores ven todos los leads de la empresa (sin filtro adicional)
+
       // Aplicar paginación
       const from = (page - 1) * limit
       const to = from + limit - 1
@@ -771,6 +785,28 @@ class LeadsService {
       })) || []
     } catch (error) {
       console.error('Error in getHistorialLeads:', error)
+      throw error
+    }
+  }
+
+  // Cancelar estado de un lead (volverlo a activo)
+  async cancelLeadStatus(leadId: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ 
+          estado: 'activo',
+          estado_temporal: 'sin_tratar'
+        })
+        .eq('id', leadId)
+        .select()
+
+      if (error) {
+        console.error('Error canceling lead status:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in cancelLeadStatus:', error)
       throw error
     }
   }

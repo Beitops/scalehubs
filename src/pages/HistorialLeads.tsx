@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 import { Link } from 'react-router-dom'
+import { ActionMenu } from '../components/ActionMenu'
 
 const HistorialLeads = () => {
   const [dateFilter, setDateFilter] = useState('')
@@ -15,6 +16,13 @@ const HistorialLeads = () => {
   })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [notification, setNotification] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error' | 'info'
+  }>({ show: false, message: '', type: 'info' })
   
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const {
@@ -25,7 +33,8 @@ const HistorialLeads = () => {
     loadHistorialLeads,
     historialTotalCount,
     historialCurrentPage,
-    historialTotalPages
+    historialTotalPages,
+    cancelLeadStatus
   } = useLeadsStore()
 
   // Cargar historial al entrar a la página
@@ -67,6 +76,21 @@ const HistorialLeads = () => {
   useEffect(() => {
     setCurrentPage(historialCurrentPage)
   }, [historialCurrentPage])
+
+  // Función para mostrar notificaciones
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ show: true, message, type })
+  }
+
+  // Auto-ocultar notificación después de 4 segundos
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }))
+      }, 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [notification.show])
 
   // Calcular leads en el rango de fechas para exportación
   const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
@@ -189,6 +213,52 @@ const HistorialLeads = () => {
     )
   }
 
+  // Función para obtener items del menú de acciones
+  const getActionMenuItems = (lead: Lead) => {
+    return [
+      {
+        label: 'Cancelar Estado',
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => handleCancelStatus(lead),
+        className: 'text-blue-600 hover:bg-blue-50'
+      }
+    ]
+  }
+
+  // Función para manejar cancelar estado
+  const handleCancelStatus = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowCancelModal(true)
+  }
+
+  // Función para confirmar cancelación de estado
+  const handleConfirmCancelStatus = async () => {
+    if (!selectedLead) return
+
+    try {
+      // Llamar a la función del store para cancelar el estado
+      await cancelLeadStatus(selectedLead.id)
+      
+      // Cerrar modal
+      setShowCancelModal(false)
+      setSelectedLead(null)
+      
+      // Mostrar notificación de éxito
+      showNotification('Estado del lead cancelado correctamente. El lead volverá a estar activo.', 'success')
+      
+      // Recargar historial
+      const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
+      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage)
+    } catch (error) {
+      console.error('Error canceling lead status:', error)
+      showNotification('Error al cancelar el estado del lead', 'error')
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -210,6 +280,58 @@ const HistorialLeads = () => {
 
   return (
     <>
+      {/* Notification */}
+      {notification.show && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] max-w-md w-full mx-4">
+          <div className={`rounded-lg shadow-lg p-4 flex items-center justify-between ${
+            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
+            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
+            'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className="flex items-center">
+              <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                notification.type === 'success' ? 'bg-green-100' :
+                notification.type === 'error' ? 'bg-red-100' :
+                'bg-blue-100'
+              }`}>
+                {notification.type === 'success' ? (
+                  <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : notification.type === 'error' ? (
+                  <svg className="w-3 h-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <p className={`ml-3 text-sm font-medium ${
+                notification.type === 'success' ? 'text-green-800' :
+                notification.type === 'error' ? 'text-red-800' :
+                'text-blue-800'
+              }`}>
+                {notification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+              className={`ml-4 flex-shrink-0 ${
+                notification.type === 'success' ? 'text-green-400 hover:text-green-600' :
+                notification.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                'text-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 lg:mb-8">
@@ -308,9 +430,6 @@ const HistorialLeads = () => {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                        {lead.plataforma_lead}
-                      </span>
                       {getStatusBadge(lead.estado || '')}
                     </div>
                   </div>
@@ -320,6 +439,14 @@ const HistorialLeads = () => {
                     {user?.rol === 'administrador' && (
                       <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
                     )}
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <ActionMenu
+                      items={getActionMenuItems(lead)}
+                      triggerLabel="Más acciones"
+                      size="sm"
+                      className="text-xs font-medium"
+                    />
                   </div>
                 </div>
               ))
@@ -341,9 +468,6 @@ const HistorialLeads = () => {
                     Teléfono
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Plataforma
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Estado
                   </th>
                   {user?.rol === 'administrador' && (
@@ -351,6 +475,9 @@ const HistorialLeads = () => {
                       Empresa
                     </th>
                   )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -373,11 +500,6 @@ const HistorialLeads = () => {
                         {lead.telefono}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                          {lead.plataforma_lead}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(lead.estado || '')}
                       </td>
                       {user?.rol === 'administrador' && (
@@ -385,6 +507,13 @@ const HistorialLeads = () => {
                           {lead.empresa_nombre || '-'}
                         </td>
                       )}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <ActionMenu
+                          items={getActionMenuItems(lead)}
+                          triggerLabel="Más acciones"
+                          size="md"
+                        />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -526,6 +655,70 @@ const HistorialLeads = () => {
                   className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Exportar ({leadsToExport.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Status Modal overlay */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowCancelModal(false)}
+        />
+      )}
+
+      {/* Cancel Status Modal */}
+      {showCancelModal && selectedLead && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#373643]">Cancelar Estado</h2>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-[#373643] mb-2">
+                  ¿Estás seguro de que quieres cancelar el estado de este lead?
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                  <p className="text-blue-800 text-xs">
+                    ℹ️ <strong>Información:</strong> Al cancelar el estado, el lead volverá a estar activo y disponible para ser procesado nuevamente.
+                  </p>
+                </div>
+                {selectedLead && (
+                  <div className="text-xs text-gray-600 mt-3">
+                    <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
+                    <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
+                    <p><strong>Estado actual:</strong> {getStatusBadge(selectedLead.estado || '')}</p>
+                    <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  No hacer nada
+                </button>
+                <button
+                  onClick={handleConfirmCancelStatus}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Cancelar Estado
                 </button>
               </div>
             </div>

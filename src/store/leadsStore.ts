@@ -44,6 +44,7 @@ interface LeadsState {
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
   updateLeadObservations: (leadId: number, observaciones: string) => Promise<void>
   returnLead: (leadId: number, userId: string) => Promise<void>
+  cancelLeadStatus: (leadId: number) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
   loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number) => Promise<void>
@@ -195,11 +196,25 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   loadHistorialLeads: async (empresaId?: number, estado?: string, page: number = 1, limit: number = 10) => {
     set({ loading: true, error: null })
     try {
+      const { user } = useAuthStore.getState()
+      
       // Obtener el conteo total
-      const totalCount = await leadsService.getHistorialLeadsCount(empresaId, estado)
+      const totalCount = await leadsService.getHistorialLeadsCount(
+        empresaId, 
+        estado, 
+        user?.id, 
+        user?.rol
+      )
       
       // Obtener los leads paginados
-      const historialLeads = await leadsService.getHistorialLeads(empresaId, estado, page, limit)
+      const historialLeads = await leadsService.getHistorialLeads(
+        empresaId, 
+        estado, 
+        page, 
+        limit, 
+        user?.id, 
+        user?.rol
+      )
       
       // Calcular total de páginas
       const totalPages = Math.ceil(totalCount / limit)
@@ -263,6 +278,15 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       await leadsService.returnLead(leadId, userId)
     } catch (error) {
       console.error('Error returning lead:', error)
+      throw error
+    }
+  },
+
+  cancelLeadStatus: async (leadId: number) => {
+    try {
+      await leadsService.cancelLeadStatus(leadId)
+    } catch (error) {
+      console.error('Error canceling lead status:', error)
       throw error
     }
   },
