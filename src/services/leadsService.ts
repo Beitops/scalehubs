@@ -307,6 +307,7 @@ class LeadsService {
 
     async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estado?: string): Promise<Lead[]> {
     try {
+      // Primero obtener leads con estados 'perdido' y 'convertido'
       let query = supabase
         .from('leads')
         .select(`
@@ -331,29 +332,103 @@ class LeadsService {
         `)
         .gte('fecha_entrada', startDate)
         .lte('fecha_entrada', endDate)
+        .in('estado', ['perdido', 'convertido'])
         .order('fecha_entrada', { ascending: false })
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
       }
 
-      // Filtrar por estado si se especifica
-      if (estado) {
+      // Filtrar por estado si se especifica y no es 'devolucion'
+      if (estado && estado !== 'devolucion') {
         query = query.eq('estado', estado)
       }
 
-      const { data, error } = await query
+      const { data: dataPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
-      if (error) {
-        console.error('Error fetching leads in date range:', error)
-        throw error
+      if (errorPerdidoConvertido) {
+        console.error('Error fetching perdido/convertido leads in date range:', errorPerdidoConvertido)
+        throw errorPerdidoConvertido
       }
 
-      return (data as any[])?.map(lead => ({
+      let allLeads = (dataPerdidoConvertido as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         calidad: lead.calidad || 1
       })) || []
+
+      // Si no se está filtrando por estado específico o se está filtrando por 'devolucion'
+      if (!estado || estado === 'devolucion') {
+        // Obtener leads con estado 'devolucion' que tengan la última devolución con estado 'resuelto'
+        let devolucionQuery = supabase
+          .from('leads')
+          .select(`
+            id,
+            fecha_entrada,
+            nombre_cliente,
+            telefono,
+            plataforma,
+            empresa_id,
+            estado_temporal,
+            estado,
+            campaña_id,
+            hub_id,
+            plataforma_lead_id,
+            user_id,
+            observaciones,
+            calidad,
+            empresas!leads_empresa_id_fkey (
+              id,
+              nombre
+            ),
+            devoluciones(
+              id,
+              estado,
+              fecha_resolucion,
+              fecha_solicitud
+            )
+          `)
+          .gte('fecha_entrada', startDate)
+          .lte('fecha_entrada', endDate)
+          .eq('estado', 'devolucion')
+          .order('fecha_entrada', { ascending: false })
+
+        if (empresaId) {
+          devolucionQuery = devolucionQuery.eq('empresa_id', empresaId)
+        }
+
+        const { data: devolucionData, error: devolucionError } = await devolucionQuery
+
+        if (devolucionError) {
+          console.error('Error fetching devolucion leads in date range:', devolucionError)
+          throw devolucionError
+        }
+
+        // Filtrar leads que tengan la última devolución con estado 'resuelto'
+        const leadsWithLastDevolucionResuelta = (devolucionData as any[])?.filter(lead => {
+          if (!lead.devoluciones || lead.devoluciones.length === 0) return false
+          
+          // Ordenar devoluciones por fecha_solicitud descendente para obtener la última
+          const sortedDevoluciones = lead.devoluciones.sort((a: any, b: any) => 
+            new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime()
+          )
+          
+          const lastDevolucion = sortedDevoluciones[0]
+          return lastDevolucion.estado === 'resuelto'
+        }).map(lead => ({
+          ...lead,
+          empresa_nombre: lead.empresas?.nombre,
+          calidad: lead.calidad || 1
+        })) || []
+
+        // Combinar todos los leads
+        allLeads = [...allLeads, ...leadsWithLastDevolucionResuelta]
+      }
+
+      // Ordenar todos los leads por fecha_entrada descendente
+      allLeads.sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
+
+      return allLeads
     } catch (error) {
       console.error('Error in getLeadsInDateRange:', error)
       throw error
@@ -696,16 +771,17 @@ class LeadsService {
   // Obtener conteo de leads en historial
   async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string): Promise<number> {
     try {
+      // Obtener conteo de leads con estados 'perdido' y 'convertido'
       let query = supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })
-        .in('estado', ['devuelto', 'perdido', 'convertido'])
+        .in('estado', ['perdido', 'convertido'])
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
       }
 
-      if (estado) {
+      if (estado && estado !== 'devolucion') {
         query = query.eq('estado', estado)
       }
 
@@ -714,16 +790,64 @@ class LeadsService {
         // Los agentes solo ven leads que les fueron asignados
         query = query.eq('user_id', userId)
       }
-      // Los coordinadores y administradores ven todos los leads de la empresa (sin filtro adicional)
 
-      const { count, error } = await query
+      const { count: countPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
-      if (error) {
-        console.error('Error getting historial leads count:', error)
-        throw error
+      if (errorPerdidoConvertido) {
+        console.error('Error getting perdido/convertido leads count:', errorPerdidoConvertido)
+        throw errorPerdidoConvertido
       }
 
-      return count || 0
+      let totalCount = countPerdidoConvertido || 0
+
+      // Si no se está filtrando por estado específico o se está filtrando por 'devolucion'
+      if (!estado || estado === 'devolucion') {
+        // Obtener leads con estado 'devolucion' que tengan la última devolución con estado 'resuelto'
+        let leadsWithDevolucionResuelta = supabase
+          .from('leads')
+          .select(`
+            id,
+            devoluciones(
+              id,
+              estado,
+              fecha_resolucion,
+              fecha_solicitud
+            )
+          `)
+          .eq('estado', 'devolucion')
+
+        if (empresaId) {
+          leadsWithDevolucionResuelta = leadsWithDevolucionResuelta.eq('empresa_id', empresaId)
+        }
+
+        if (userRole === 'agente' && userId) {
+          leadsWithDevolucionResuelta = leadsWithDevolucionResuelta.eq('user_id', userId)
+        }
+
+        const { data: leadsData, error: leadsError } = await leadsWithDevolucionResuelta
+
+        if (leadsError) {
+          console.error('Error getting leads with devoluciones:', leadsError)
+          throw leadsError
+        }
+
+        // Filtrar leads que tengan la última devolución con estado 'resuelto'
+        const leadsWithLastDevolucionResuelta = leadsData?.filter(lead => {
+          if (!lead.devoluciones || lead.devoluciones.length === 0) return false
+          
+          // Ordenar devoluciones por fecha_solicitud descendente para obtener la última
+          const sortedDevoluciones = lead.devoluciones.sort((a: any, b: any) => 
+            new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime()
+          )
+          
+          const lastDevolucion = sortedDevoluciones[0]
+          return lastDevolucion.estado === 'resuelto'
+        }) || []
+
+        totalCount += leadsWithLastDevolucionResuelta.length
+      }
+
+      return totalCount
     } catch (error) {
       console.error('Error in getHistorialLeadsCount:', error)
       throw error
@@ -733,6 +857,7 @@ class LeadsService {
   // Obtener leads del historial con paginación
   async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string): Promise<Lead[]> {
     try {
+      // Primero obtener leads con estados 'perdido' y 'convertido'
       let query = supabase
         .from('leads')
         .select(`
@@ -746,43 +871,109 @@ class LeadsService {
             nombre
           )
         `)
-        .in('estado', ['devuelto', 'perdido', 'convertido'])
+        .in('estado', ['perdido', 'convertido'])
         .order('fecha_entrada', { ascending: false })
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
       }
 
-      if (estado) {
+      if (estado && estado !== 'devolucion') {
         query = query.eq('estado', estado)
       }
 
       // Filtrar por usuario según el rol
       if (userRole === 'agente' && userId) {
-        // Los agentes solo ven leads que les fueron asignados
         query = query.eq('user_id', userId)
       }
-      // Los coordinadores y administradores ven todos los leads de la empresa (sin filtro adicional)
 
-      // Aplicar paginación
-      const from = (page - 1) * limit
-      const to = from + limit - 1
-      query = query.range(from, to)
+      const { data: dataPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching historial leads:', error)
-        throw error
+      if (errorPerdidoConvertido) {
+        console.error('Error fetching perdido/convertido leads:', errorPerdidoConvertido)
+        throw errorPerdidoConvertido
       }
 
-      return (data as any[])?.map(lead => ({
+      let allLeads = (dataPerdidoConvertido as any[])?.map(lead => ({
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         usuario_nombre: lead.profiles?.nombre,
         plataforma_lead: platformConverter(lead.plataforma|| ''),
         calidad: lead.calidad || 1
       })) || []
+
+      // Si no se está filtrando por estado específico o se está filtrando por 'devolucion'
+      if (!estado || estado === 'devolucion') {
+        // Obtener leads con estado 'devolucion' que tengan la última devolución con estado 'resuelto'
+        let devolucionQuery = supabase
+          .from('leads')
+          .select(`
+            *,
+            empresas!leads_empresa_id_fkey (
+              id,
+              nombre
+            ),
+            profiles!leads_user_id_fkey (
+              user_id,
+              nombre
+            ),
+            devoluciones(
+              id,
+              estado,
+              fecha_resolucion,
+              fecha_solicitud
+            )
+          `)
+          .eq('estado', 'devolucion')
+          .order('fecha_entrada', { ascending: false })
+
+        if (empresaId) {
+          devolucionQuery = devolucionQuery.eq('empresa_id', empresaId)
+        }
+
+        if (userRole === 'agente' && userId) {
+          devolucionQuery = devolucionQuery.eq('user_id', userId)
+        }
+
+        const { data: devolucionData, error: devolucionError } = await devolucionQuery
+
+        if (devolucionError) {
+          console.error('Error fetching devolucion leads:', devolucionError)
+          throw devolucionError
+        }
+
+        // Filtrar leads que tengan la última devolución con estado 'resuelto'
+        const leadsWithLastDevolucionResuelta = (devolucionData as any[])?.filter(lead => {
+          if (!lead.devoluciones || lead.devoluciones.length === 0) return false
+          
+          // Ordenar devoluciones por fecha_solicitud descendente para obtener la última
+          const sortedDevoluciones = lead.devoluciones.sort((a: any, b: any) => 
+            new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime()
+          )
+          
+          const lastDevolucion = sortedDevoluciones[0]
+          return lastDevolucion.estado === 'resuelto'
+        }).map(lead => ({
+          ...lead,
+          empresa_nombre: lead.empresas?.nombre,
+          usuario_nombre: lead.profiles?.nombre,
+          plataforma_lead: platformConverter(lead.plataforma|| ''),
+          calidad: lead.calidad || 1
+        })) || []
+
+        // Combinar todos los leads
+        allLeads = [...allLeads, ...leadsWithLastDevolucionResuelta]
+      }
+
+      // Ordenar todos los leads por fecha_entrada descendente
+      allLeads.sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
+
+      // Aplicar paginación manualmente
+      const from = (page - 1) * limit
+      const to = from + limit
+      const paginatedLeads = allLeads.slice(from, to)
+
+      return paginatedLeads
     } catch (error) {
       console.error('Error in getHistorialLeads:', error)
       throw error

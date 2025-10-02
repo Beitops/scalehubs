@@ -100,12 +100,12 @@ const HistorialLeads = () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          // Cargar leads devuelto, perdido y convertido por separado para el rango de fechas
-          const leadsDevueltos = await getLeadsInDateRange(
+          // Cargar leads devolucion, perdido y convertido por separado para el rango de fechas
+          const leadsDevolucion = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
             empresaId || undefined,
-            'devuelto'
+            'devolucion'
           )
           const leadsPerdidos = await getLeadsInDateRange(
             exportDateRange.startDate, 
@@ -119,7 +119,7 @@ const HistorialLeads = () => {
             empresaId || undefined,
             'convertido'
           )
-          const historialInRange = [...leadsDevueltos, ...leadsPerdidos, ...leadsConvertidos]
+          const historialInRange = [...leadsDevolucion, ...leadsPerdidos, ...leadsConvertidos]
           setLeadsToExport(historialInRange)
         } catch (error) {
           console.error('Error fetching leads in date range:', error)
@@ -187,10 +187,10 @@ const HistorialLeads = () => {
   }
 
   const getStatusBadge = (status: string) => {
-    if (status === 'devuelto') {
+    if (status === 'devolucion') {
       return (
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-blue-700 bg-blue-100">
-          Devuelto
+          Devolución
         </span>
       )
     } else if (status === 'convertido') {
@@ -396,7 +396,7 @@ const HistorialLeads = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                 >
                   <option value="">Todos los estados</option>
-                  <option value="devuelto">Devuelto</option>
+                  <option value="devolucion">Devolución</option>
                   <option value="convertido">Convertido</option>
                   <option value="perdido">Perdido</option>
                 </select>
