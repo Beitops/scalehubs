@@ -474,6 +474,24 @@ const Leads = () => {
 
   const handleStatusChange = async (leadId: number, newStatus: string) => {
     try {
+      // Obtener el lead actual para verificar si ya está asignado
+      const currentLead = localActiveLeads.find(lead => lead.id === leadId)
+      
+      // Si es coordinador, verificar si el lead ya está asignado a otro usuario
+      if (user?.rol === 'coordinador' && currentLead?.user_id && currentLead.user_id !== user.id) {
+        showNotification(
+          `Este lead ya está asignado a ${currentLead.usuario_nombre || 'otro usuario'}. No puedes cambiar su estado.`, 
+          'error'
+        )
+        return
+      }
+
+      // Si es coordinador y el lead no está asignado, asignarlo al coordinador
+      if (user?.rol === 'coordinador' && !currentLead?.user_id) {
+        await leadsService.assignLeadToAgent(leadId, user.id)
+      }
+
+      // Actualizar el estado del lead
       await updateLeadStatus(leadId, newStatus)
       
       // Si el estado es 'convertido' o 'no_cerrado', el lead debe desaparecer de la lista activa
@@ -484,14 +502,30 @@ const Leads = () => {
         )
         showNotification('Lead movido al historial correctamente', 'success')
       } else {
-        // Actualizar solo el estado temporal del lead en la lista local
+        // Actualizar el estado temporal del lead en la lista local
         setLocalActiveLeads(prevLeads => 
           prevLeads.map(lead => 
             lead.id === leadId 
-              ? { ...lead, estado_temporal: newStatus }
+              ? { 
+                  ...lead, 
+                  estado_temporal: newStatus,
+                  // Si es coordinador y el lead no estaba asignado, actualizar la asignación localmente
+                  ...(user?.rol === 'coordinador' && !currentLead?.user_id ? {
+                    user_id: user.id,
+                    usuario_nombre: user.nombre || user.email,
+                    fecha_asignacion: new Date().toISOString()
+                  } : {})
+                }
               : lead
           )
         )
+        
+        // Mostrar notificación de éxito
+        if (user?.rol === 'coordinador' && !currentLead?.user_id) {
+          showNotification('Lead asignado y estado actualizado correctamente', 'success')
+        } else {
+          showNotification('Estado del lead actualizado correctamente', 'success')
+        }
       }
     } catch (error) {
       console.error('Error updating lead status:', error)

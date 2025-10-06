@@ -5,9 +5,6 @@ export interface VentaRealizada {
   empresa_id: number
   user_id: string
   fecha_venta: string
-  anulada: boolean
-  fecha_anulacion: string | null
-  motivo_anulacion: string | null
 }
 
 export interface DevolucionResuelta {
@@ -45,7 +42,6 @@ class SalesService {
         .from('ventas_realizadas')
         .select('*')
         .eq('empresa_id', empresaId)
-        .eq('anulada', false)
         .order('fecha_venta', { ascending: false })
 
       if (startDate) {
@@ -77,7 +73,6 @@ class SalesService {
         .select('*')
         .eq('empresa_id', empresaId)
         .eq('user_id', userId)
-        .eq('anulada', false)
         .order('fecha_venta', { ascending: false })
 
       if (startDate) {
@@ -206,7 +201,6 @@ class SalesService {
         .from('ventas_realizadas')
         .select('lead_id')
         .eq('empresa_id', empresaId)
-        .eq('anulada', false)
 
       if (userId) {
         ventasQuery = ventasQuery.eq('user_id', userId)
