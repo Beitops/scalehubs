@@ -38,7 +38,8 @@ const Empresas = () => {
   const [empresaConfiguracion, setEmpresaConfiguracion] = useState({
     maxSolicitudesPorAgente: 1,
     solicitudesAutomaticas: false,
-    maximoAgentes: 1
+    maximoAgentes: 1,
+    diasExclusividad: 0
   })
 
   const { getEmpresaConfiguracion, updateEmpresaConfiguracionById } = useAuthStore()
@@ -160,7 +161,8 @@ const Empresas = () => {
       setEmpresaConfiguracion({
         maxSolicitudesPorAgente: config?.maxSolicitudesPorAgente || 1,
         solicitudesAutomaticas: config?.solicitudesAutomaticas || false,
-        maximoAgentes: config?.maximoAgentes || 1
+        maximoAgentes: config?.maximoAgentes || 1,
+        diasExclusividad: config?.diasExclusividad ?? 0
       })
     } catch (error) {
       console.error('Error loading company config:', error)
@@ -179,7 +181,14 @@ const Empresas = () => {
     setConfigSuccess(null)
 
     try {
-      await updateEmpresaConfiguracionById(selectedCompany.id, empresaConfiguracion)
+      // Asegurar que los valores numéricos tengan valores por defecto si están vacíos
+      const configToSave = {
+        ...empresaConfiguracion,
+        maximoAgentes: empresaConfiguracion.maximoAgentes || 1,
+        diasExclusividad: empresaConfiguracion.diasExclusividad || 0
+      }
+      
+      await updateEmpresaConfiguracionById(selectedCompany.id, configToSave)
       setConfigSuccess('Configuraciones actualizadas correctamente')
     } catch (error) {
       console.error('Error updating company config:', error)
@@ -191,10 +200,31 @@ const Empresas = () => {
 
   const handleConfigInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    setEmpresaConfiguracion(prev => ({
-      ...prev,
-      [name]: type === 'number' ? Number(value) : type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
+    
+    if (type === 'number') {
+      // Permitir campo vacío temporalmente para mejor UX
+      if (value === '') {
+        setEmpresaConfiguracion(prev => ({
+          ...prev,
+          [name]: 0
+        }))
+      } else {
+        setEmpresaConfiguracion(prev => ({
+          ...prev,
+          [name]: Number(value)
+        }))
+      }
+    } else if (type === 'checkbox') {
+      setEmpresaConfiguracion(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }))
+    } else {
+      setEmpresaConfiguracion(prev => ({
+        ...prev,
+        [name]: value
+      }))
+    }
   }
 
   const getActionMenuItems = (company: Company) => [
@@ -754,14 +784,35 @@ const Empresas = () => {
                   <input
                     type="number"
                     name="maximoAgentes"
-                    value={empresaConfiguracion.maximoAgentes}
+                    value={empresaConfiguracion.maximoAgentes || ''}
                     onChange={handleConfigInputChange}
                     min="1"
                     max="100"
+                    placeholder="1"
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Número máximo de agentes que puede tener esta empresa
+                  </p>
+                </div>
+
+                {/* Días de exclusividad */}
+                <div>
+                  <label className="block text-sm font-medium text-[#373643] mb-2">
+                    Días de exclusividad
+                  </label>
+                  <input
+                    type="number"
+                    name="diasExclusividad"
+                    value={empresaConfiguracion.diasExclusividad || ''}
+                    onChange={handleConfigInputChange}
+                    min="0"
+                    max="365"
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Número de días de exclusividad para los leads de esta empresa (0 = sin exclusividad)
                   </p>
                 </div>
 

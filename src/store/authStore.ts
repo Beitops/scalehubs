@@ -12,6 +12,7 @@ interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
     maximoAgentes?: number
+    diasExclusividad?: number
 }
 
 interface AuthState {
@@ -280,7 +281,7 @@ export const useAuthStore = create<AuthState>()(
                     try {
                         const { data: configData, error } = await supabase
                             .from('configuraciones_empresa')
-                            .select('configuraciones')
+                            .select('configuraciones, dias_exclusividad')
                             .eq('empresa_id', empresaId)
                             .single()
                         
@@ -290,7 +291,8 @@ export const useAuthStore = create<AuthState>()(
                                 return {
                                     maxSolicitudesPorAgente: 1,
                                     solicitudesAutomaticas: false,
-                                    maximoAgentes: 1
+                                    maximoAgentes: 1,
+                                    diasExclusividad: 0
                                 }
                             }
                             throw new Error(error.message)
@@ -302,14 +304,16 @@ export const useAuthStore = create<AuthState>()(
                             return {
                                 maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
                                 solicitudesAutomaticas: config.solicitudesAutomaticas || false,
-                                maximoAgentes: config.maximoAgentes || 1
+                                maximoAgentes: config.maximoAgentes || 1,
+                                diasExclusividad: configData.dias_exclusividad ?? 0
                             }
                         }
 
                         return {
                             maxSolicitudesPorAgente: 1,
                             solicitudesAutomaticas: false,
-                            maximoAgentes: 1
+                            maximoAgentes: 1,
+                            diasExclusividad: 0
                         }
                     } catch (error) {
                         throw error
@@ -318,11 +322,15 @@ export const useAuthStore = create<AuthState>()(
 
                 updateEmpresaConfiguracionById: async (empresaId: number, config: EmpresaConfiguracion) => {
                     try {
+                        // Extraer diasExclusividad del config para guardarlo en su campo separado
+                        const { diasExclusividad, ...configJSON } = config
+                        
                         const { error } = await supabase
                             .from('configuraciones_empresa')
                             .upsert({
                                 empresa_id: empresaId,
-                                configuraciones: config,
+                                configuraciones: configJSON,
+                                dias_exclusividad: diasExclusividad ?? 0,
                                 fecha_modificacion: new Date().toISOString()
                             })
 
