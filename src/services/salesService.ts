@@ -114,6 +114,8 @@ class SalesService {
       if (startDate) {
         query = query.gte('fecha_resolucion', startDate)
       }
+      console.log('startDate', startDate)
+      console.log('endDate', endDate)
       if (endDate) {
         query = query.lte('fecha_resolucion', endDate)
       }

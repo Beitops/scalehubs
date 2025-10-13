@@ -533,7 +533,10 @@ class LeadsService {
     try {
       const { error } = await supabase
         .from('leads')
-        .update({ empresa_id: empresaId })
+        .update({ 
+          empresa_id: empresaId,
+          fecha_asignacion: new Date().toISOString()
+        })
         .eq('id', leadId)
 
       if (error) {
