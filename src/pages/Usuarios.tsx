@@ -137,6 +137,9 @@ const Usuarios = ({}: UsuariosProps) => {
         // Validar límite de agentes para coordinadores
         const agentesInfo = await canAddAgente(userEmpresaId)
         if (!agentesInfo.canAdd) {
+          if (agentesInfo.maxAgentes === 0) {
+            throw new Error('Tu empresa no tiene permitido crear agentes. Contacta al administrador para más información.')
+          }
           throw new Error(`No se pueden añadir más agentes. La empresa ya tiene ${agentesInfo.currentCount} de ${agentesInfo.maxAgentes} agentes permitidos. Contacta al administrador para aumentar el límite.`)
         }
 
@@ -172,6 +175,9 @@ const Usuarios = ({}: UsuariosProps) => {
           if (newUser.rol === 'agente') {
             const agentesInfo = await canAddAgente(empresa.id)
             if (!agentesInfo.canAdd) {
+              if (agentesInfo.maxAgentes === 0) {
+                throw new Error(`La empresa ${empresa.nombre} no tiene permitido crear agentes. Actualiza la configuración de la empresa para permitir agentes.`)
+              }
               throw new Error(`No se pueden añadir más agentes a la empresa ${empresa.nombre}. Ya tiene ${agentesInfo.currentCount} de ${agentesInfo.maxAgentes} agentes permitidos.`)
             }
           }

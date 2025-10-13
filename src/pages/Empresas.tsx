@@ -161,7 +161,7 @@ const Empresas = () => {
       setEmpresaConfiguracion({
         maxSolicitudesPorAgente: config?.maxSolicitudesPorAgente || 1,
         solicitudesAutomaticas: config?.solicitudesAutomaticas || false,
-        maximoAgentes: config?.maximoAgentes || 1,
+        maximoAgentes: config?.maximoAgentes !== undefined ? config.maximoAgentes : 1,
         diasExclusividad: config?.diasExclusividad ?? 0
       })
     } catch (error) {
@@ -184,8 +184,8 @@ const Empresas = () => {
       // Asegurar que los valores numéricos tengan valores por defecto si están vacíos
       const configToSave = {
         ...empresaConfiguracion,
-        maximoAgentes: empresaConfiguracion.maximoAgentes || 1,
-        diasExclusividad: empresaConfiguracion.diasExclusividad || 0
+        maximoAgentes: empresaConfiguracion.maximoAgentes !== undefined ? empresaConfiguracion.maximoAgentes : 1,
+        diasExclusividad: empresaConfiguracion.diasExclusividad !== undefined ? empresaConfiguracion.diasExclusividad : 0
       }
       
       await updateEmpresaConfiguracionById(selectedCompany.id, configToSave)
@@ -784,15 +784,15 @@ const Empresas = () => {
                   <input
                     type="number"
                     name="maximoAgentes"
-                    value={empresaConfiguracion.maximoAgentes || ''}
+                    value={empresaConfiguracion.maximoAgentes !== undefined ? empresaConfiguracion.maximoAgentes : ''}
                     onChange={handleConfigInputChange}
-                    min="1"
+                    min="0"
                     max="100"
-                    placeholder="1"
+                    placeholder="0"
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Número máximo de agentes que puede tener esta empresa
+                    Número máximo de agentes que puede tener esta empresa (0 = no puede crear agentes)
                   </p>
                 </div>
 

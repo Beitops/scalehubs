@@ -304,7 +304,7 @@ export const useAuthStore = create<AuthState>()(
                             return {
                                 maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
                                 solicitudesAutomaticas: config.solicitudesAutomaticas || false,
-                                maximoAgentes: config.maximoAgentes || 1,
+                                maximoAgentes: config.maximoAgentes !== undefined ? config.maximoAgentes : 1,
                                 diasExclusividad: configData.dias_exclusividad ?? 0
                             }
                         }
@@ -399,7 +399,7 @@ export const useAuthStore = create<AuthState>()(
                         
                         if (!configError && configData?.configuraciones) {
                             const config = configData.configuraciones as any
-                            maxAgentes = config.maximoAgentes || 1
+                            maxAgentes = config.maximoAgentes !== undefined ? config.maximoAgentes : 1
                         }
 
                         // Contar agentes actuales
