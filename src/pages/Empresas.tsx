@@ -21,6 +21,11 @@ const Empresas = () => {
   const [configError, setConfigError] = useState<string | null>(null)
   const [configSuccess, setConfigSuccess] = useState<string | null>(null)
   
+  // Estados para el modal de detalles
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [detailsCompany, setDetailsCompany] = useState<Company | null>(null)
+  const [toggleLoading, setToggleLoading] = useState(false)
+  
   // Filtros
   const [nameFilter, setNameFilter] = useState('')
   const [cifFilter, setCifFilter] = useState('')
@@ -149,6 +154,59 @@ const Empresas = () => {
     })
   }
 
+  const handleMostrarDetalles = (company: Company) => {
+    setDetailsCompany(company)
+    setShowDetailsModal(true)
+  }
+
+  const handleToggleActiva = async () => {
+    if (!detailsCompany) return
+
+    setToggleLoading(true)
+    try {
+      const updatedCompany = await companyService.updateCompany(detailsCompany.id, {
+        activa: !detailsCompany.activa
+      })
+
+      if (updatedCompany) {
+        // Actualizar el estado local
+        setDetailsCompany(updatedCompany)
+        
+        // Recargar la lista de empresas para reflejar el cambio
+        await loadCompanies()
+
+        // Mostrar mensaje de éxito
+        setMessage(`Empresa ${updatedCompany.activa ? 'activada' : 'desactivada'} correctamente`)
+        setShowSuccessMessage(true)
+        setTimeout(() => setMessageVisible(true), 100)
+
+        // Ocultar mensaje después de 4 segundos
+        setTimeout(() => {
+          setMessageVisible(false)
+          setTimeout(() => {
+            setShowSuccessMessage(false)
+          }, 300)
+        }, 4000)
+      } else {
+        throw new Error('No se pudo actualizar la empresa')
+      }
+    } catch (error) {
+      console.error('Error toggling company active status:', error)
+      setMessage('Error al actualizar el estado de la empresa')
+      setShowSuccessMessage(true)
+      setTimeout(() => setMessageVisible(true), 100)
+
+      setTimeout(() => {
+        setMessageVisible(false)
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+        }, 300)
+      }, 4000)
+    } finally {
+      setToggleLoading(false)
+    }
+  }
+
   const handleConfigurarEmpresa = async (company: Company) => {
     setSelectedCompany(company)
     setConfigError(null)
@@ -228,6 +286,17 @@ const Empresas = () => {
   }
 
   const getActionMenuItems = (company: Company) => [
+    {
+      label: 'Mostrar detalles',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      ),
+      onClick: () => handleMostrarDetalles(company),
+      className: 'text-green-600 hover:bg-green-50'
+    },
     {
       label: 'Configuraciones',
       icon: (
@@ -841,6 +910,160 @@ const Empresas = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalles de Empresa - Overlay */}
+      {showDetailsModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowDetailsModal(false)}
+        />
+      )}
+
+      {/* Modal de Detalles de Empresa */}
+      {showDetailsModal && detailsCompany && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">
+                Detalles de la Empresa
+              </h2>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 pb-6">
+              <div className="space-y-6">
+                {/* ID de la empresa */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    ID de la empresa
+                  </label>
+                  <p className="text-base text-gray-900 font-mono">
+                    {detailsCompany.id}
+                  </p>
+                </div>
+
+                {/* Nombre de la empresa */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Nombre de la empresa
+                  </label>
+                  <p className="text-base font-semibold text-[#373643]">
+                    {detailsCompany.nombre}
+                  </p>
+                </div>
+
+                {/* CIF */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    CIF
+                  </label>
+                  <p className="text-base text-gray-900 font-mono">
+                    {detailsCompany.cif}
+                  </p>
+                </div>
+
+                {/* Email de contacto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Email de contacto
+                  </label>
+                  <p className="text-base text-gray-900">
+                    {detailsCompany.email_contacto || '-'}
+                  </p>
+                </div>
+
+                {/* Volumen diario */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Volumen diario
+                  </label>
+                  <p className="text-base text-gray-900">
+                    {detailsCompany.volumen_diario.toLocaleString()} leads
+                  </p>
+                </div>
+
+                {/* Prioridad */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Prioridad
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getPriorityColor(detailsCompany.prioridad)}`}>
+                      {getPriorityText(detailsCompany.prioridad)}
+                    </span>
+                    <span className="text-sm text-gray-500">({detailsCompany.prioridad})</span>
+                  </div>
+                </div>
+
+                {/* URL de recepción de leads */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    URL de recepción de leads
+                  </label>
+                  <p className="text-base text-gray-900 break-all">
+                    {detailsCompany.url_recepcion_leads || '-'}
+                  </p>
+                </div>
+
+                {/* Estado de la empresa con Toggle */}
+                <div className="pt-4 border-t border-gray-200">
+                  <label className="block text-sm font-medium text-gray-500 mb-3">
+                    Estado de la empresa
+                  </label>
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${detailsCompany.activa ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className={`font-semibold ${detailsCompany.activa ? 'text-green-700' : 'text-red-700'}`}>
+                        {detailsCompany.activa ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleToggleActiva}
+                      disabled={toggleLoading}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        detailsCompany.activa
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {toggleLoading ? (
+                        <span className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Actualizando...
+                        </span>
+                      ) : (
+                        detailsCompany.activa ? 'Desactivar' : 'Activar'
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {detailsCompany.activa
+                      ? 'La empresa está activa y puede recibir leads'
+                      : 'La empresa está inactiva y no recibirá nuevos leads'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón cerrar */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
