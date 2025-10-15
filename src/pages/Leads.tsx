@@ -73,14 +73,12 @@ const LeadMobileCard = memo(({
         )}
       </div>
       <div className="flex gap-2 mt-3">
-        {user?.rol !== 'administrador' && (
-          <ActionMenu
-            items={getActionMenuItems(lead)}
-            triggerLabel="Más acciones"
-            size="sm"
-            className="text-xs font-medium"
-          />
-        )}
+        <ActionMenu
+          items={getActionMenuItems(lead)}
+          triggerLabel={user?.rol === 'administrador' ? 'Acciones' : 'Más acciones'}
+          size="sm"
+          className="text-xs font-medium"
+        />
       </div>
     </div>
   )
@@ -120,11 +118,13 @@ const LeadDesktopRow = memo(({
       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
         {lead.telefono}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-          {lead.plataforma_lead}
-        </span>
-      </td>
+      {user?.rol !== 'administrador' && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
+            {lead.plataforma_lead}
+          </span>
+        </td>
+      )}
       <td className="px-6 py-4 whitespace-nowrap">
         <select
           value={lead.estado_temporal || 'sin_tratar'}
@@ -144,15 +144,13 @@ const LeadDesktopRow = memo(({
           {lead.empresa_nombre || '-'}
         </td>
       )}
-      {user?.rol !== 'administrador' && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-          <ActionMenu
-            items={getActionMenuItems(lead)}
-            triggerLabel="Más acciones"
-            size="md"
-          />
-        </td>
-      )}
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+        <ActionMenu
+          items={getActionMenuItems(lead)}
+          triggerLabel={user?.rol === 'administrador' ? 'Acciones' : 'Más acciones'}
+          size="md"
+        />
+      </td>
     </tr>
   )
 })
@@ -387,6 +385,23 @@ const Leads = () => {
   }
 
   const getActionMenuItems = (lead: Lead): ActionMenuItem[] => {
+    // Si es administrador, solo mostrar "Archivos adjuntos"
+    if (user?.rol === 'administrador') {
+      return [
+        {
+          label: 'Archivos adjuntos',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          ),
+          onClick: () => handleVerArchivosAdjuntos(lead),
+          className: 'text-blue-600 hover:bg-blue-50'
+        }
+      ]
+    }
+
+    // Para coordinadores y agentes
     const items: ActionMenuItem[] = [
       {
         label: 'Ver detalles',
@@ -1092,9 +1107,11 @@ const Leads = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Teléfono
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Plataforma
-                  </th>
+                  {user?.rol !== 'administrador' && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                      Plataforma
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Estado
                   </th>
@@ -1103,11 +1120,9 @@ const Leads = () => {
                       Empresa
                     </th>
                   )}
-                  {user?.rol !== 'administrador' && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
