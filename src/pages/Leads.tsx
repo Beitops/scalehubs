@@ -494,8 +494,8 @@ const Leads = () => {
       // Actualizar el estado del lead
       await updateLeadStatus(leadId, newStatus)
       
-      // Si el estado es 'convertido' o 'no_cerrado', el lead debe desaparecer de la lista activa
-      if (newStatus === 'convertido' || newStatus === 'no_cerrado') {
+      // Si el estado es 'convertido', 'no_cerrado' o 'no_valido', el lead debe desaparecer de la lista activa
+      if (newStatus === 'convertido' || newStatus === 'no_cerrado' || newStatus === 'no_valido') {
         // Eliminar el lead de la lista local
         setLocalActiveLeads(prevLeads => 
           prevLeads.filter(lead => lead.id !== leadId)

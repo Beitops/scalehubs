@@ -200,13 +200,15 @@ class LeadsService {
 
   async updateLeadStatus(leadId: number, estadoTemporal: string): Promise<void> {
     try {
-      // Si el estado temporal es 'convertido' o 'no_cerrado', cambiar también el estado correspondiente
+      // Si el estado temporal es 'convertido', 'no_cerrado' o 'no_valido', cambiar también el estado correspondiente
       const updates: any = { estado_temporal: estadoTemporal }
       
       if (estadoTemporal === 'convertido') {
         updates.estado = 'convertido'
       } else if (estadoTemporal === 'no_cerrado') {
         updates.estado = 'perdido'
+      } else if (estadoTemporal === 'no_valido') {
+        updates.estado = 'no_valido'
       }
 
       const { error } = await supabase
@@ -307,7 +309,7 @@ class LeadsService {
 
     async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estado?: string): Promise<Lead[]> {
     try {
-      // Primero obtener leads con estados 'perdido' y 'convertido'
+      // Primero obtener leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
         .from('leads')
         .select(`
@@ -332,7 +334,7 @@ class LeadsService {
         `)
         .gte('fecha_entrada', startDate)
         .lte('fecha_entrada', endDate)
-        .in('estado', ['perdido', 'convertido'])
+        .in('estado', ['perdido', 'convertido', 'no_valido'])
         .order('fecha_entrada', { ascending: false })
 
       if (empresaId) {
@@ -347,7 +349,7 @@ class LeadsService {
       const { data: dataPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
       if (errorPerdidoConvertido) {
-        console.error('Error fetching perdido/convertido leads in date range:', errorPerdidoConvertido)
+        console.error('Error fetching historial leads in date range:', errorPerdidoConvertido)
         throw errorPerdidoConvertido
       }
 
@@ -774,11 +776,11 @@ class LeadsService {
   // Obtener conteo de leads en historial
   async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string): Promise<number> {
     try {
-      // Obtener conteo de leads con estados 'perdido' y 'convertido'
+      // Obtener conteo de leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })
-        .in('estado', ['perdido', 'convertido'])
+        .in('estado', ['perdido', 'convertido', 'no_valido'])
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
@@ -797,7 +799,7 @@ class LeadsService {
       const { count: countPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
       if (errorPerdidoConvertido) {
-        console.error('Error getting perdido/convertido leads count:', errorPerdidoConvertido)
+        console.error('Error getting historial leads count:', errorPerdidoConvertido)
         throw errorPerdidoConvertido
       }
 
@@ -860,7 +862,7 @@ class LeadsService {
   // Obtener leads del historial con paginación
   async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string): Promise<Lead[]> {
     try {
-      // Primero obtener leads con estados 'perdido' y 'convertido'
+      // Primero obtener leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
         .from('leads')
         .select(`
@@ -874,7 +876,7 @@ class LeadsService {
             nombre
           )
         `)
-        .in('estado', ['perdido', 'convertido'])
+        .in('estado', ['perdido', 'convertido', 'no_valido'])
         .order('fecha_entrada', { ascending: false })
 
       if (empresaId) {
@@ -893,7 +895,7 @@ class LeadsService {
       const { data: dataPerdidoConvertido, error: errorPerdidoConvertido } = await query
 
       if (errorPerdidoConvertido) {
-        console.error('Error fetching perdido/convertido leads:', errorPerdidoConvertido)
+        console.error('Error fetching historial leads:', errorPerdidoConvertido)
         throw errorPerdidoConvertido
       }
 

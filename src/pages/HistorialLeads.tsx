@@ -100,7 +100,7 @@ const HistorialLeads = () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          // Cargar leads devolucion, perdido y convertido por separado para el rango de fechas
+          // Cargar leads devolucion, perdido, convertido y no_valido por separado para el rango de fechas
           const leadsDevolucion = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
@@ -119,7 +119,13 @@ const HistorialLeads = () => {
             empresaId || undefined,
             'convertido'
           )
-          const historialInRange = [...leadsDevolucion, ...leadsPerdidos, ...leadsConvertidos]
+          const leadsNoValidos = await getLeadsInDateRange(
+            exportDateRange.startDate, 
+            exportDateRange.endDate, 
+            empresaId || undefined,
+            'no_valido'
+          )
+          const historialInRange = [...leadsDevolucion, ...leadsPerdidos, ...leadsConvertidos, ...leadsNoValidos]
           setLeadsToExport(historialInRange)
         } catch (error) {
           console.error('Error fetching leads in date range:', error)
@@ -203,6 +209,12 @@ const HistorialLeads = () => {
       return (
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
           Perdido
+        </span>
+      )
+    } else if (status === 'no_valido') {
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-orange-700 bg-orange-100">
+          No válido
         </span>
       )
     }
@@ -399,6 +411,7 @@ const HistorialLeads = () => {
                   <option value="devolucion">Devolución</option>
                   <option value="convertido">Convertido</option>
                   <option value="perdido">Perdido</option>
+                  <option value="no_valido">No válido</option>
                 </select>
               </div>
             </div>
