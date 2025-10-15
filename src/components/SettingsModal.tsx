@@ -27,6 +27,9 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [solicitudesAutomaticas, setSolicitudesAutomaticas] = useState(
     userEmpresaConfiguracion?.solicitudesAutomaticas || false
   )
+  const [rehusarLeadsAgentes, setRehusarLeadsAgentes] = useState(
+    userEmpresaConfiguracion?.rehusarLeadsAgentes || false
+  )
 
   // Limpiar mensajes al cambiar de sección
   useEffect(() => {
@@ -87,7 +90,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
       await updateEmpresaConfiguracion({
         maxSolicitudesPorAgente: maxSolicitudes,
-        solicitudesAutomaticas: solicitudesAutomaticas
+        solicitudesAutomaticas: solicitudesAutomaticas,
+        rehusarLeadsAgentes: rehusarLeadsAgentes
       })
       setSuccess('Configuración de empresa actualizada correctamente')
     } catch (error) {
@@ -346,6 +350,23 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 </label>
                 <p className="text-xs text-gray-500 mt-1 ml-7">
                   Si está activado, las solicitudes de leads se aprobarán automáticamente sin revisión manual
+                </p>
+              </div>
+
+              <div>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={rehusarLeadsAgentes}
+                    onChange={(e) => setRehusarLeadsAgentes(e.target.checked)}
+                    className="h-4 w-4 text-[#18cb96] focus:ring-[#18cb96] border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-[#373643]">
+                    Agentes podrán rehusarse sus propios leads
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-7">
+                  Si está activado, los agentes pueden rehusar los leads que tienen asignados
                 </p>
               </div>
 

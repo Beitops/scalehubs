@@ -13,6 +13,7 @@ interface EmpresaConfiguracion {
     solicitudesAutomaticas: boolean
     maximoAgentes?: number
     diasExclusividad?: number
+    rehusarLeadsAgentes?: boolean
 }
 
 interface AuthState {
@@ -292,7 +293,8 @@ export const useAuthStore = create<AuthState>()(
                                     maxSolicitudesPorAgente: 1,
                                     solicitudesAutomaticas: false,
                                     maximoAgentes: 1,
-                                    diasExclusividad: 0
+                                    diasExclusividad: 0,
+                                    rehusarLeadsAgentes: false
                                 }
                             }
                             throw new Error(error.message)
@@ -305,7 +307,8 @@ export const useAuthStore = create<AuthState>()(
                                 maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
                                 solicitudesAutomaticas: config.solicitudesAutomaticas || false,
                                 maximoAgentes: config.maximoAgentes !== undefined ? config.maximoAgentes : 1,
-                                diasExclusividad: configData.dias_exclusividad ?? 0
+                                diasExclusividad: configData.dias_exclusividad ?? 0,
+                                rehusarLeadsAgentes: config.rehusarLeadsAgentes || false
                             }
                         }
 
@@ -313,7 +316,8 @@ export const useAuthStore = create<AuthState>()(
                             maxSolicitudesPorAgente: 1,
                             solicitudesAutomaticas: false,
                             maximoAgentes: 1,
-                            diasExclusividad: 0
+                            diasExclusividad: 0,
+                            rehusarLeadsAgentes: false
                         }
                     } catch (error) {
                         throw error

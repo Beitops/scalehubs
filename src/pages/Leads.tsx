@@ -536,6 +536,17 @@ const Leads = () => {
   const handleRehusarLead = async (lead: Lead) => {
     if (!user?.id) return
 
+    // Si es un agente, verificar que su empresa permita rehusar leads
+    if (user?.rol === 'agente' && user.id === lead.user_id) {
+      if (!userEmpresaConfiguracion?.rehusarLeadsAgentes) {
+        showNotification(
+          'Tu empresa no permite que los agentes rehúsen sus propios leads. Contacta con tu coordinador si necesitas ayuda con este lead.',
+          'error'
+        )
+        return
+      }
+    }
+
     try {
       await leadsService.rehusarLead(lead.id, user.id)
       

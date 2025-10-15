@@ -44,7 +44,8 @@ const Empresas = () => {
     maxSolicitudesPorAgente: 1,
     solicitudesAutomaticas: false,
     maximoAgentes: 1,
-    diasExclusividad: 0
+    diasExclusividad: 0,
+    rehusarLeadsAgentes: false
   })
 
   const { getEmpresaConfiguracion, updateEmpresaConfiguracionById } = useAuthStore()
@@ -220,7 +221,8 @@ const Empresas = () => {
         maxSolicitudesPorAgente: config?.maxSolicitudesPorAgente || 1,
         solicitudesAutomaticas: config?.solicitudesAutomaticas || false,
         maximoAgentes: config?.maximoAgentes !== undefined ? config.maximoAgentes : 1,
-        diasExclusividad: config?.diasExclusividad ?? 0
+        diasExclusividad: config?.diasExclusividad ?? 0,
+        rehusarLeadsAgentes: config?.rehusarLeadsAgentes || false
       })
     } catch (error) {
       console.error('Error loading company config:', error)
@@ -243,7 +245,8 @@ const Empresas = () => {
       const configToSave = {
         ...empresaConfiguracion,
         maximoAgentes: empresaConfiguracion.maximoAgentes !== undefined ? empresaConfiguracion.maximoAgentes : 1,
-        diasExclusividad: empresaConfiguracion.diasExclusividad !== undefined ? empresaConfiguracion.diasExclusividad : 0
+        diasExclusividad: empresaConfiguracion.diasExclusividad !== undefined ? empresaConfiguracion.diasExclusividad : 0,
+        rehusarLeadsAgentes: empresaConfiguracion.rehusarLeadsAgentes || false
       }
       
       await updateEmpresaConfiguracionById(selectedCompany.id, configToSave)
@@ -882,6 +885,25 @@ const Empresas = () => {
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Número de días de exclusividad para los leads de esta empresa (0 = sin exclusividad)
+                  </p>
+                </div>
+
+                {/* Agentes podrán rehusar sus propios leads */}
+                <div>
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      name="rehusarLeadsAgentes"
+                      checked={empresaConfiguracion.rehusarLeadsAgentes}
+                      onChange={handleConfigInputChange}
+                      className="h-4 w-4 text-[#18cb96] focus:ring-[#18cb96] border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-[#373643]">
+                      Agentes podrán rehusarse sus propios leads
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-7">
+                    Si está activado, los agentes pueden rehusar los leads que tienen asignados
                   </p>
                 </div>
 
