@@ -159,6 +159,7 @@ const Leads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [empresaFilter, setEmpresaFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -243,12 +244,12 @@ const Leads = () => {
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
 
-  // Cargar empresas cuando se abra el modal de importación
+  // Cargar empresas cuando se abra el modal de importación o si es administrador
   useEffect(() => {
-    if (showImportModal) {
+    if (showImportModal || user?.rol === 'administrador') {
       loadCompanies()
     }
-  }, [showImportModal])
+  }, [showImportModal, user?.rol])
 
 
 
@@ -256,7 +257,8 @@ const Leads = () => {
     const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
     const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
     const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
-    return matchesDate && matchesPhone && matchesStatus
+    const matchesEmpresa = !empresaFilter || lead.empresa_id?.toString() === empresaFilter
+    return matchesDate && matchesPhone && matchesStatus && matchesEmpresa
   })
 
   // Calcular paginación
@@ -268,7 +270,7 @@ const Leads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [dateFilter, phoneFilter, statusFilter])
+  }, [dateFilter, phoneFilter, statusFilter, empresaFilter])
 
   // Calcular leads en el rango de fechas para exportación
   const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
@@ -385,9 +387,19 @@ const Leads = () => {
   }
 
   const getActionMenuItems = (lead: Lead): ActionMenuItem[] => {
-    // Si es administrador, solo mostrar "Archivos adjuntos"
+    // Si es administrador, mostrar "Ver detalles" y "Archivos adjuntos"
     if (user?.rol === 'administrador') {
       return [
+        {
+          label: 'Ver detalles',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          ),
+          onClick: () => handleViewDetails(lead)
+        },
         {
           label: 'Archivos adjuntos',
           icon: (
@@ -1005,7 +1017,7 @@ const Leads = () => {
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
           <div className="flex flex-col gap-4">
             {/* Filters Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${user?.rol === 'administrador' ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
               <div>
                 <label htmlFor="dateFilter" className="block text-sm font-medium text-[#373643] mb-2">
                   Filtrar por fecha
@@ -1050,6 +1062,26 @@ const Leads = () => {
                   <option value="no_cerrado">No Cerrado</option>
                 </select>
               </div>
+              {user?.rol === 'administrador' && (
+                <div>
+                  <label htmlFor="empresaFilter" className="block text-sm font-medium text-[#373643] mb-2">
+                    Filtrar por empresa
+                  </label>
+                  <select
+                    id="empresaFilter"
+                    value={empresaFilter}
+                    onChange={(e) => setEmpresaFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                  >
+                    <option value="">Todas las empresas</option>
+                    {companies.map(company => (
+                      <option key={company.id} value={company.id}>
+                        {company.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             
             {/* Export and Import Buttons */}
@@ -1362,28 +1394,28 @@ const Leads = () => {
             <div className="p-6 space-y-6">
               {/* Lead Information Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Nombre del Cliente</label>
                   <p className="text-sm text-gray-700">{selectedLead.nombre_cliente}</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Teléfono</label>
                   <p className="text-sm text-gray-700">{selectedLead.telefono}</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Plataforma</label>
                   <p className="text-sm text-gray-700">{selectedLead.plataforma_lead}</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Fecha de Entrada</label>
                   <p className="text-sm text-gray-700">{new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Estado Actual</label>
                   <p className="text-sm text-gray-700">{getStatusDisplayName(selectedLead.estado_temporal || 'sin_tratar')}</p>
                 </div>
                 {user?.rol === 'administrador' && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                     <label className="block text-sm font-medium text-[#373643] mb-1">Empresa</label>
                     <p className="text-sm text-gray-700">{selectedLead.empresa_nombre || '-'}</p>
                   </div>
@@ -1559,6 +1591,7 @@ const Leads = () => {
                 </div>
               ) : (
                 <>
+                  <h3 className="text-sm font-semibold text-[#373643] mb-3">Archivos Adjuntos</h3>
                   {/* Grid de archivos */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
                     {paginatedArchivos.map((archivo) => (
@@ -1573,7 +1606,7 @@ const Leads = () => {
                           }
                         }}
                       >
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-[#18cb96] hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 relative">
+                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-[#18cb96] hover:border-[#15b885] hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 relative">
                           {archivosAdjuntosService.isImage(archivo.mime_type) ? (
                             <img
                               src={archivo.url}
