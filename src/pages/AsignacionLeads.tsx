@@ -7,6 +7,7 @@ import { getUsersByCompany } from '../services/userService'
 import type { DatabaseProfile } from '../types/database'
 import type { Lead } from '../services/leadsService'
 import { leadSolicitudesService, type LeadSolicitud } from '../services/leadSolicitudesService'
+import { callbellService } from '../services/callbellService'
 
 const AsignacionLeads = () => {
   const [companies, setCompanies] = useState<Company[]>([])
@@ -26,7 +27,7 @@ const AsignacionLeads = () => {
   const [notification, setNotification] = useState<{
     show: boolean
     message: string
-    type: 'success' | 'error' | 'info'
+    type: 'success' | 'error' | 'info' | 'warning'
   }>({ show: false, message: '', type: 'info' })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
@@ -44,7 +45,7 @@ const AsignacionLeads = () => {
   } = useLeadsStore()
 
   // Función para mostrar notificaciones
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setNotification({ show: true, message, type })
   }
 
@@ -179,7 +180,12 @@ const AsignacionLeads = () => {
         showNotification('No hay leads disponibles para asignar. La solicitud será rechazada.', 'info')
         await leadSolicitudesService.rechazarSolicitud(solicitudId, user.id)
       } else {
-        await leadSolicitudesService.aprobarSolicitud(solicitudId, leadId, user.id)
+        const result = await leadSolicitudesService.aprobarSolicitud(solicitudId, leadId, user.id)
+        
+        // Si hay error de Callbell, mostrar notificación amarilla
+        if (result.callbellError) {
+          showNotification(result.callbellError, 'warning')
+        }
       }
 
       // Recargar solicitudes
@@ -254,6 +260,17 @@ const AsignacionLeads = () => {
           showNotification('Por favor selecciona un agente', 'error')
           return
         }
+        
+        // Si el lead pertenece a la empresa 15, intentar asignar en Callbell
+        if (selectedLead.empresa_id === 15) {
+          const callbellResult = await callbellService.assignLeadToCallbell(selectedLead.id, selectedUser)
+          
+          // Si falla con 403 o 404, mostrar notificación amarilla y continuar con asignación normal
+          if (!callbellResult.success && callbellResult.error) {
+            showNotification(callbellResult.error, 'warning')
+          }
+        }
+        
         await assignLeadToAgent(selectedLead.id, selectedUser)
       }
       refreshLeads()
@@ -314,12 +331,14 @@ const AsignacionLeads = () => {
           <div className={`rounded-lg shadow-lg p-4 flex items-center justify-between ${
             notification.type === 'success' ? 'bg-green-50 border border-green-200' :
             notification.type === 'error' ? 'bg-red-50 border border-red-200' :
+            notification.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
             'bg-blue-50 border border-blue-200'
           }`}>
             <div className="flex items-center">
               <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
                 notification.type === 'success' ? 'bg-green-100' :
                 notification.type === 'error' ? 'bg-red-100' :
+                notification.type === 'warning' ? 'bg-yellow-100' :
                 'bg-blue-100'
               }`}>
                 {notification.type === 'success' ? (
@@ -330,6 +349,10 @@ const AsignacionLeads = () => {
                   <svg className="w-3 h-3 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
+                ) : notification.type === 'warning' ? (
+                  <svg className="w-3 h-3 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
                 ) : (
                   <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -339,6 +362,7 @@ const AsignacionLeads = () => {
               <p className={`ml-3 text-sm font-medium ${
                 notification.type === 'success' ? 'text-green-800' :
                 notification.type === 'error' ? 'text-red-800' :
+                notification.type === 'warning' ? 'text-yellow-800' :
                 'text-blue-800'
               }`}>
                 {notification.message}
@@ -349,6 +373,7 @@ const AsignacionLeads = () => {
               className={`ml-4 flex-shrink-0 ${
                 notification.type === 'success' ? 'text-green-400 hover:text-green-600' :
                 notification.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                notification.type === 'warning' ? 'text-yellow-400 hover:text-yellow-600' :
                 'text-blue-400 hover:text-blue-600'
               }`}
             >

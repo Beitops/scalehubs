@@ -985,6 +985,47 @@ class LeadsService {
     }
   }
 
+  // Obtener un lead por ID
+  async getLeadById(leadId: number): Promise<Lead | null> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
+          )
+        `)
+        .eq('id', leadId)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No se encontró el lead
+          return null
+        }
+        console.error('Error fetching lead by ID:', error)
+        throw error
+      }
+
+      return {
+        ...data,
+        empresa_nombre: data.empresas?.nombre,
+        usuario_nombre: data.profiles?.nombre,
+        plataforma_lead: platformConverter(data.plataforma || ''),
+        calidad: data.calidad || 1
+      }
+    } catch (error) {
+      console.error('Error in getLeadById:', error)
+      throw error
+    }
+  }
+
   // Cancelar estado de un lead (volverlo a activo)
   async cancelLeadStatus(leadId: number): Promise<void> {
     try {

@@ -66,6 +66,7 @@ interface LeadsState {
   loadUnassignedLeadsByCompany: (empresaId: number) => Promise<void>
   assignLeadToCompany: (leadId: number, empresaId: number) => Promise<void>
   assignLeadToAgent: (leadId: number, userId: string) => Promise<void>
+  getLeadById: (leadId: number) => Promise<Lead | null>
   resetInitialized: () => void
 }
 
@@ -508,6 +509,16 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error assigning lead to agent:', error)
+      throw error
+    }
+  },
+
+  getLeadById: async (leadId: number) => {
+    try {
+      const lead = await leadsService.getLeadById(leadId)
+      return lead
+    } catch (error) {
+      console.error('Error getting lead by ID:', error)
       throw error
     }
   },

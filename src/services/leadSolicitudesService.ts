@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { callbellService } from './callbellService'
 
 export interface LeadSolicitud {
   id: number
@@ -92,7 +93,7 @@ class LeadSolicitudesService {
   }
 
   // Aprobar una solicitud y asignar un lead
-  async aprobarSolicitud(solicitudId: number, leadId: number, coordinadorUserId: string): Promise<void> {
+  async aprobarSolicitud(solicitudId: number, leadId: number, coordinadorUserId: string): Promise<{ callbellError?: string }> {
     try {
       // Obtener el solicitante_user_id de la solicitud
       const { data: solicitudData, error: fetchError } = await supabase
@@ -104,6 +105,35 @@ class LeadSolicitudesService {
       if (fetchError) {
         console.error('Error obteniendo datos de la solicitud:', fetchError)
         throw fetchError
+      }
+
+      // Obtener información del lead para verificar la empresa
+      const { data: leadData, error: leadFetchError } = await supabase
+        .from('leads')
+        .select('empresa_id')
+        .eq('id', leadId)
+        .single()
+
+      if (leadFetchError) {
+        console.error('Error obteniendo datos del lead:', leadFetchError)
+        throw leadFetchError
+      }
+
+      let callbellError: string | undefined
+
+      // Si el lead pertenece a la empresa 15, intentar asignar en Callbell
+      if (leadData?.empresa_id === 15) {
+        try {
+          const callbellResult = await callbellService.assignLeadToCallbell(leadId, solicitudData.solicitante_user_id)
+          
+          // Si falla con 403 o 404, capturar el error para retornarlo
+          if (!callbellResult.success && callbellResult.error) {
+            callbellError = callbellResult.error
+          }
+        } catch (error) {
+          // Si falla, continuamos con la asignación normal
+          console.log('Callbell assignment failed, continuing with normal assignment:', error)
+        }
       }
 
       // Actualizar la solicitud
@@ -135,6 +165,8 @@ class LeadSolicitudesService {
         console.error('Error asignando lead:', leadError)
         throw leadError
       }
+
+      return { callbellError }
     } catch (error) {
       console.error('Error in aprobarSolicitud:', error)
       throw error
