@@ -8,6 +8,7 @@ import { ActionMenu } from '../components/ActionMenu'
 import { leadSolicitudesService } from '../services/leadSolicitudesService'
 import { archivosAdjuntosService, type ArchivoAdjunto } from '../services/archivosAdjuntosService'
 import { companyService } from '../services/companyService'
+import { callbellService } from '../services/callbellService'
 
 interface ActionMenuItem {
   label: string
@@ -575,6 +576,16 @@ const Leads = () => {
     }
 
     try {
+      // Si el lead pertenece a la empresa 15, desasignarlo en Callbell
+      if (lead.empresa_id === 15) {
+        const callbellResult = await callbellService.unassignLeadFromCallbell(lead.id)
+        
+        // Si falla con 403 o 404, mostrar notificación amarilla y continuar
+        if (!callbellResult.success && callbellResult.error) {
+          showNotification(callbellResult.error, 'warning')
+        }
+      }
+      
       await leadsService.rehusarLead(lead.id, user.id)
       
       // Si es un agente rehusando su propio lead, eliminarlo de la lista
@@ -758,13 +769,67 @@ const Leads = () => {
       throw new Error('El archivo CSV debe tener al menos una fila de datos')
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const requiredHeaders = ['nombre_cliente', 'telefono']
+    // Función para normalizar headers (quitar tildes y convertir a minúsculas)
+    const normalizeHeader = (header: string): string => {
+      return header
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Quitar tildes y acentos
+    }
+
+    // Mapeo de variantes de nombres de columnas
+    const headerVariants: Record<string, string> = {
+      'nombre': 'nombre_cliente',
+      'nombre cliente': 'nombre_cliente',
+      'nombre_cliente': 'nombre_cliente',
+      'cliente': 'nombre_cliente',
+      'nombrecliente': 'nombre_cliente',
+      
+      'telefono': 'telefono',
+      'teléfono': 'telefono',
+      'tlf': 'telefono',
+      'phone': 'telefono',
+      
+      'empresa': 'empresa_id',
+      'empresa_id': 'empresa_id',
+      'id empresa': 'empresa_id',
+      'idempresa': 'empresa_id',
+      'empresaid': 'empresa_id',
+      
+      'plataforma': 'plataforma',
+      
+      'estado temporal': 'estado_temporal',
+      'estado_temporal': 'estado_temporal',
+      'estadotemporal': 'estado_temporal',
+      
+      'estado_general': 'estado',
+      
+      'observaciones': 'observaciones',
+      'observacion': 'observaciones',
+      'comentarios': 'observaciones',
+      'comentario': 'observaciones',
+      'notas': 'observaciones',
+      'nota': 'observaciones',
+      
+      'calidad': 'calidad'
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim())
+    const normalizedHeaders = headers.map(h => {
+      const normalized = normalizeHeader(h)
+      return headerVariants[normalized] || normalized
+    })
+
+    // Verificar que estén los headers requeridos (aceptando cualquier variante)
+    const hasNombreCliente = normalizedHeaders.some(h => h === 'nombre_cliente')
+    const hasTelefono = normalizedHeaders.some(h => h === 'telefono')
     
-    // Verificar que estén los headers requeridos
-    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header))
-    if (missingHeaders.length > 0) {
-      throw new Error(`Faltan las siguientes columnas requeridas: ${missingHeaders.join(', ')}`)
+    if (!hasNombreCliente || !hasTelefono) {
+      const missing: string[] = []
+      if (!hasNombreCliente) missing.push('nombre/nombre_cliente')
+      if (!hasTelefono) missing.push('telefono/teléfono')
+      throw new Error(`Faltan las siguientes columnas requeridas: ${missing.join(', ')}`)
     }
 
     const leads: ImportLeadData[] = []
@@ -778,15 +843,20 @@ const Leads = () => {
         continue
       }
 
+      const getColumnValue = (columnName: string): string => {
+        const index = normalizedHeaders.indexOf(columnName)
+        return index >= 0 ? values[index] || '' : ''
+      }
+
       const lead: ImportLeadData = {
-        nombre_cliente: values[headers.indexOf('nombre_cliente')] || '',
-        telefono: values[headers.indexOf('telefono')] || '',
-        plataforma: values[headers.indexOf('plataforma')] || 'ScaleHubs',
-        empresa_id: values[headers.indexOf('empresa_id')] ? parseInt(values[headers.indexOf('empresa_id')]) : undefined,
-        estado_temporal: values[headers.indexOf('estado_temporal')] || 'sin_tratar',
-        estado: values[headers.indexOf('estado')] || 'activo',
-        observaciones: values[headers.indexOf('observaciones')] || undefined,
-        calidad: values[headers.indexOf('calidad')] ? parseInt(values[headers.indexOf('calidad')]) : 1
+        nombre_cliente: getColumnValue('nombre_cliente'),
+        telefono: getColumnValue('telefono'),
+        plataforma: getColumnValue('plataforma') || 'ScaleHubs',
+        empresa_id: getColumnValue('empresa_id') ? parseInt(getColumnValue('empresa_id')) : undefined,
+        estado_temporal: getColumnValue('estado_temporal') || 'sin_tratar',
+        estado: getColumnValue('estado') || 'activo',
+        observaciones: getColumnValue('observaciones') || undefined,
+        calidad: getColumnValue('calidad') ? parseInt(getColumnValue('calidad')) : 1
       }
 
       // Validar campos requeridos
@@ -1774,8 +1844,8 @@ const Leads = () => {
       {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-xl font-bold text-[#373643]">Importar Leads</h2>
               <button
                 onClick={() => setShowImportModal(false)}
@@ -1787,7 +1857,7 @@ const Leads = () => {
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               {/* Toggle Buttons */}
               <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
                 <button
@@ -1928,8 +1998,9 @@ const Leads = () => {
                   <div className="bg-yellow-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-yellow-800 mb-2">Formato requerido del CSV</h3>
                     <div className="text-sm text-yellow-700 space-y-1">
-                      <p><strong>Columnas requeridas:</strong> nombre_cliente, telefono</p>
-                      <p><strong>Columnas opcionales:</strong> plataforma, empresa_id, estado_temporal, estado, observaciones, calidad</p>
+                      <p><strong>Columnas requeridas:</strong> Nombre/Nombre Cliente/Nombre_Cliente, Teléfono/Teléfono/Telefono</p>
+                      <p><strong>Columnas opcionales:</strong> Plataforma, Empresa/Empresa_ID, Estado Temporal/Estado_Temporal, Estado, Observaciones, Calidad</p>
+                      <p><strong>Formato flexible:</strong> Se aceptan tildes, mayúsculas/minúsculas y diferentes variantes de nombres</p>
                       <p><strong>Nota:</strong> Los teléfonos duplicados no se importarán</p>
                     </div>
                   </div>
