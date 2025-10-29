@@ -505,9 +505,18 @@ const AsignacionLeads = () => {
                 {paginatedLeads.map((lead) => (
                   <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                        {lead.plataforma_lead}
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex px-2 py-1 text-[10px] font-semibold rounded-full text-white bg-[#1e3a8a]">
+                          {lead.campaña_nombre || 'Sin Campaña'}
+                        </span>
+                        <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
+                      </div>
+                      <span className="inline-flex items-center justify-center w-8 h-8">
+                        <img 
+                          src={`/calidadLead/${lead.calidad || 1}.png`} 
+                          alt={`Calidad ${lead.calidad || 1}`}
+                          className="w-8 h-8 object-contain"
+                        />
                       </span>
                     </div>
                     <div className="space-y-1 text-xs text-gray-600">
@@ -538,14 +547,18 @@ const AsignacionLeads = () => {
                         Fecha Entrada
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                        Campaña
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                        Calidad
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                         Nombre
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                         Teléfono
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                        Plataforma
-                      </th>
+                      
                       {user?.rol === 'administrador' && (
                         <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                           Empresa
@@ -562,17 +575,25 @@ const AsignacionLeads = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                           {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+                          {lead.campaña_nombre || 'Sin Campaña'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center w-10 h-10">
+                            <img 
+                              src={`/calidadLead/${lead.calidad || 1}.png`} 
+                              alt={`Calidad ${lead.calidad || 1}`}
+                              className="w-10 h-10 object-contain"
+                            />
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                           {lead.telefono}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
-                            {lead.plataforma_lead}
-                          </span>
-                        </td>
+                        
                         {user?.rol === 'administrador' && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             Sin asignar
