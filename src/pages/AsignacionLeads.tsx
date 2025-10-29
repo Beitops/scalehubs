@@ -264,7 +264,6 @@ const AsignacionLeads = () => {
         // Si el lead pertenece a la empresa 15, intentar asignar en Callbell
         if (selectedLead.empresa_id === 15) {
           const callbellResult = await callbellService.assignLeadToCallbell(selectedLead.id, selectedUser)
-          
           // Si falla con 403 o 404, mostrar notificación amarilla y continuar con asignación normal
           if (!callbellResult.success && callbellResult.error) {
             showNotification(callbellResult.error, 'warning')

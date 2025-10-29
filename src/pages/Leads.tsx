@@ -804,6 +804,8 @@ const Leads = () => {
       'estadotemporal': 'estado_temporal',
       
       'estado_general': 'estado',
+      'estado': 'estado',
+      'estado_lead': 'estado',
       
       'observaciones': 'observaciones',
       'observacion': 'observaciones',
