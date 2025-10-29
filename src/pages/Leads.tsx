@@ -578,7 +578,7 @@ const Leads = () => {
     try {
       // Si el lead pertenece a la empresa 15, desasignarlo en Callbell
       if (lead.empresa_id === 15) {
-        const callbellResult = await callbellService.unassignLeadFromCallbell(lead.id)
+        const callbellResult = await callbellService.unassignLeadFromCallbell(lead.id, lead.user_id || undefined)
         
         // Si falla con 403 o 404, mostrar notificación amarilla y continuar
         if (!callbellResult.success && callbellResult.error) {
@@ -640,34 +640,31 @@ const Leads = () => {
 
       // Si la asignación es automática
       if (configuracion.solicitudesAutomaticas) {
-        // Intentar asignar lead automáticamente
-        const resultado = await leadSolicitudesService.asignarLeadAutomaticamente(user.id, userEmpresaId)
-        
-        if (resultado.success && resultado.leadId) {
-          // Crear solicitud con el agente como receptor (para registro)
-          await leadSolicitudesService.createSolicitud({
-            solicitante_user_id: user.id
-          })
-          
-          // Aprobar automáticamente la solicitud
-          const solicitudes = await leadSolicitudesService.getSolicitudesByAgente(user.id)
-          const ultimaSolicitud = solicitudes.find(s => s.estado === 'pendiente')
-          
-          if (ultimaSolicitud && resultado.leadId) {
-            const aprobarResult = await leadSolicitudesService.aprobarSolicitud(ultimaSolicitud.id, resultado.leadId, user.id)
-            
-            // Si hay error de Callbell, mostrar notificación amarilla
-            if (aprobarResult.callbellError) {
-              showNotification(aprobarResult.callbellError, 'warning')
-            }
+        // 1) Crear solicitud (registro)
+        const solicitud = await leadSolicitudesService.createSolicitud({
+          solicitante_user_id: user.id
+        })
+
+        // 2) Obtener el lead más reciente sin asignar de la empresa
+        const leadId = await leadSolicitudesService.getLeadMasRecienteSinAsignar(userEmpresaId)
+
+        if (!leadId) {
+          // Si no hay leads, rechazar la solicitud creada y notificar
+          await leadSolicitudesService.rechazarSolicitud(solicitud.id, user.id)
+          showNotification('No hay leads disponibles para asignar en este momento', 'error')
+        } else {
+          // 3) Aprobar la solicitud y asignar el lead
+          const aprobarResult = await leadSolicitudesService.aprobarSolicitud(solicitud.id, leadId, user.id)
+
+          // Si hay error de Callbell, mostrar notificación amarilla
+          if (aprobarResult.callbellError) {
+            showNotification(aprobarResult.callbellError, 'warning')
           }
-          
+
           showNotification('¡Lead asignado automáticamente! Ya tienes un nuevo lead para trabajar.', 'success')
-          
+
           // Recargar leads para mostrar el nuevo lead
           await refreshLeads()
-        } else {
-          showNotification(resultado.message, 'error')
         }
       } else {
         // Asignación manual - crear solicitud normal

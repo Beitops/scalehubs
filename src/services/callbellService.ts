@@ -30,7 +30,8 @@ class CallbellService {
         edgeFunctionUrl,
         {
           lead_id: leadId,
-          profile_id: profileId
+          profile_id: profileId,
+          asignacion: true
         },
         {
           headers: {
@@ -68,12 +69,13 @@ class CallbellService {
   /**
    * Desasigna un lead del sistema Callbell
    * @param leadId - ID del lead a desasignar
+   * @param profileId - ID del perfil (usuario) al que se asignará el lead
    * @returns Promise con el resultado de la operación
    */
-  async unassignLeadFromCallbell(leadId: number): Promise<AssignCallbellResponse> {
+  async unassignLeadFromCallbell(leadId: number, profileId: string | undefined): Promise<AssignCallbellResponse> {
     try {
       const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/asignar-callbell`
-      
+      console.log('profileId', profileId)
       // Obtener el JWT del usuario actual
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) {
@@ -84,7 +86,8 @@ class CallbellService {
         edgeFunctionUrl,
         {
           lead_id: leadId,
-          profile_id: null
+          profile_id: profileId,
+          asignacion: false
         },
         {
           headers: {
