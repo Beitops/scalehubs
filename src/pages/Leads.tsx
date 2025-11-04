@@ -794,6 +794,14 @@ const Leads = () => {
       'idempresa': 'empresa_id',
       'empresaid': 'empresa_id',
       
+      'campaña': 'campaña_id',
+      'campana': 'campaña_id',
+      'campaña_id': 'campaña_id',
+      'campana_id': 'campaña_id',
+      'id campaña': 'campaña_id',
+      'idcampana': 'campaña_id',
+      'campañaid': 'campaña_id',
+      
       'plataforma': 'plataforma',
       
       'estado temporal': 'estado_temporal',
@@ -852,6 +860,7 @@ const Leads = () => {
         telefono: getColumnValue('telefono'),
         plataforma: getColumnValue('plataforma') || 'ScaleHubs',
         empresa_id: getColumnValue('empresa_id') ? parseInt(getColumnValue('empresa_id')) : undefined,
+        campaña_id: getColumnValue('campaña_id') ? parseInt(getColumnValue('campaña_id')) : undefined,
         estado_temporal: getColumnValue('estado_temporal') || 'sin_tratar',
         estado: getColumnValue('estado') || 'activo',
         observaciones: getColumnValue('observaciones') || undefined,
@@ -1998,7 +2007,7 @@ const Leads = () => {
                     <h3 className="text-sm font-medium text-yellow-800 mb-2">Formato requerido del CSV</h3>
                     <div className="text-sm text-yellow-700 space-y-1">
                       <p><strong>Columnas requeridas:</strong> Nombre/Nombre Cliente/Nombre_Cliente, Teléfono/Teléfono/Telefono</p>
-                      <p><strong>Columnas opcionales:</strong> Plataforma, Empresa/Empresa_ID, Estado Temporal/Estado_Temporal, Estado, Observaciones, Calidad</p>
+                      <p><strong>Columnas opcionales:</strong> Plataforma, Empresa/Empresa_ID, Campaña/Campaña_ID, Estado Temporal/Estado_Temporal, Estado, Observaciones, Calidad</p>
                       <p><strong>Formato flexible:</strong> Se aceptan tildes, mayúsculas/minúsculas y diferentes variantes de nombres</p>
                       <p><strong>Nota:</strong> Los teléfonos duplicados no se importarán</p>
                     </div>

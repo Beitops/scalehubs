@@ -27,7 +27,7 @@ const Sidebar = ({ onClose, onLogout, onOpenSettings }: SidebarProps) => {
   ];
 
   const coordinadorMenuItems = [
-    { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' },
+    { id: 'usuarios', label: 'Usuarios', icon: '👤', to: '/usuarios' }
   ];
 
   const menuItems = user?.rol === 'administrador'
