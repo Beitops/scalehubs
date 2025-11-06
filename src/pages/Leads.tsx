@@ -9,6 +9,8 @@ import { leadSolicitudesService } from '../services/leadSolicitudesService'
 import { archivosAdjuntosService, type ArchivoAdjunto } from '../services/archivosAdjuntosService'
 import { companyService } from '../services/companyService'
 import { callbellService } from '../services/callbellService'
+import { supabase } from '../lib/supabase'
+import axios from 'axios'
 
 interface ActionMenuItem {
   label: string
@@ -197,8 +199,13 @@ const Leads = () => {
   const [manualFormData, setManualFormData] = useState({
     nombre_cliente: '',
     telefono: '',
-    empresa_id: ''
+    empresa_id: '',
+    campaña_id: '',
+    hub_id: ''
   })
+  const [sendCallbell, setSendCallbell] = useState(false)
+  const [campaigns, setCampaigns] = useState<Array<{id: number, nombre: string, meta_plataforma_id: string | null}>>([])
+  const [hubs, setHubs] = useState<Array<{id: number, nombre: string}>>([])
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
@@ -249,6 +256,8 @@ const Leads = () => {
   useEffect(() => {
     if (showImportModal || user?.rol === 'administrador') {
       loadCompanies()
+      loadCampaigns()
+      loadHubs()
     }
   }, [showImportModal, user?.rol])
 
@@ -731,8 +740,9 @@ const Leads = () => {
   const handleImport = () => {
     setShowImportModal(true)
     setImportMode('manual')
-    setManualFormData({ nombre_cliente: '', telefono: '', empresa_id: '' })
+    setManualFormData({ nombre_cliente: '', telefono: '', empresa_id: '', campaña_id: '', hub_id: '' })
     setCsvFile(null)
+    setSendCallbell(false)
   }
 
   const loadCompanies = async () => {
@@ -741,6 +751,42 @@ const Leads = () => {
       setCompanies(companiesData.map(company => ({ id: company.id, nombre: company.nombre })))
     } catch (error) {
       console.error('Error loading companies:', error)
+    }
+  }
+
+  const loadCampaigns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('campañas')
+        .select('id, nombre, meta_plataforma_id')
+        .order('nombre')
+      
+      if (error) {
+        console.error('Error loading campaigns:', error)
+        return
+      }
+      
+      setCampaigns(data || [])
+    } catch (error) {
+      console.error('Error loading campaigns:', error)
+    }
+  }
+
+  const loadHubs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hubs')
+        .select('id, nombre')
+        .order('nombre')
+      
+      if (error) {
+        console.error('Error loading hubs:', error)
+        return
+      }
+      
+      setHubs(data || [])
+    } catch (error) {
+      console.error('Error loading hubs:', error)
     }
   }
 
@@ -887,31 +933,138 @@ const Leads = () => {
     return leads
   }
 
+  // Función para generar un lead_id pseudoaleatorio
+  const generateLeadId = (): string => {
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 11)
+    const phoneHash = manualFormData.telefono.split('').reduce((acc, char) => {
+      return ((acc << 5) - acc) + char.charCodeAt(0)
+    }, 0).toString(36)
+    return `${timestamp}-${phoneHash}-${random}`
+  }
+
   const handleManualImport = async () => {
     if (!manualFormData.nombre_cliente || !manualFormData.telefono) {
       showNotification('Por favor completa todos los campos requeridos', 'error')
       return
     }
 
+    // Validar campos requeridos si se envía a Callbell
+    if (sendCallbell) {
+      if (!manualFormData.campaña_id) {
+        showNotification('La campaña es requerida cuando se envía mensaje a Callbell', 'error')
+        return
+      }
+      if (!manualFormData.hub_id) {
+        showNotification('El hub es requerido cuando se envía mensaje a Callbell', 'error')
+        return
+      }
+    }
+
     setImportLoading(true)
     try {
-      const leadData: ImportLeadData = {
-        nombre_cliente: manualFormData.nombre_cliente,
-        telefono: manualFormData.telefono,
-        plataforma: 'ScaleHubs',
-        empresa_id: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : undefined,
-        estado_temporal: 'sin_tratar',
-        estado: 'activo',
-        calidad: 1
-      }
+      // Si se marcó enviar a Callbell, enviar directamente a la edge function
+      if (sendCallbell) {
+        // Obtener la campaña seleccionada
+        const selectedCampaign = campaigns.find(c => c.id === parseInt(manualFormData.campaña_id))
+        const campaignName = selectedCampaign?.nombre || ''
+        const metaPlataformaId = selectedCampaign?.meta_plataforma_id
 
-      await leadsService.createImportLead(leadData)
-      showNotification('Lead importado correctamente', 'success')
-      setShowImportModal(false)
-      await refreshLeads()
+        if (!metaPlataformaId) {
+          showNotification('La campaña seleccionada no tiene meta_plataforma_id configurado', 'error')
+          setImportLoading(false)
+          return
+        }
+
+        // Obtener el token de acceso
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) {
+          throw new Error('No hay sesión activa')
+        }
+
+        // Generar lead_id pseudoaleatorio
+        const leadId = generateLeadId()
+
+        // Preparar el payload según la estructura JSON
+        const callbellPayload = {
+          campaign_id: metaPlataformaId,
+          campaign_name: campaignName,
+          field_data: {
+            name: manualFormData.nombre_cliente,
+            phone: manualFormData.telefono
+          },
+          fecha: new Date().toISOString(),
+          platform: 'Scalehubs',
+          empresa: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : null,
+          hub: parseInt(manualFormData.hub_id),
+          lead_id: leadId
+        }
+
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+        const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/insert-lead-callbell`
+
+        // Si hay un error al enviar a Callbell, lanzar el error para que no se cree el lead
+        let response: any = null
+        try {
+          response = await axios.post(
+            edgeFunctionUrl,
+            callbellPayload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            }
+          )
+
+          // Verificar si la respuesta tiene un warning (aunque success sea true)
+          if (response.data?.warning) {
+            const warningMessage = response.data?.message || 'Error al enviar el lead a Callbell'
+            throw new Error(warningMessage) // Lanzar error para detener el flujo
+          }
+
+          // Solo si la llamada a Callbell es exitosa y sin warnings, mostrar éxito y refrescar
+          showNotification('Lead importado y mensaje enviado a Callbell correctamente', 'success')
+          setShowImportModal(false)
+          await refreshLeads()
+        } catch (callbellError) {
+          console.error('Error sending to Callbell:', callbellError)
+          // Obtener el mensaje de error
+          const errorMessage = response?.data?.warning 
+            ? response.data?.message || 'Error al enviar el lead a Callbell'
+            : axios.isAxiosError(callbellError) 
+              ? callbellError.response?.data?.message || callbellError.response?.data?.error || callbellError.message || 'Error al enviar el lead a Callbell'
+              : callbellError instanceof Error 
+                ? callbellError.message 
+                : 'Error al enviar el lead a Callbell'
+          showNotification(errorMessage, 'error')
+          throw callbellError // Lanzar el error para detener el flujo
+        }
+      } else {
+        // Si no se envía a Callbell, crear el lead normalmente
+        const leadData: ImportLeadData = {
+          nombre_cliente: manualFormData.nombre_cliente,
+          telefono: manualFormData.telefono,
+          plataforma: 'ScaleHubs',
+          empresa_id: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : undefined,
+          campaña_id: manualFormData.campaña_id ? parseInt(manualFormData.campaña_id) : undefined,
+          hub_id: manualFormData.hub_id ? parseInt(manualFormData.hub_id) : undefined,
+          estado_temporal: 'sin_tratar',
+          estado: 'activo',
+          calidad: 1
+        }
+
+        await leadsService.createImportLead(leadData)
+        showNotification('Lead importado correctamente', 'success')
+        setShowImportModal(false)
+        await refreshLeads()
+      }
     } catch (error) {
       console.error('Error importing lead:', error)
-      showNotification('Error al importar el lead', 'error')
+      // Solo mostrar error si no se mostró ya (para evitar duplicados)
+      if (!sendCallbell || (sendCallbell && !axios.isAxiosError(error))) {
+        showNotification('Error al importar el lead', 'error')
+      }
     } finally {
       setImportLoading(false)
     }
@@ -1003,7 +1156,7 @@ const Leads = () => {
     <>
       {/* Notification */}
       {notification.show && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] max-w-md w-full mx-4">
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10003] max-w-md w-full mx-4">
           <div className={`rounded-lg shadow-lg p-4 flex items-center justify-between ${
             notification.type === 'success' ? 'bg-green-50 border border-green-200' :
             notification.type === 'error' ? 'bg-red-50 border border-red-200' :
@@ -1944,6 +2097,67 @@ const Leads = () => {
                       ))}
                     </select>
                   </div>
+
+                  {/* Checkbox para enviar mensaje a Callbell */}
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="sendCallbell"
+                      checked={sendCallbell}
+                      onChange={(e) => setSendCallbell(e.target.checked)}
+                      className="h-4 w-4 text-[#18cb96] focus:ring-[#18cb96] border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendCallbell" className="ml-2 block text-sm font-medium text-[#373643]">
+                      Enviar mensaje callbell
+                    </label>
+                  </div>
+
+                  {/* Campos adicionales cuando se marca el checkbox */}
+                  {sendCallbell && (
+                    <>
+                      <div>
+                        <label htmlFor="campaña_id" className="block text-sm font-medium text-[#373643] mb-2">
+                          Campaña *
+                        </label>
+                        <select
+                          id="campaña_id"
+                          name="campaña_id"
+                          value={manualFormData.campaña_id}
+                          onChange={handleManualFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                          required
+                        >
+                          <option value="">Selecciona una campaña</option>
+                          {campaigns.map(campaign => (
+                            <option key={campaign.id} value={campaign.id}>
+                              {campaign.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="hub_id" className="block text-sm font-medium text-[#373643] mb-2">
+                          Hub *
+                        </label>
+                        <select
+                          id="hub_id"
+                          name="hub_id"
+                          value={manualFormData.hub_id}
+                          onChange={handleManualFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                          required
+                        >
+                          <option value="">Selecciona un hub</option>
+                          {hubs.map(hub => (
+                            <option key={hub.id} value={hub.id}>
+                              {hub.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
 
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-blue-800 mb-2">Información automática</h3>
