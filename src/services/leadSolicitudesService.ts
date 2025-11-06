@@ -284,19 +284,35 @@ class LeadSolicitudesService {
   async puedeSolicitarLead(agenteUserId: string, _empresaId: number, maxSolicitudes: number): Promise<boolean> {
     try {
       // Contar leads activos del agente con estado 'sin_tratar'
-      const { data: leadsActivos, error } = await supabase
+      const { data: leadsActivos, error: leadsError } = await supabase
         .from('leads')
         .select('id')
         .eq('user_id', agenteUserId)
         .eq('estado', 'activo')
         .eq('estado_temporal', 'sin_tratar')
 
-      if (error) {
-        console.error('Error checking active leads:', error)
-        throw error
+      if (leadsError) {
+        console.error('Error checking active leads:', leadsError)
+        throw leadsError
       }
 
-      return (leadsActivos?.length || 0) < maxSolicitudes
+      // Contar solicitudes pendientes del agente
+      const { data: solicitudesPendientes, error: solicitudesError } = await supabase
+        .from('lead_solicitudes')
+        .select('id')
+        .eq('solicitante_user_id', agenteUserId)
+        .eq('estado', 'pendiente')
+
+      if (solicitudesError) {
+        console.error('Error checking pending solicitudes:', solicitudesError)
+        throw solicitudesError
+      }
+
+      const numLeadsSinTratar = leadsActivos?.length || 0
+      const numSolicitudesPendientes = solicitudesPendientes?.length || 0
+      const total = numLeadsSinTratar + numSolicitudesPendientes
+
+      return total < maxSolicitudes
     } catch (error) {
       console.error('Error in puedeSolicitarLead:', error)
       throw error
