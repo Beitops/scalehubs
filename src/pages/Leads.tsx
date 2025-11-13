@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
@@ -11,6 +11,12 @@ import { companyService } from '../services/companyService'
 import { callbellService } from '../services/callbellService'
 import { supabase } from '../lib/supabase'
 import axios from 'axios'
+import type { AssignedUserProfile } from '../services/LeadsFilterService'
+import {
+  createAssignedUsersById,
+  fetchAssignedUsers,
+  filterLeads
+} from '../services/LeadsFilterService'
 
 interface ActionMenuItem {
   label: string
@@ -163,6 +169,7 @@ const Leads = () => {
   const [phoneFilter, setPhoneFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [empresaFilter, setEmpresaFilter] = useState('')
+  const [assignedUserFilter, setAssignedUserFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -206,6 +213,7 @@ const Leads = () => {
   const [sendCallbell, setSendCallbell] = useState(false)
   const [campaigns, setCampaigns] = useState<Array<{id: number, nombre: string, meta_plataforma_id: string | null}>>([])
   const [hubs, setHubs] = useState<Array<{id: number, nombre: string}>>([])
+  const [assignedUsers, setAssignedUsers] = useState<AssignedUserProfile[]>([])
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
@@ -261,15 +269,40 @@ const Leads = () => {
     }
   }, [showImportModal, user?.rol])
 
+  useEffect(() => {
+    if (user?.rol === 'coordinador' && userEmpresaId) {
+      loadAssignedUsers()
+    } else {
+      setAssignedUsers([])
+    }
+  }, [user?.rol, userEmpresaId])
 
+  const assignedUsersById = useMemo(
+    () => createAssignedUsersById(assignedUsers),
+    [assignedUsers]
+  )
 
-  const filteredLeads = localActiveLeads.filter(lead => {
-    const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
-    const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
-    const matchesStatus = !statusFilter || lead.estado_temporal === statusFilter
-    const matchesEmpresa = !empresaFilter || lead.empresa_id?.toString() === empresaFilter
-    return matchesDate && matchesPhone && matchesStatus && matchesEmpresa
-  })
+  const filteredLeads = useMemo(
+    () =>
+      filterLeads(localActiveLeads, {
+        dateFilter,
+        phoneFilter,
+        statusFilter,
+        empresaFilter,
+        assignedUserFilter,
+        assignedUsersById,
+        statusGetter: (lead: Lead) => lead.estado_temporal
+      }),
+    [
+      localActiveLeads,
+      dateFilter,
+      phoneFilter,
+      statusFilter,
+      empresaFilter,
+      assignedUserFilter,
+      assignedUsersById
+    ]
+  )
 
   // Calcular paginación
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
@@ -280,7 +313,7 @@ const Leads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [dateFilter, phoneFilter, statusFilter, empresaFilter])
+  }, [dateFilter, phoneFilter, statusFilter, empresaFilter, assignedUserFilter])
 
   // Calcular leads en el rango de fechas para exportación
   const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
@@ -745,6 +778,17 @@ const Leads = () => {
     setSendCallbell(false)
   }
 
+  const loadAssignedUsers = async () => {
+    if (!userEmpresaId) return
+
+    try {
+      const profiles = await fetchAssignedUsers(supabase, userEmpresaId)
+      setAssignedUsers(profiles)
+    } catch (error) {
+      console.error('Error loading assigned users:', error)
+    }
+  }
+
   const loadCompanies = async () => {
     try {
       const companiesData = await companyService.getCompanies()
@@ -1133,6 +1177,13 @@ const Leads = () => {
     return colorMap[status] || 'text-gray-700'
   }
 
+  const filtersGridCols =
+    user?.rol === 'administrador'
+      ? 'sm:grid-cols-2 lg:grid-cols-4'
+      : user?.rol === 'coordinador'
+        ? 'sm:grid-cols-2 lg:grid-cols-4'
+        : 'sm:grid-cols-3'
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -1261,7 +1312,7 @@ const Leads = () => {
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
           <div className="flex flex-col gap-4">
             {/* Filters Row */}
-            <div className={`grid grid-cols-1 gap-4 ${user?.rol === 'administrador' ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
+            <div className={`grid grid-cols-1 gap-4 ${filtersGridCols}`}>
               <div>
                 <label htmlFor="dateFilter" className="block text-sm font-medium text-[#373643] mb-2">
                   Filtrar por fecha
@@ -1306,6 +1357,37 @@ const Leads = () => {
                   <option value="no_cerrado">No Cerrado</option>
                 </select>
               </div>
+              {user?.rol === 'coordinador' && (
+                <div>
+                  <label htmlFor="assignedUserFilter" className="block text-sm font-medium text-[#373643] mb-2">
+                    Filtrar por usuario asignado
+                  </label>
+                  <input
+                    type="text"
+                    id="assignedUserFilter"
+                    placeholder="Buscar por nombre, email o rol..."
+                    value={assignedUserFilter}
+                    onChange={(e) => setAssignedUserFilter(e.target.value)}
+                    list={assignedUsers.length > 0 ? 'assignedUserFilterList' : undefined}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                  />
+                  {assignedUsers.length > 0 && (
+                    <datalist id="assignedUserFilterList">
+                      {assignedUsers.map(userProfile => {
+                        const displayName = userProfile.nombre || userProfile.email || 'Sin nombre'
+                        const label = `${displayName}${userProfile.rol ? ` (${userProfile.rol})` : ''}`
+                        return (
+                          <option
+                            key={userProfile.user_id}
+                            value={displayName}
+                            label={label}
+                          />
+                        )
+                      })}
+                    </datalist>
+                  )}
+                </div>
+              )}
               {user?.rol === 'administrador' && (
                 <div>
                   <label htmlFor="empresaFilter" className="block text-sm font-medium text-[#373643] mb-2">

@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 import { Link } from 'react-router-dom'
 import { ActionMenu } from '../components/ActionMenu'
+import { supabase } from '../lib/supabase'
+import type { AssignedUserProfile } from '../services/LeadsFilterService'
+import {
+  createAssignedUsersById,
+  fetchAssignedUsers,
+  filterLeads
+} from '../services/LeadsFilterService'
 
 const HistorialLeads = () => {
   const [dateFilter, setDateFilter] = useState('')
@@ -23,6 +30,10 @@ const HistorialLeads = () => {
     message: string
     type: 'success' | 'error' | 'info'
   }>({ show: false, message: '', type: 'info' })
+  const [assignedUserFilter, setAssignedUserFilter] = useState('')
+  const [assignedUsers, setAssignedUsers] = useState<AssignedUserProfile[]>([])
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [selectedLeadDetails, setSelectedLeadDetails] = useState<Lead | null>(null)
   
   const { user, userEmpresaId, userEmpresaNombre } = useAuthStore()
   const {
@@ -45,14 +56,29 @@ const HistorialLeads = () => {
     }
   }, [user, userEmpresaId, loadHistorialLeads, statusFilter, currentPage, itemsPerPage])
 
+  const assignedUsersById = useMemo(
+    () => createAssignedUsersById(assignedUsers),
+    [assignedUsers]
+  )
 
-
-  // Filtrar solo por fecha y teléfono en el cliente (el estado se filtra en el servidor)
-  const filteredLeads = leadsHistorial.filter(lead => {
-    const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
-    const matchesPhone = !phoneFilter || lead.telefono.includes(phoneFilter)
-    return matchesDate && matchesPhone
-  })
+  // Filtrar solo por fecha, teléfono y usuario asignado en el cliente (el estado se filtra en el servidor)
+  const filteredLeads = useMemo(
+    () =>
+      filterLeads(leadsHistorial, {
+        dateFilter,
+        phoneFilter,
+        assignedUserFilter,
+        assignedUsersById,
+        statusGetter: (lead: Lead) => lead.estado
+      }),
+    [
+      leadsHistorial,
+      dateFilter,
+      phoneFilter,
+      assignedUserFilter,
+      assignedUsersById
+    ]
+  )
 
   // Detectar si es móvil y ajustar items por página
   useEffect(() => {
@@ -70,7 +96,7 @@ const HistorialLeads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [dateFilter, phoneFilter, statusFilter])
+  }, [dateFilter, phoneFilter, statusFilter, assignedUserFilter])
 
   // Sincronizar currentPage con el store
   useEffect(() => {
@@ -192,6 +218,16 @@ const HistorialLeads = () => {
     })
   }
 
+  const handleViewDetails = (lead: Lead) => {
+    setSelectedLeadDetails(lead)
+    setShowDetailsModal(true)
+  }
+
+  const handleCloseDetailsModal = () => {
+    setShowDetailsModal(false)
+    setSelectedLeadDetails(null)
+  }
+
   const getStatusBadge = (status: string) => {
     if (status === 'devolucion') {
       return (
@@ -226,20 +262,28 @@ const HistorialLeads = () => {
   }
 
   // Función para obtener items del menú de acciones
-  const getActionMenuItems = (lead: Lead) => {
-    return [
-      {
-        label: 'Cancelar Estado',
-        icon: (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-        onClick: () => handleCancelStatus(lead),
-        className: 'text-blue-600 hover:bg-blue-50'
-      }
-    ]
-  }
+  const getActionMenuItems = (lead: Lead) => [
+    {
+      label: 'Ver detalles',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      ),
+      onClick: () => handleViewDetails(lead)
+    },
+    {
+      label: 'Cancelar Estado',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      onClick: () => handleCancelStatus(lead),
+      className: 'text-blue-600 hover:bg-blue-50'
+    }
+  ]
 
   // Función para manejar cancelar estado
   const handleCancelStatus = (lead: Lead) => {
@@ -270,6 +314,25 @@ const HistorialLeads = () => {
       showNotification('Error al cancelar el estado del lead', 'error')
     }
   }
+
+  useEffect(() => {
+    const loadAssignedUsers = async () => {
+      if (!userEmpresaId) return
+
+      try {
+        const profiles = await fetchAssignedUsers(supabase, userEmpresaId)
+        setAssignedUsers(profiles)
+      } catch (error) {
+        console.error('Error loading assigned users:', error)
+      }
+    }
+
+    if (user?.rol === 'coordinador' && userEmpresaId) {
+      loadAssignedUsers()
+    } else {
+      setAssignedUsers([])
+    }
+  }, [user?.rol, userEmpresaId])
 
   if (loading) {
     return (
@@ -371,7 +434,7 @@ const HistorialLeads = () => {
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
           <div className="flex flex-col gap-4">
             {/* Filters Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label htmlFor="dateFilter" className="block text-sm font-medium text-[#373643] mb-2">
                   Filtrar por fecha
@@ -414,6 +477,37 @@ const HistorialLeads = () => {
                   <option value="no_valido">No válido</option>
                 </select>
               </div>
+              {user?.rol === 'coordinador' && (
+                <div>
+                  <label htmlFor="assignedUserFilter" className="block text-sm font-medium text-[#373643] mb-2">
+                    Filtrar por usuario asignado
+                  </label>
+                  <input
+                    type="text"
+                    id="assignedUserFilter"
+                    placeholder="Buscar por nombre, email o rol..."
+                    value={assignedUserFilter}
+                    onChange={(e) => setAssignedUserFilter(e.target.value)}
+                    list={assignedUsers.length > 0 ? 'historialAssignedUserFilterList' : undefined}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                  />
+                  {assignedUsers.length > 0 && (
+                    <datalist id="historialAssignedUserFilterList">
+                      {assignedUsers.map(userProfile => {
+                        const displayName = userProfile.nombre || userProfile.email || 'Sin nombre'
+                        const label = `${displayName}${userProfile.rol ? ` (${userProfile.rol})` : ''}`
+                        return (
+                          <option
+                            key={userProfile.user_id}
+                            value={displayName}
+                            label={label}
+                          />
+                        )
+                      })}
+                    </datalist>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* Export Button */}
@@ -472,7 +566,7 @@ const HistorialLeads = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Fecha Entrada
+                    {user?.rol === 'coordinador' ? 'Usuario Asignado' : 'Fecha Entrada'}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                     Nombre
@@ -504,7 +598,9 @@ const HistorialLeads = () => {
                   filteredLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                        {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
+                        {user?.rol === 'coordinador'
+                          ? lead.usuario_nombre || 'Sin asignar'
+                          : new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
@@ -582,6 +678,85 @@ const HistorialLeads = () => {
           </div>
         </div>
       </div>
+
+      {/* Details Modal overlay */}
+      {showDetailsModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-[10001]"
+          onClick={handleCloseDetailsModal}
+        />
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedLeadDetails && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10002] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-[#373643]">Detalles del Lead</h2>
+              <button
+                onClick={handleCloseDetailsModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Nombre del Cliente</label>
+                  <p className="text-sm text-gray-700">{selectedLeadDetails.nombre_cliente}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Teléfono</label>
+                  <p className="text-sm text-gray-700">{selectedLeadDetails.telefono}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Plataforma</label>
+                  <p className="text-sm text-gray-700">{selectedLeadDetails.plataforma || 'Sin plataforma'}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Fecha de Entrada</label>
+                  <p className="text-sm text-gray-700">{new Date(selectedLeadDetails.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Estado</label>
+                  <div className="mt-1">{getStatusBadge(selectedLeadDetails.estado || '')}</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                  <label className="block text-sm font-medium text-[#373643] mb-1">Usuario Asignado</label>
+                  <p className="text-sm text-gray-700">{selectedLeadDetails.usuario_nombre || 'Sin asignar'}</p>
+                </div>
+                {user?.rol === 'administrador' && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
+                    <label className="block text-sm font-medium text-[#373643] mb-1">Empresa</label>
+                    <p className="text-sm text-gray-700">{selectedLeadDetails.empresa_nombre || '-'}</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#373643] mb-2">Observaciones</label>
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-700">
+                  {selectedLeadDetails.observaciones || 'Sin observaciones'}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={handleCloseDetailsModal}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Export Modal overlay */}
       {showExportModal && (
