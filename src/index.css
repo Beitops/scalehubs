@@ -30,3 +30,45 @@
 .animate-slideIn {
   animation: slideIn 0.3s ease-out;
 }
+
+/* Tarjeta de estadísticas: borde lateral por defecto, borde completo y texto en color --accent al hover */
+.stats-card {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--accent);
+  transition: border-color 200ms ease-out, color 200ms ease-out, box-shadow 200ms ease-out, transform 200ms ease-out;
+  will-change: transform, box-shadow, border-color;
+}
+.stats-card h3,
+.stats-card p {
+  transition: color 200ms ease-out;
+}
+.stats-card:hover {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--accent);
+  box-shadow: 0 4px 6px rgba(16, 24, 40, 0.08);
+  transform: translateY(-4px);
+}
+.stats-card:hover h3,
+.stats-card:hover p {
+  color: var(--accent) !important;
+}
+
+/* Wrapper usado para agrupar Calidad + Distribución y separar de la lista */
+.stats-panel {
+  padding-top: 0.5rem;
+}
+
+/* Plataforma: estilo similar a otras tarjetas */
+.platform-card {
+  border: 1px solid #e6f9ef; 
+}
+
+/* Leads Lista*/
+.leads-list-card h2 {
+  transition: color 200ms ease-out;
+}
+.leads-list-card:hover h2 {
+  color: #18cb96 !important;
+}

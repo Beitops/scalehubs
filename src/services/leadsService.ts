@@ -308,8 +308,74 @@ class LeadsService {
     }
   }
 
-    async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estado?: string): Promise<Lead[]> {
+    // Obtener leads en un rango de fechas con filtros avanzados
+    async getLeadsInDateRange(
+      startDate: string, 
+      endDate: string, 
+      empresaId?: number | undefined | null, 
+      estado?: string
+    ): Promise<Lead[]> {
+    
     try {
+      // Detectar si es el Administrador pidiendo TODOS los leads en el rango de fechas.
+      // Se activa si empresaId es undefined y no se recibe 'estado'
+      const isAdminGlobalAllFilter = empresaId === undefined && !estado; 
+
+      if (isAdminGlobalAllFilter) {
+          // Caso 1: Administrador pidiendo todos los leads en el rango de fechas (sin filtros de estado o empresa).
+          let queryAll = supabase
+              .from('leads')
+              .select(`
+                id,
+                fecha_entrada,
+                nombre_cliente,
+                telefono,
+                plataforma,
+                empresa_id,
+                estado_temporal,
+                estado,
+                campaña_id,
+                hub_id,
+                plataforma_lead_id,
+                user_id,
+                observaciones,
+                calidad,
+                empresas!leads_empresa_id_fkey (
+                  id,
+                  nombre
+                )
+              `)
+              .gte('fecha_entrada', startDate)
+              .lte('fecha_entrada', endDate)
+              .order('fecha_entrada', { ascending: false });
+
+          // Aplicar filtro de empresa si se proporciona (incluyendo NULL para "Sin asignar")
+          if (empresaId !== undefined) {
+              if (empresaId === null) {
+                  // Si es NULL (indicando "Sin asignar"), filtramos por is.null
+                  queryAll = queryAll.is('empresa_id', null)
+              } else if (empresaId > 0) {
+                  // Si es un número (ID de empresa), filtramos por eq
+                  queryAll = queryAll.eq('empresa_id', empresaId)
+              }
+          }
+
+          
+          const { data, error } = await queryAll
+          if (error) {
+              console.error('Error fetching ALL leads in date range for Admin:', error)
+              throw error
+          }
+
+          return (data as any[])?.map(lead => ({
+            ...lead,
+            empresa_nombre: lead.empresas?.nombre,
+            calidad: lead.calidad || 1
+          })) || []
+      }
+
+
+      // Caso 2: Lógica original para Coordinadores/Agentes (historial) o Admin pidiendo un estado específico.
       // Primero obtener leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
         .from('leads')
@@ -335,7 +401,7 @@ class LeadsService {
         `)
         .gte('fecha_entrada', startDate)
         .lte('fecha_entrada', endDate)
-        .in('estado', ['perdido', 'convertido', 'no_valido'])
+        .in('estado', ['perdido', 'convertido', 'no_valido']) // <--- Este filtro se mantiene solo para el Caso 2 (Historial)
         .order('fecha_entrada', { ascending: false })
 
       if (empresaId) {
@@ -434,6 +500,26 @@ class LeadsService {
       return allLeads
     } catch (error) {
       console.error('Error in getLeadsInDateRange:', error)
+      throw error
+    }
+  }
+
+  // Obtener la lista de empresas para el filtro
+  async getCompaniesList(): Promise<Array<{ id: number; nombre: string }>> {
+    try {
+      const { data, error } = await supabase
+        .from('empresas')
+        .select(`id, nombre`)
+        .order('nombre', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching companies list:', error)
+        throw error
+      }
+      
+      return data || []
+    } catch (error) {
+      console.error('Error in getCompaniesList:', error)
       throw error
     }
   }
