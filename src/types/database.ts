@@ -32,7 +32,8 @@ export interface DatabaseLead {
   telefono: string
   campaña_id: number | null
   fecha_entrada: string // timestamp without time zone
-  fecha_asignacion: string | null // timestamp without time zone
+  fecha_asignacion: string | null // timestamp without time zone (para asignación a empresas)
+  fecha_asignacion_usuario: string | null // timestamp without time zone (para asignación a usuarios)
   empresa_id: number | null
   hub_id: number | null
   plataforma: string | null
@@ -131,7 +132,8 @@ export interface ApiLeadResponse {
   telefono: string
   campaña_id: number | null
   fecha_entrada: string
-  fecha_asignacion: string | null
+  fecha_asignacion: string | null // para asignación a empresas
+  fecha_asignacion_usuario: string | null // para asignación a usuarios
   empresa_id: number | null
   hub_id: number | null
   plataforma: string | null

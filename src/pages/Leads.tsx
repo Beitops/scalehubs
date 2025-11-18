@@ -282,27 +282,38 @@ const Leads = () => {
     [assignedUsers]
   )
 
-  const filteredLeads = useMemo(
-    () =>
-      filterLeads(localActiveLeads, {
-        dateFilter,
-        phoneFilter,
-        statusFilter,
-        empresaFilter,
-        assignedUserFilter,
-        assignedUsersById,
-        statusGetter: (lead: Lead) => lead.estado_temporal
-      }),
-    [
-      localActiveLeads,
+  const filteredLeads = useMemo(() => {
+    const filtered = filterLeads(localActiveLeads, {
       dateFilter,
       phoneFilter,
       statusFilter,
       empresaFilter,
       assignedUserFilter,
-      assignedUsersById
-    ]
-  )
+      assignedUsersById,
+      statusGetter: (lead: Lead) => lead.estado_temporal
+    })
+
+    // Si el usuario es agente, ordenar por fecha_asignacion_usuario descendente (más recientes primero)
+    if (user?.rol === 'agente') {
+      return [...filtered].sort((a, b) => {
+        const fechaA = a.fecha_asignacion_usuario ? new Date(a.fecha_asignacion_usuario).getTime() : 0
+        const fechaB = b.fecha_asignacion_usuario ? new Date(b.fecha_asignacion_usuario).getTime() : 0
+        return fechaB - fechaA // Descendente (más recientes primero)
+      })
+    }
+
+    // Para coordinadores y administradores, mantener el orden original (sin cambios)
+    return filtered
+  }, [
+    localActiveLeads,
+    dateFilter,
+    phoneFilter,
+    statusFilter,
+    empresaFilter,
+    assignedUserFilter,
+    assignedUsersById,
+    user?.rol
+  ])
 
   // Calcular paginación
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
@@ -583,7 +594,7 @@ const Leads = () => {
                   ...(user?.rol === 'coordinador' && !currentLead?.user_id ? {
                     user_id: user.id,
                     usuario_nombre: user.nombre || user.email,
-                    fecha_asignacion: new Date().toISOString()
+                    fecha_asignacion_usuario: new Date().toISOString()
                   } : {})
                 }
               : lead
@@ -641,7 +652,7 @@ const Leads = () => {
         setLocalActiveLeads(prevLeads => 
           prevLeads.map(l => 
             l.id === lead.id 
-              ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion: undefined }
+              ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion_usuario: undefined }
               : l
           )
         )

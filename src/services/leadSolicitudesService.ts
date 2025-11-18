@@ -157,7 +157,7 @@ class LeadSolicitudesService {
         .from('leads')
         .update({
           user_id: solicitudData.solicitante_user_id,
-          fecha_asignacion: new Date().toISOString()
+          fecha_asignacion_usuario: new Date().toISOString()
         })
         .eq('id', leadId)
 
@@ -351,7 +351,7 @@ class LeadSolicitudesService {
         .from('leads')
         .update({
           user_id: agenteUserId,
-          fecha_asignacion: new Date().toISOString()
+          fecha_asignacion_usuario: new Date().toISOString()
         })
         .eq('id', leadId)
         .is('user_id', null) // Solo actualizar si aún no está asignado

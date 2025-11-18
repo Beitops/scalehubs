@@ -17,6 +17,7 @@ export interface Lead {
   hub_id?: number
   plataforma_lead_id?: string
   fecha_asignacion?: string
+  fecha_asignacion_usuario?: string
   plataforma_lead?: string
   observaciones?: string
   user_id?: string
@@ -569,7 +570,7 @@ class LeadsService {
         .from('leads')
         .update({ 
           user_id: userId,
-          fecha_asignacion: new Date().toISOString()
+          fecha_asignacion_usuario: new Date().toISOString()
         })
         .eq('id', leadId)
 
@@ -618,7 +619,7 @@ class LeadsService {
         .from('leads')
         .update({ 
           user_id: null,
-          fecha_asignacion: null
+          fecha_asignacion_usuario: null
         })
         .eq('id', leadId)
 
@@ -649,7 +650,7 @@ class LeadsService {
         calidad: leadData.calidad || 1,
         fecha_entrada: new Date().toISOString(),
         user_id: null,
-        fecha_asignacion: null
+        fecha_asignacion: leadData.empresa_id ? new Date().toISOString() : null
       }
 
       const { data, error } = await supabase
@@ -734,7 +735,7 @@ class LeadsService {
         calidad: lead.calidad || 1,
         fecha_entrada: new Date().toISOString(),
         user_id: null,
-        fecha_asignacion: null
+        fecha_asignacion: lead.empresa_id ? new Date().toISOString() : null
       }))
 
       // Insertar leads en lote
