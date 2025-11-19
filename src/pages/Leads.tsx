@@ -293,16 +293,22 @@ const Leads = () => {
       statusGetter: (lead: Lead) => lead.estado_temporal
     })
 
-    // Si el usuario es agente, ordenar por fecha_asignacion_usuario descendente (más recientes primero)
     if (user?.rol === 'agente') {
       return [...filtered].sort((a, b) => {
         const fechaA = a.fecha_asignacion_usuario ? new Date(a.fecha_asignacion_usuario).getTime() : 0
         const fechaB = b.fecha_asignacion_usuario ? new Date(b.fecha_asignacion_usuario).getTime() : 0
-        return fechaB - fechaA // Descendente (más recientes primero)
+        return fechaB - fechaA
       })
     }
 
-    // Para coordinadores y administradores, mantener el orden original (sin cambios)
+    if (user?.rol === 'coordinador') {
+      return [...filtered].sort((a, b) => {
+        const fechaA = a.fecha_asignacion ? new Date(a.fecha_asignacion).getTime() : 0
+        const fechaB = b.fecha_asignacion ? new Date(b.fecha_asignacion).getTime() : 0
+        return fechaB - fechaA
+      })
+    }
+
     return filtered
   }, [
     localActiveLeads,
