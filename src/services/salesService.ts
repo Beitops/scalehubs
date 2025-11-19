@@ -36,7 +36,7 @@ export interface RankingVendedor {
 
 class SalesService {
   // Obtener ventas realizadas por empresa y usuario
-  async getVentasByCompany(empresaId: number, startDate?: string, endDate?: string): Promise<VentaRealizada[]> {
+  async getVentasByCompany(empresaId: number | null, startDate?: string, endDate?: string): Promise<VentaRealizada[]> {
     try {
       let query = supabase
         .from('ventas_realizadas')
@@ -66,7 +66,7 @@ class SalesService {
   }
 
   // Obtener ventas realizadas por usuario específico
-  async getVentasByUser(empresaId: number, userId: string, startDate?: string, endDate?: string): Promise<VentaRealizada[]> {
+  async getVentasByUser(empresaId: number | null, userId: string, startDate?: string, endDate?: string): Promise<VentaRealizada[]> {
     try {
       let query = supabase
         .from('ventas_realizadas')
@@ -97,7 +97,7 @@ class SalesService {
   }
 
   // Obtener devoluciones resueltas por empresa
-  async getDevolucionesResueltasByCompany(empresaId: number, startDate?: string, endDate?: string): Promise<DevolucionResuelta[]> {
+  async getDevolucionesResueltasByCompany(empresaId: number | null, startDate?: string, endDate?: string): Promise<DevolucionResuelta[]> {
     try {
       let query = supabase
         .from('devoluciones')
@@ -147,7 +147,7 @@ class SalesService {
   }
 
   // Obtener devoluciones resueltas por usuario específico
-  async getDevolucionesResueltasByUser(empresaId: number, userId: string, startDate?: string, endDate?: string): Promise<DevolucionResuelta[]> {
+  async getDevolucionesResueltasByUser(empresaId: number | null, userId: string, startDate?: string, endDate?: string): Promise<DevolucionResuelta[]> {
     try {
       let query = supabase
         .from('devoluciones')
@@ -257,7 +257,7 @@ class SalesService {
   }
 
   // Obtener ranking de vendedores
-  async getRankingVendedores(empresaId?: number): Promise<RankingVendedor[]> {
+  async getRankingVendedores(empresaId?: number | null): Promise<RankingVendedor[]> {
     try {
       let query = supabase
         .from('ranking_ventas_4periodos')
