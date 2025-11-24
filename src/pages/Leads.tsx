@@ -25,6 +25,13 @@ interface ActionMenuItem {
   className?: string
 }
 
+// Función helper para truncar nombres
+const truncateNombre = (nombre: string, maxLength: number = 50) => {
+  if (!nombre) return ''
+  if (nombre.length <= maxLength) return nombre
+  return nombre.substring(0, maxLength) + '...'
+}
+
 // Componente optimizado para fila móvil
 const LeadMobileCard = memo(({ 
   lead, 
@@ -42,7 +49,9 @@ const LeadMobileCard = memo(({
   return (
     <div className="p-4 border-b border-gray-200 last:border-b-0">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
+        <h3 className="font-medium text-[#373643] text-sm" title={lead.nombre_cliente}>
+          {truncateNombre(lead.nombre_cliente)}
+        </h3>
         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white bg-[#18cb96]">
           {lead.plataforma_lead}
         </span>
@@ -122,7 +131,9 @@ const LeadDesktopRow = memo(({
         </span>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
+        <div className="text-sm font-medium text-[#373643]" title={lead.nombre_cliente}>
+          {truncateNombre(lead.nombre_cliente)}
+        </div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
         {lead.telefono}
