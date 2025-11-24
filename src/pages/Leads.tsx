@@ -965,7 +965,7 @@ const Leads = () => {
       const lead: ImportLeadData = {
         nombre_cliente: getColumnValue('nombre_cliente'),
         telefono: getColumnValue('telefono'),
-        plataforma: getColumnValue('plataforma') || 'ScaleHubs',
+        plataforma: 'scalehubs',
         empresa_id: getColumnValue('empresa_id') ? parseInt(getColumnValue('empresa_id')) : undefined,
         campaña_id: getColumnValue('campaña_id') ? parseInt(getColumnValue('campaña_id')) : undefined,
         estado_temporal: getColumnValue('estado_temporal') || 'sin_tratar',
@@ -1055,7 +1055,7 @@ const Leads = () => {
             phone: manualFormData.telefono
           },
           fecha: new Date().toISOString(),
-          platform: 'Scalehubs',
+          platform: 'scalehubs',
           empresa: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : null,
           hub: parseInt(manualFormData.hub_id),
           lead_id: leadId
@@ -1106,7 +1106,7 @@ const Leads = () => {
         const leadData: ImportLeadData = {
           nombre_cliente: manualFormData.nombre_cliente,
           telefono: manualFormData.telefono,
-          plataforma: 'ScaleHubs',
+          plataforma: 'scalehubs',
           empresa_id: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : undefined,
           campaña_id: manualFormData.campaña_id ? parseInt(manualFormData.campaña_id) : undefined,
           hub_id: manualFormData.hub_id ? parseInt(manualFormData.hub_id) : undefined,
@@ -2261,7 +2261,7 @@ const Leads = () => {
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-blue-800 mb-2">Información automática</h3>
                     <div className="text-sm text-blue-700 space-y-1">
-                      <p>• Plataforma: ScaleHubs</p>
+                      <p>• Plataforma: scalehubs</p>
                       <p>• Estado: Activo</p>
                       <p>• Estado Temporal: Sin Tratar</p>
                       <p>• Calidad: 1</p>
@@ -2329,7 +2329,7 @@ const Leads = () => {
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-blue-800 mb-2">Valores por defecto</h3>
                     <div className="text-sm text-blue-700 space-y-1">
-                      <p>• Plataforma: ScaleHubs (si no se especifica)</p>
+                      <p>• Plataforma: scalehubs (siempre se usa este valor)</p>
                       <p>• Estado: Activo (si no se especifica)</p>
                       <p>• Estado Temporal: Sin Tratar (si no se especifica)</p>
                       <p>• Calidad: 1 (si no se especifica)</p>

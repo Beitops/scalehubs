@@ -17,6 +17,8 @@ export const platformConverter = (platform: string) => {
       return 'CallBell'
     case 'ScaleHubs':
       return 'ScaleHubs'
+    case 'scalehubs':
+      return 'Scalehubs'
     default:
       return platform
   }
