@@ -247,39 +247,6 @@ class LeadsService {
     }
   }
 
-  async returnLead(leadId: number, userId: string): Promise<void> {
-    try {
-      // Actualizar el estado del lead a 'devolucion'
-      const { error: updateError } = await supabase
-        .from('leads')
-        .update({ estado: 'devolucion' })
-        .eq('id', leadId)
-        .select()
-
-      if (updateError) {
-        console.error('Error updating lead estado:', updateError)
-        throw updateError
-      }
-
-      // Insertar en tabla devoluciones
-      const { error: devolucionError } = await supabase
-        .from('devoluciones')
-        .insert({
-          lead_id: leadId,
-          usuario_id: userId,
-          estado: 'pendiente'
-        })
-
-      if (devolucionError) {
-        console.error('Error creating devolucion record:', devolucionError)
-        throw devolucionError
-      }
-    } catch (error) {
-      console.error('Error in returnLead:', error)
-      throw error
-    }
-  }
-
   async createLead(leadData: CreateLeadData): Promise<Lead> {
     try {
       const { data, error } = await supabase

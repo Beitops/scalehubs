@@ -43,7 +43,6 @@ interface LeadsState {
   getAllLeads: () => Promise<Lead[]>
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
   updateLeadObservations: (leadId: number, observaciones: string) => Promise<void>
-  returnLead: (leadId: number, userId: string) => Promise<void>
   cancelLeadStatus: (leadId: number) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
@@ -270,15 +269,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       await leadsService.updateLeadObservations(leadId, observaciones)
     } catch (error) {
       console.error('Error updating lead observations:', error)
-      throw error
-    }
-  },
-
-  returnLead: async (leadId: number, userId: string) => {
-    try {
-      await leadsService.returnLead(leadId, userId)
-    } catch (error) {
-      console.error('Error returning lead:', error)
       throw error
     }
   },

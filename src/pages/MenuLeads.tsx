@@ -87,7 +87,7 @@ const MenuLeads = () => {
         </Link>
 
         {/* Devoluciones */}
-        <Link 
+        {/* <Link 
           to="/leads/devoluciones"
           className="group block h-full"
         >
@@ -123,7 +123,7 @@ const MenuLeads = () => {
               </svg>
             </div>
           </div>
-        </Link>
+        </Link> */}
 
         {/* Asignación de Leads */}
         {(user?.rol === 'administrador' || user?.rol === 'coordinador') && (

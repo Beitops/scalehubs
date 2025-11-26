@@ -182,7 +182,6 @@ const Leads = () => {
   const [empresaFilter, setEmpresaFilter] = useState('')
   const [assignedUserFilter, setAssignedUserFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
-  const [showReturnModal, setShowReturnModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [observations, setObservations] = useState('')
@@ -233,7 +232,6 @@ const Leads = () => {
     refreshLeads, 
     updateLeadStatus, 
     updateLeadObservations,
-    returnLead,
     getLeadsInDateRange,
     activeLeads,
   } = useLeadsStore()
@@ -424,16 +422,7 @@ const Leads = () => {
     })
   }
 
-  const handleReturnLead = (lead: Lead) => {
-    // Verificar que el lead tenga estado_temporal 'no_valido'
-    if (lead.estado_temporal !== 'no_valido') {
-      showNotification('Solo se pueden devolver leads con estado "No Válido". Por favor, tipifica el lead como "No Válido" antes de devolverlo.', 'error')
-      return
-    }
-    
-    setSelectedLead(lead)
-    setShowReturnModal(true)
-  }
+
 
   const handleViewDetails = (lead: Lead) => {
     setSelectedLead(lead)
@@ -522,53 +511,10 @@ const Leads = () => {
       })
     }
 
-    // Agregar opción de devolver lead
-    items.push({
-      label: 'Devolver lead',
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-5a2 2 0 00-2-2H6a2 2 0 00-2 2v5a2 2 0 002 2h12a2 2 0 002-2z" />
-        </svg>
-      ),
-      onClick: () => handleReturnLead(lead),
-      className: 'text-red-600 hover:bg-red-50'
-    })
-
     return items
   }
 
 
-
-  const handleConfirmReturn = async () => {
-    if (selectedLead && user?.id) {
-      // Verificar nuevamente que el lead tenga estado_temporal 'no_valido'
-      if (selectedLead.estado_temporal !== 'no_valido') {
-        showNotification('Solo se pueden devolver leads con estado "No Válido". Por favor, tipifica el lead como "No Válido" antes de devolverlo.', 'error')
-        setShowReturnModal(false)
-        setSelectedLead(null)
-        return
-      }
-
-      try {
-        // Usar la función específica para devoluciones
-        await returnLead(selectedLead.id, user.id)
-        setShowReturnModal(false)
-        setSelectedLead(null)
-        
-        // Recargar leads para actualizar la vista
-        await refreshLeads()
-        
-        // También recargar devoluciones para sincronizar con la página de devoluciones
-        const { loadDevoluciones } = useLeadsStore.getState()
-        await loadDevoluciones()
-        
-        showNotification('Lead devuelto correctamente. Aparecerá en la sección de devoluciones.', 'success')
-      } catch (error) {
-        console.error('Error returning lead:', error)
-        showNotification('Error al devolver el lead. Inténtalo de nuevo.', 'error')
-      }
-    }
-  }
 
   const handleStatusChange = async (leadId: number, newStatus: string) => {
     try {
@@ -1650,70 +1596,6 @@ const Leads = () => {
                   className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Exportar ({leadsToExport.length})
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Return Modal overlay */}
-      {showReturnModal && (
-        <div
-          className="fixed inset-0 bg-black opacity-50 z-51"
-          onClick={() => setShowReturnModal(false)}
-        />
-      )}
-
-      {/* Return Confirmation Modal */}
-      {showReturnModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[#373643]">Confirmar Devolución</h2>
-              <button
-                onClick={() => setShowReturnModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-[#373643] mb-2">
-                  ¿Estás seguro de que quieres devolver este lead?
-                </p>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
-                  <p className="text-yellow-800 text-xs">
-                    ⚠️ <strong>Importante:</strong> Después de confirmar, deberás ir a la sección "Devoluciones" para finalizar el trámite de devolución.
-                  </p>
-                </div>
-                {selectedLead && (
-                  <div className="text-xs text-gray-600 mt-3">
-                    <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
-                    <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
-                    <p><strong>Plataforma:</strong> {selectedLead.plataforma}</p>
-                    <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowReturnModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmReturn}
-                  className="flex-1 px-4 py-2 bg-red-400 text-white rounded-lg hover:bg-red-500 transition-colors"
-                >
-                  Confirmar Devolución
                 </button>
               </div>
             </div>
