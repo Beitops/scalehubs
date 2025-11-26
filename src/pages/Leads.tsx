@@ -234,6 +234,8 @@ const Leads = () => {
     updateLeadObservations,
     getLeadsInDateRange,
     activeLeads,
+    updateActiveLeadLocally,
+    removeActiveLeadLocally,
   } = useLeadsStore()
 
   // Función para mostrar notificaciones
@@ -540,29 +542,35 @@ const Leads = () => {
       
       // Si el estado es 'convertido', 'no_cerrado' o 'no_valido', el lead debe desaparecer de la lista activa
       if (newStatus === 'convertido' || newStatus === 'no_cerrado' || newStatus === 'no_valido') {
-        // Eliminar el lead de la lista local
+        // Eliminar el lead de la lista local y del store global
         setLocalActiveLeads(prevLeads => 
           prevLeads.filter(lead => lead.id !== leadId)
         )
+        removeActiveLeadLocally(leadId)
         showNotification('Lead movido al historial correctamente', 'success')
       } else {
+        // Preparar las actualizaciones del lead
+        const leadUpdates: Partial<Lead> = {
+          estado_temporal: newStatus,
+          // Si es coordinador y el lead no estaba asignado, actualizar la asignación localmente
+          ...(user?.rol === 'coordinador' && !currentLead?.user_id ? {
+            user_id: user.id,
+            usuario_nombre: user.nombre || user.email,
+            fecha_asignacion_usuario: new Date().toISOString()
+          } : {})
+        }
+
         // Actualizar el estado temporal del lead en la lista local
         setLocalActiveLeads(prevLeads => 
           prevLeads.map(lead => 
             lead.id === leadId 
-              ? { 
-                  ...lead, 
-                  estado_temporal: newStatus,
-                  // Si es coordinador y el lead no estaba asignado, actualizar la asignación localmente
-                  ...(user?.rol === 'coordinador' && !currentLead?.user_id ? {
-                    user_id: user.id,
-                    usuario_nombre: user.nombre || user.email,
-                    fecha_asignacion_usuario: new Date().toISOString()
-                  } : {})
-                }
+              ? { ...lead, ...leadUpdates }
               : lead
           )
         )
+        
+        // Actualizar también el store global
+        updateActiveLeadLocally(leadId, leadUpdates)
         
         // Mostrar notificación de éxito
         if (user?.rol === 'coordinador' && !currentLead?.user_id) {

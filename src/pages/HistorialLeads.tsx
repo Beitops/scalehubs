@@ -45,7 +45,8 @@ const HistorialLeads = () => {
     historialTotalCount,
     historialCurrentPage,
     historialTotalPages,
-    cancelLeadStatus
+    cancelLeadStatus,
+    refreshLeads
   } = useLeadsStore()
 
   // Cargar historial al entrar a la página
@@ -309,6 +310,9 @@ const HistorialLeads = () => {
       // Recargar historial
       const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
       loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage)
+      
+      // Refrescar leads activos para que esté disponible en Leads.tsx
+      await refreshLeads()
     } catch (error) {
       console.error('Error canceling lead status:', error)
       showNotification('Error al cancelar el estado del lead', 'error')

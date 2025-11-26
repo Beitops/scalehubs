@@ -67,6 +67,8 @@ interface LeadsState {
   assignLeadToAgent: (leadId: number, userId: string) => Promise<void>
   getLeadById: (leadId: number) => Promise<Lead | null>
   resetInitialized: () => void
+  updateActiveLeadLocally: (leadId: number, updates: Partial<Lead>) => void
+  removeActiveLeadLocally: (leadId: number) => void
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
@@ -515,5 +517,23 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
   resetInitialized: () => {
     set({ leads: [], devoluciones: [], unassignedLeads: [], isInitialized: false })
+  },
+
+  updateActiveLeadLocally: (leadId: number, updates: Partial<Lead>) => {
+    set(state => ({
+      activeLeads: state.activeLeads.map(lead =>
+        lead.id === leadId ? { ...lead, ...updates } : lead
+      ),
+      leads: state.leads.map(lead =>
+        lead.id === leadId ? { ...lead, ...updates } : lead
+      )
+    }))
+  },
+
+  removeActiveLeadLocally: (leadId: number) => {
+    set(state => ({
+      activeLeads: state.activeLeads.filter(lead => lead.id !== leadId),
+      leads: state.leads.filter(lead => lead.id !== leadId)
+    }))
   }
 })) 
