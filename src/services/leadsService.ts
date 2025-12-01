@@ -1026,6 +1026,151 @@ class LeadsService {
       throw error
     }
   }
+
+  // Obtener estadísticas para el dashboard de administrador
+  async getAdminDashboardStats(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_entrada' | 'fecha_asignacion' = 'fecha_entrada',
+    empresaIds?: number[]
+  ): Promise<{
+    totalLeads: number
+    leadsConvertidos: number
+    leadsPerdidos: number
+    leadsSinAsignar: number
+    leadsInvalidos: number
+    platformDistribution: Record<string, number>
+  }> {
+    try {
+      // Obtener todos los leads en el rango de fechas
+      let query = supabase
+        .from('leads')
+        .select('id, plataforma, estado, empresa_id')
+      
+      // Aplicar filtro según el campo de fecha seleccionado
+      if (dateField === 'fecha_asignacion') {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+      } else {
+        query = query
+          .gte('fecha_entrada', startDate)
+          .lte('fecha_entrada', endDate)
+      }
+
+      // Aplicar filtro de empresas si se especifica
+      if (empresaIds && empresaIds.length > 0) {
+        query = query.in('empresa_id', empresaIds)
+      }
+
+      const { data: leads, error } = await query
+
+      if (error) {
+        console.error('Error fetching admin dashboard stats:', error)
+        throw error
+      }
+
+      const allLeads = leads || []
+
+      // Calcular estadísticas
+      const totalLeads = allLeads.length
+      const leadsConvertidos = allLeads.filter(lead => lead.estado === 'convertido').length
+      const leadsPerdidos = allLeads.filter(lead => lead.estado === 'perdido').length
+      const leadsSinAsignar = allLeads.filter(lead => lead.empresa_id === null).length
+      const leadsInvalidos = allLeads.filter(lead => lead.estado === 'no_valido').length
+
+      // Calcular distribución de plataformas
+      const platformDistribution = allLeads.reduce((acc, lead) => {
+        const platform = platformConverter(lead.plataforma || '') || 'Sin plataforma'
+        acc[platform] = (acc[platform] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
+      return {
+        totalLeads,
+        leadsConvertidos,
+        leadsPerdidos,
+        leadsSinAsignar,
+        leadsInvalidos,
+        platformDistribution
+      }
+    } catch (error) {
+      console.error('Error in getAdminDashboardStats:', error)
+      throw error
+    }
+  }
+
+  // Obtener leads paginados para el dashboard de administrador
+  async getAdminDashboardLeads(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_entrada' | 'fecha_asignacion' = 'fecha_entrada',
+    page: number = 1,
+    limit: number = 10,
+    empresaIds?: number[]
+  ): Promise<{ leads: Lead[], totalCount: number }> {
+    try {
+      // Obtener leads paginados con conteo total en una sola query
+      let query = supabase
+        .from('leads')
+        .select(`
+          id,
+          nombre_cliente,
+          telefono,
+          fecha_entrada,
+          fecha_asignacion,
+          empresa_id,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          )
+        `, { count: 'exact' })
+      
+      if (dateField === 'fecha_asignacion') {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+          .order('fecha_asignacion', { ascending: false })
+      } else {
+        query = query
+          .gte('fecha_entrada', startDate)
+          .lte('fecha_entrada', endDate)
+          .order('fecha_entrada', { ascending: false })
+      }
+
+      // Aplicar filtro de empresas si se especifica
+      if (empresaIds && empresaIds.length > 0) {
+        query = query.in('empresa_id', empresaIds)
+      }
+
+      // Aplicar paginación
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+
+      const { data, count, error } = await query
+
+      if (error) {
+        console.error('Error fetching admin dashboard leads:', error)
+        throw error
+      }
+
+      const leads = (data as any[])?.map(lead => ({
+        ...lead,
+        empresa_nombre: lead.empresas?.nombre || 'Sin asignar'
+      })) || []
+
+      return {
+        leads,
+        totalCount: count || 0
+      }
+    } catch (error) {
+      console.error('Error in getAdminDashboardLeads:', error)
+      throw error
+    }
+  }
 }
 
 export const leadsService = new LeadsService() 

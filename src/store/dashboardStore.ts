@@ -16,13 +16,33 @@ interface DashboardLead {
   plataforma_lead?: string
 }
 
-type TimeFilter = 'hoy' | 'semana' | 'mes' | 'año'
+type TimeFilter = 'hoy' | 'semana' | 'mes' | 'año' | 'personalizado'
+type DateFieldFilter = 'fecha_entrada' | 'fecha_asignacion'
 
 interface DashboardStats {
   totalLeads: number
   leadsDevueltos: number
   leadsCerrados: number
   platformDistribution: Record<string, number>
+}
+
+interface AdminStats {
+  totalLeads: number
+  leadsConvertidos: number
+  leadsPerdidos: number
+  leadsSinAsignar: number
+  leadsInvalidos: number
+  platformDistribution: Record<string, number>
+}
+
+interface AdminLead {
+  id: number
+  nombre_cliente: string
+  telefono: string
+  fecha_entrada: string
+  fecha_asignacion?: string | null
+  empresa_id?: number | null
+  empresa_nombre?: string
 }
 
 interface DashboardState {
@@ -35,17 +55,30 @@ interface DashboardState {
   error: string | null
   isInitialized: boolean
   timeFilter: TimeFilter
+  dateFieldFilter: DateFieldFilter
+  selectedEmpresaIds: number[]
   stats: DashboardStats
-  loadDashboardData: (timeFilter?: TimeFilter) => Promise<void>
+  adminStats: AdminStats
+  adminLeads: AdminLead[]
+  adminLeadsPage: number
+  adminLeadsTotalCount: number
+  customDateRange: { startDate: string; endDate: string } | null
+  loadDashboardData: (timeFilter?: TimeFilter, customRange?: { startDate: string; endDate: string }) => Promise<void>
   loadDashboardLeads: () => Promise<void> // Mantener compatibilidad
+  loadAdminLeadsPage: (page: number) => Promise<void>
   setTimeFilter: (filter: TimeFilter) => void
+  setDateFieldFilter: (field: DateFieldFilter) => void
+  setSelectedEmpresaIds: (ids: number[]) => void
+  setCustomDateRange: (range: { startDate: string; endDate: string }) => void
   resetInitialized: () => void
 }
 
 // Función auxiliar para obtener fechas según el filtro de tiempo
-const getDateRange = (filter: TimeFilter): { startDate: string; endDate: string } => {
+const getDateRange = (filter: TimeFilter, customRange?: { startDate: string; endDate: string }): { startDate: string; endDate: string } => {
   const now = new Date()
-  const endDate = now.toISOString()
+  // End of day for today
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  const endDate = endOfDay.toISOString()
   
   switch (filter) {
     case 'hoy':
@@ -55,6 +88,7 @@ const getDateRange = (filter: TimeFilter): { startDate: string; endDate: string 
     case 'semana':
       const startOfWeek = new Date(now)
       startOfWeek.setDate(now.getDate() - 7)
+      startOfWeek.setHours(0, 0, 0, 0)
       return { startDate: startOfWeek.toISOString(), endDate }
     
     case 'mes':
@@ -64,6 +98,17 @@ const getDateRange = (filter: TimeFilter): { startDate: string; endDate: string 
     case 'año':
       const startOfYear = new Date(now.getFullYear(), 0, 1)
       return { startDate: startOfYear.toISOString(), endDate }
+    
+    case 'personalizado':
+      if (customRange) {
+        // For custom range, ensure we include the full end date
+        const customStart = new Date(customRange.startDate)
+        customStart.setHours(0, 0, 0, 0)
+        const customEnd = new Date(customRange.endDate)
+        customEnd.setHours(23, 59, 59, 999)
+        return { startDate: customStart.toISOString(), endDate: customEnd.toISOString() }
+      }
+      return { startDate: '', endDate: '' }
     
     default:
       return { startDate: '', endDate: '' }
@@ -80,25 +125,59 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   error: null,
   isInitialized: false,
   timeFilter: 'hoy',
+  dateFieldFilter: 'fecha_entrada',
+  selectedEmpresaIds: [],
   stats: {
     totalLeads: 0,
     leadsDevueltos: 0,
     leadsCerrados: 0,
     platformDistribution: {}
   },
+  adminStats: {
+    totalLeads: 0,
+    leadsConvertidos: 0,
+    leadsPerdidos: 0,
+    leadsSinAsignar: 0,
+    leadsInvalidos: 0,
+    platformDistribution: {}
+  },
+  adminLeads: [],
+  adminLeadsPage: 1,
+  adminLeadsTotalCount: 0,
+  customDateRange: null,
 
   setTimeFilter: (filter: TimeFilter) => {
-    set({ timeFilter: filter })
-    get().loadDashboardData(filter)
+    set({ timeFilter: filter, adminLeadsPage: 1 })
+    if (filter !== 'personalizado') {
+      get().loadDashboardData(filter)
+    }
   },
 
-  loadDashboardData: async (timeFilter?: TimeFilter) => {
+  setDateFieldFilter: (field: DateFieldFilter) => {
+    set({ dateFieldFilter: field, adminLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
+  setSelectedEmpresaIds: (ids: number[]) => {
+    set({ selectedEmpresaIds: ids, adminLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
+  setCustomDateRange: (range: { startDate: string; endDate: string }) => {
+    set({ customDateRange: range, timeFilter: 'personalizado', adminLeadsPage: 1 })
+    get().loadDashboardData('personalizado', range)
+  },
+
+  loadDashboardData: async (timeFilter?: TimeFilter, customRange?: { startDate: string; endDate: string }) => {
     const { user, userEmpresaId } = useAuthStore.getState()
 
     if (!user) return
 
     const filter = timeFilter || get().timeFilter
-    const { startDate, endDate } = getDateRange(filter)
+    const dateField = get().dateFieldFilter
+    const empresaIds = get().selectedEmpresaIds
+    const rangeToUse = customRange || get().customDateRange
+    const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
 
     set({ loading: true, error: null })
     try {
@@ -109,8 +188,24 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       let rankingVendedores: RankingVendedor[] = []
       
       if (user?.rol === 'administrador') {
-        // Para administradores, mantener la lógica actual por ahora
-        Dleads = await leadsService.getAllLeads()
+        // Para administradores, obtener estadísticas con filtro de fecha y empresas
+        const empresaIdsToUse = empresaIds.length > 0 ? empresaIds : undefined
+        const [adminStats, adminLeadsData] = await Promise.all([
+          leadsService.getAdminDashboardStats(startDate, endDate, dateField, empresaIdsToUse),
+          leadsService.getAdminDashboardLeads(startDate, endDate, dateField, 1, 10, empresaIdsToUse)
+        ])
+        
+        set({ 
+          adminStats,
+          adminLeads: adminLeadsData.leads,
+          adminLeadsPage: 1,
+          adminLeadsTotalCount: adminLeadsData.totalCount,
+          timeFilter: filter,
+          customDateRange: filter === 'personalizado' ? rangeToUse : null,
+          isInitialized: true, 
+          loading: false 
+        })
+        return
       } else if (userEmpresaId) {
         // Usuario no admin, verificar rol
         if (user?.rol === 'coordinador') {
@@ -198,6 +293,30 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     await get().loadDashboardData()
   },
 
+  loadAdminLeadsPage: async (page: number) => {
+    const { user } = useAuthStore.getState()
+    if (!user || user.rol !== 'administrador') return
+
+    const filter = get().timeFilter
+    const dateField = get().dateFieldFilter
+    const empresaIds = get().selectedEmpresaIds
+    const rangeToUse = get().customDateRange
+    const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
+
+    try {
+      const empresaIdsToUse = empresaIds.length > 0 ? empresaIds : undefined
+      const adminLeadsData = await leadsService.getAdminDashboardLeads(startDate, endDate, dateField, page, 10, empresaIdsToUse)
+      
+      set({ 
+        adminLeads: adminLeadsData.leads,
+        adminLeadsPage: page,
+        adminLeadsTotalCount: adminLeadsData.totalCount
+      })
+    } catch (error) {
+      console.error('Error loading admin leads page:', error)
+    }
+  },
+
   resetInitialized: () => {
     set({ 
       dashboardLeads: [], 
@@ -211,6 +330,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         leadsCerrados: 0,
         platformDistribution: {}
       },
+      adminStats: {
+        totalLeads: 0,
+        leadsConvertidos: 0,
+        leadsPerdidos: 0,
+        leadsSinAsignar: 0,
+        leadsInvalidos: 0,
+        platformDistribution: {}
+      },
+      adminLeads: [],
+      adminLeadsPage: 1,
+      adminLeadsTotalCount: 0,
+      customDateRange: null,
+      dateFieldFilter: 'fecha_entrada',
+      selectedEmpresaIds: [],
       isInitialized: false 
     })
   }
