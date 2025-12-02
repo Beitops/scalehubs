@@ -691,7 +691,7 @@ class LeadsService {
   }
 
   // Obtener conteo de leads en historial
-  async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string): Promise<number> {
+  async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string, phoneFilter?: string): Promise<number> {
     try {
       // Obtener conteo de leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
@@ -705,6 +705,11 @@ class LeadsService {
 
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Filtrar por teléfono (búsqueda parcial)
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
       }
 
       // Filtrar por usuario según el rol
@@ -728,7 +733,7 @@ class LeadsService {
   }
 
   // Obtener leads del historial con paginación
-  async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string): Promise<Lead[]> {
+  async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string, phoneFilter?: string): Promise<Lead[]> {
     try {
       // Obtener leads con estados 'perdido', 'convertido' y 'no_valido'
       let query = supabase
@@ -753,6 +758,11 @@ class LeadsService {
 
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Filtrar por teléfono (búsqueda parcial)
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
       }
 
       // Filtrar por usuario según el rol

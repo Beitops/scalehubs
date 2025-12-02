@@ -46,7 +46,7 @@ interface LeadsState {
   cancelLeadStatus: (leadId: number) => Promise<void>
   loadLeads: (empresaId?: number) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
-  loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number) => Promise<void>
+  loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number, phoneFilter?: string) => Promise<void>
   loadInitialLeads: () => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estado?: string) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
@@ -195,7 +195,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  loadHistorialLeads: async (empresaId?: number, estado?: string, page: number = 1, limit: number = 10) => {
+  loadHistorialLeads: async (empresaId?: number, estado?: string, page: number = 1, limit: number = 10, phoneFilter?: string) => {
     set({ loading: true, error: null })
     try {
       const { user } = useAuthStore.getState()
@@ -205,7 +205,8 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         empresaId, 
         estado, 
         user?.id, 
-        user?.rol
+        user?.rol,
+        phoneFilter
       )
       
       // Obtener los leads paginados
@@ -215,7 +216,8 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         page, 
         limit, 
         user?.id, 
-        user?.rol
+        user?.rol,
+        phoneFilter
       )
       
       // Calcular total de páginas

@@ -3,7 +3,6 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 import type { Lead } from '../services/leadsService'
 import { Link } from 'react-router-dom'
-import { ActionMenu } from '../components/ActionMenu'
 import { supabase } from '../lib/supabase'
 import type { AssignedUserProfile } from '../services/LeadsFilterService'
 import {
@@ -11,10 +10,12 @@ import {
   fetchAssignedUsers,
   filterLeads
 } from '../services/LeadsFilterService'
+import { LeadsHistorialList, getStatusBadge } from '../components/LeadsHistorialList'
 
 const HistorialLeads = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [phoneFilter, setPhoneFilter] = useState('')
+  const [debouncedPhoneFilter, setDebouncedPhoneFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportDateRange, setExportDateRange] = useState({
@@ -49,25 +50,33 @@ const HistorialLeads = () => {
     refreshLeads
   } = useLeadsStore()
 
+  // Debounce para el filtro de teléfono (esperar 500ms después de que el usuario deje de escribir)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneFilter(phoneFilter)
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [phoneFilter])
+
   // Cargar historial al entrar a la página
   useEffect(() => {
     const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
     if (user) {
-      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage)
+      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage, debouncedPhoneFilter || undefined)
     }
-  }, [user, userEmpresaId, loadHistorialLeads, statusFilter, currentPage, itemsPerPage])
+  }, [user, userEmpresaId, loadHistorialLeads, statusFilter, currentPage, itemsPerPage, debouncedPhoneFilter])
 
   const assignedUsersById = useMemo(
     () => createAssignedUsersById(assignedUsers),
     [assignedUsers]
   )
 
-  // Filtrar solo por fecha, teléfono y usuario asignado en el cliente (el estado se filtra en el servidor)
+  // Filtrar solo por fecha y usuario asignado en el cliente (estado y teléfono se filtran en el servidor)
   const filteredLeads = useMemo(
     () =>
       filterLeads(leadsHistorial, {
         dateFilter,
-        phoneFilter,
         assignedUserFilter,
         assignedUsersById,
         statusGetter: (lead: Lead) => lead.estado
@@ -75,7 +84,6 @@ const HistorialLeads = () => {
     [
       leadsHistorial,
       dateFilter,
-      phoneFilter,
       assignedUserFilter,
       assignedUsersById
     ]
@@ -97,7 +105,7 @@ const HistorialLeads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [dateFilter, phoneFilter, statusFilter, assignedUserFilter])
+  }, [dateFilter, debouncedPhoneFilter, statusFilter, assignedUserFilter])
 
   // Sincronizar currentPage con el store
   useEffect(() => {
@@ -229,63 +237,6 @@ const HistorialLeads = () => {
     setSelectedLeadDetails(null)
   }
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'devolucion') {
-      return (
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-blue-700 bg-blue-100">
-          Devolución
-        </span>
-      )
-    } else if (status === 'convertido') {
-      return (
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-green-700 bg-green-100">
-          Convertido
-        </span>
-      )
-    } else if (status === 'perdido') {
-      return (
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
-          Perdido
-        </span>
-      )
-    } else if (status === 'no_valido') {
-      return (
-        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-orange-700 bg-orange-100">
-          No válido
-        </span>
-      )
-    }
-    return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-gray-700 bg-gray-100">
-        {status || 'N/A'}
-      </span>
-    )
-  }
-
-  // Función para obtener items del menú de acciones
-  const getActionMenuItems = (lead: Lead) => [
-    {
-      label: 'Ver detalles',
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        </svg>
-      ),
-      onClick: () => handleViewDetails(lead)
-    },
-    {
-      label: 'Cancelar Estado',
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      onClick: () => handleCancelStatus(lead),
-      className: 'text-blue-600 hover:bg-blue-50'
-    }
-  ]
-
   // Función para manejar cancelar estado
   const handleCancelStatus = (lead: Lead) => {
     setSelectedLead(lead)
@@ -309,7 +260,7 @@ const HistorialLeads = () => {
       
       // Recargar historial
       const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
-      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage)
+      loadHistorialLeads(empresaId, statusFilter, currentPage, itemsPerPage, debouncedPhoneFilter || undefined)
       
       // Refrescar leads activos para que esté disponible en Leads.tsx
       await refreshLeads()
@@ -337,15 +288,6 @@ const HistorialLeads = () => {
       setAssignedUsers([])
     }
   }, [user?.rol, userEmpresaId])
-
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18cb96]"></div>
-        <span className="ml-3 text-gray-600">Cargando historial...</span>
-      </div>
-    )
-  }
 
   if (error) {
     return (
@@ -529,110 +471,14 @@ const HistorialLeads = () => {
 
         {/* Historial Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {/* Mobile Cards View */}
-          <div className="lg:hidden">
-            {filteredLeads.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p>No hay leads en el historial con los filtros aplicados</p>
-              </div>
-            ) : (
-              filteredLeads.map((lead) => (
-                <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(lead.estado || '')}
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
-                    <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
-                    {user?.rol === 'administrador' && (
-                      <p><span className="font-medium">Empresa:</span> {lead.empresa_nombre || '-'}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <ActionMenu
-                      items={getActionMenuItems(lead)}
-                      triggerLabel="Más acciones"
-                      size="sm"
-                      className="text-xs font-medium"
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    {user?.rol === 'coordinador' ? 'Usuario Asignado' : 'Fecha Entrada'}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Nombre
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Teléfono
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Estado
-                  </th>
-                  {user?.rol === 'administrador' && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                      Empresa
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLeads.length === 0 ? (
-                  <tr>
-                    <td colSpan={user?.rol === 'administrador' ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
-                      No hay leads en el historial con los filtros aplicados
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                        {user?.rol === 'coordinador'
-                          ? lead.usuario_nombre || 'Sin asignar'
-                          : new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                        {lead.telefono}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(lead.estado || '')}
-                      </td>
-                      {user?.rol === 'administrador' && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                          {lead.empresa_nombre || '-'}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <ActionMenu
-                          items={getActionMenuItems(lead)}
-                          triggerLabel="Más acciones"
-                          size="md"
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Leads List Component with integrated loading */}
+          <LeadsHistorialList
+            leads={filteredLeads}
+            loading={loading}
+            userRole={user?.rol}
+            onViewDetails={handleViewDetails}
+            onCancelStatus={handleCancelStatus}
+          />
 
           {/* Table Footer */}
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
@@ -652,7 +498,7 @@ const HistorialLeads = () => {
                       const newPage = Math.max(currentPage - 1, 1)
                       setCurrentPage(newPage)
                       const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
-                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage)
+                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage, debouncedPhoneFilter || undefined)
                     }}
                     disabled={currentPage === 1}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -669,7 +515,7 @@ const HistorialLeads = () => {
                       const newPage = Math.min(currentPage + 1, historialTotalPages)
                       setCurrentPage(newPage)
                       const empresaId = user?.rol !== 'administrador' ? (userEmpresaId || undefined) : undefined
-                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage)
+                      loadHistorialLeads(empresaId, statusFilter, newPage, itemsPerPage, debouncedPhoneFilter || undefined)
                     }}
                     disabled={currentPage === historialTotalPages}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
