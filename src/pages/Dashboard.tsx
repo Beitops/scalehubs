@@ -63,7 +63,7 @@ const Dashboard = () => {
   }, [user, loadDashboardData])
 
   // Usar estadísticas del store
-  const { totalLeads, leadsDevueltos, leadsCerrados, platformDistribution } = stats
+  const { totalLeads, leadsCerrados, platformDistribution } = stats
 
   // Solo mostrar estadísticas para coordinadores y agentes
   const shouldShowStats = user?.rol === 'coordinador' || user?.rol === 'agente'
@@ -250,14 +250,6 @@ const Dashboard = () => {
       changeType: 'positive' as const,
       icon: '📈',
       color: 'bg-blue-500'
-    },
-    {
-      title: 'Leads Devueltos',
-      value: leadsDevueltos.toString(),
-      change: '',
-      changeType: 'positive' as const,
-      icon: '↩️',
-      color: 'bg-orange-500'
     },
     {
       title: 'Leads Cerrados',

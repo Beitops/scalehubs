@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { leadsService, type Lead } from '../services/leadsService'
-import { salesService, type VentaRealizada, type DevolucionResuelta, type RankingVendedor } from '../services/salesService'
+import { salesService, type VentaRealizada, type RankingVendedor } from '../services/salesService'
 import { useAuthStore } from './authStore'
 import { platformConverter } from '../utils/platformConverter'
 interface DashboardLead {
@@ -21,7 +21,6 @@ type DateFieldFilter = 'fecha_entrada' | 'fecha_asignacion'
 
 interface DashboardStats {
   totalLeads: number
-  leadsDevueltos: number
   leadsCerrados: number
   platformDistribution: Record<string, number>
 }
@@ -48,7 +47,6 @@ interface AdminLead {
 interface DashboardState {
   dashboardLeads: DashboardLead[]
   ventas: VentaRealizada[]
-  devolucionesResueltas: DevolucionResuelta[]
   leadsConvertidos: number[]
   rankingVendedores: RankingVendedor[]
   loading: boolean
@@ -118,7 +116,6 @@ const getDateRange = (filter: TimeFilter, customRange?: { startDate: string; end
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboardLeads: [],
   ventas: [],
-  devolucionesResueltas: [],
   leadsConvertidos: [],
   rankingVendedores: [],
   loading: false,
@@ -129,7 +126,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   selectedEmpresaIds: [],
   stats: {
     totalLeads: 0,
-    leadsDevueltos: 0,
     leadsCerrados: 0,
     platformDistribution: {}
   },
@@ -183,7 +179,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     try {
       let Dleads: Lead[] = []
       let ventas: VentaRealizada[] = []
-      let devolucionesResueltas: DevolucionResuelta[] = []
       let leadsConvertidos: number[] = []
       let rankingVendedores: RankingVendedor[] = []
       
@@ -209,19 +204,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       } else if (userEmpresaId) {
         // Usuario no admin, verificar rol
         if (user?.rol === 'coordinador') {
-          // Coordinador ve todos los leads de su empresa
-          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId)
+          // Coordinador ve todos los leads de su empresa, filtrados por fecha_asignacion
+          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, undefined, 'fecha_asignacion')
           ventas = await salesService.getVentasByCompany(userEmpresaId, startDate, endDate)
-          devolucionesResueltas = await salesService.getDevolucionesResueltasByCompany(userEmpresaId, startDate, endDate)
           leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, undefined, startDate, endDate)
           rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
         } else if (user?.rol === 'agente') {
-          // Agente solo ve los leads asignados a él
-          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, 'activo')
+          // Agente solo ve los leads asignados a él, filtrados por fecha_asignacion_usuario
+          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, 'activo', 'fecha_asignacion_usuario')
           // Filtrar leads asignados al usuario
           Dleads = Dleads.filter(lead => lead.user_id === user.id)
           ventas = await salesService.getVentasByUser(userEmpresaId, user.id, startDate, endDate)
-          devolucionesResueltas = await salesService.getDevolucionesResueltasByUser(userEmpresaId, user.id, startDate, endDate)
           leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, user.id, startDate, endDate)
           rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
         } else {
@@ -251,7 +244,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
       // Calcular estadísticas
       const totalLeads = dashboardLeads.length
-      const leadsDevueltos = devolucionesResueltas.length
       const leadsCerrados = leadsConvertidos.length
 
       // Calcular distribución de plataformas
@@ -263,7 +255,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
       const stats: DashboardStats = {
         totalLeads,
-        leadsDevueltos,
         leadsCerrados,
         platformDistribution
       }
@@ -271,7 +262,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ 
         dashboardLeads, 
         ventas,
-        devolucionesResueltas,
         leadsConvertidos,
         rankingVendedores,
         stats,
@@ -321,12 +311,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ 
       dashboardLeads: [], 
       ventas: [],
-      devolucionesResueltas: [],
       leadsConvertidos: [],
       rankingVendedores: [],
       stats: {
         totalLeads: 0,
-        leadsDevueltos: 0,
         leadsCerrados: 0,
         platformDistribution: {}
       },
