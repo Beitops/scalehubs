@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useMemo } from 'react'
+import { useState, useEffect, memo, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
@@ -30,6 +30,32 @@ const truncateNombre = (nombre: string, maxLength: number = 50) => {
   if (!nombre) return ''
   if (nombre.length <= maxLength) return nombre
   return nombre.substring(0, maxLength) + '...'
+}
+
+// Funciones estáticas movidas fuera del componente para evitar recreación en cada render
+const getStatusDisplayName = (status: string) => {
+  const statusMap: Record<string, string> = {
+    'sin_tratar': 'Sin Tratar',
+    'no_contesta': 'No Contesta',
+    'no_valido': 'No Valido',
+    'gestion': 'En gestión',
+    'convertido': 'Convertido',
+    'no_cerrado': 'No Cerrado',
+    'devolucion': 'Devolución'
+  }
+  return statusMap[status] || status
+}
+
+const getStatusTextColor = (status: string) => {
+  const colorMap: Record<string, string> = {
+    'sin_tratar': 'text-gray-700',
+    'no_contesta': 'text-yellow-700',
+    'no_valido': 'text-red-700',
+    'gestion': 'text-blue-700',
+    'convertido': 'text-green-700',
+    'no_cerrado': 'text-red-700',
+  }
+  return colorMap[status] || 'text-gray-700'
 }
 
 // Componente optimizado para fila móvil
@@ -196,7 +222,6 @@ const Leads = () => {
     message: string
     type: 'success' | 'error' | 'info' | 'warning'
   }>({ show: false, message: '', type: 'info' })
-  const [localActiveLeads, setLocalActiveLeads] = useState<Lead[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [showArchivosModal, setShowArchivosModal] = useState(false)
@@ -253,11 +278,6 @@ const Leads = () => {
     }
   }, [notification.show])
 
-  // Sincronizar estado local con el estado global
-  useEffect(() => {
-    setLocalActiveLeads(activeLeads)
-  }, [activeLeads])
-
   // Detectar si es móvil y ajustar items por página
   useEffect(() => {
     const checkIsMobile = () => {
@@ -271,14 +291,20 @@ const Leads = () => {
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
 
-  // Cargar empresas cuando se abra el modal de importación o si es administrador
+  // Cargar empresas para filtros si es administrador (solo una vez al montar)
   useEffect(() => {
-    if (showImportModal || user?.rol === 'administrador') {
+    if (user?.rol === 'administrador') {
       loadCompanies()
+    }
+  }, [user?.rol])
+
+  // Cargar datos adicionales cuando se abra el modal de importación
+  useEffect(() => {
+    if (showImportModal) {
       loadCampaigns()
       loadHubs()
     }
-  }, [showImportModal, user?.rol])
+  }, [showImportModal])
 
   useEffect(() => {
     if (user?.rol === 'coordinador' && userEmpresaId) {
@@ -294,7 +320,7 @@ const Leads = () => {
   )
 
   const filteredLeads = useMemo(() => {
-    const filtered = filterLeads(localActiveLeads, {
+    const filtered = filterLeads(activeLeads, {
       dateFilter,
       phoneFilter,
       statusFilter,
@@ -322,7 +348,7 @@ const Leads = () => {
 
     return filtered
   }, [
-    localActiveLeads,
+    activeLeads,
     dateFilter,
     phoneFilter,
     statusFilter,
@@ -367,7 +393,7 @@ const Leads = () => {
     }
 
     fetchLeadsInRange()
-  }, [exportDateRange])
+  }, [exportDateRange, user?.rol, userEmpresaId, getLeadsInDateRange])
 
 
 
@@ -448,7 +474,53 @@ const Leads = () => {
     }
   }
 
-  const getActionMenuItems = (lead: Lead): ActionMenuItem[] => {
+  const handleRehusarLead = useCallback(async (lead: Lead) => {
+    if (!user?.id) return
+
+    // Si es un agente, verificar que su empresa permita rehusar leads
+    if (user?.rol === 'agente' && user.id === lead.user_id) {
+      if (!userEmpresaConfiguracion?.rehusarLeadsAgentes) {
+        showNotification(
+          'Tu empresa no permite que los agentes rehúsen sus propios leads. Contacta con tu coordinador si necesitas ayuda con este lead.',
+          'error'
+        )
+        return
+      }
+    }
+
+    try {
+      // Si el lead pertenece a la empresa 15, desasignarlo en Callbell
+      if (lead.empresa_id === 15) {
+        const callbellResult = await callbellService.unassignLeadFromCallbell(lead.id, lead.user_id || undefined)
+        
+        // Si falla con 403 o 404, mostrar notificación amarilla y continuar
+        if (!callbellResult.success && callbellResult.error) {
+          showNotification(callbellResult.error, 'warning')
+        }
+      }
+      
+      await leadsService.rehusarLead(lead.id, user.id)
+      
+      // Si es un agente rehusando su propio lead, eliminarlo de la lista
+      if (user?.rol === 'agente' && user.id === lead.user_id) {
+        removeActiveLeadLocally(lead.id)
+        showNotification('Lead rehusado correctamente. Ya no aparece en tu lista.', 'success')
+      } else {
+        // Si es un coordinador, solo actualizar el estado del lead
+        updateActiveLeadLocally(lead.id, { 
+          user_id: undefined, 
+          usuario_nombre: undefined, 
+          fecha_asignacion_usuario: undefined 
+        })
+        showNotification('Lead rehusado correctamente', 'success')
+      }
+    } catch (error) {
+      console.error('Error rehusing lead:', error)
+      showNotification(error instanceof Error ? error.message : 'Error al rehusar el lead', 'error')
+    }
+  }, [user, userEmpresaConfiguracion, updateActiveLeadLocally, removeActiveLeadLocally, showNotification])
+
+  const getActionMenuItems = useCallback((lead: Lead): ActionMenuItem[] => {
     // Si es administrador, mostrar "Ver detalles" y "Archivos adjuntos"
     if (user?.rol === 'administrador') {
       return [
@@ -514,14 +586,14 @@ const Leads = () => {
     }
 
     return items
-  }
+  }, [user?.rol, handleRehusarLead])
 
 
 
-  const handleStatusChange = async (leadId: number, newStatus: string) => {
+  const handleStatusChange = useCallback(async (leadId: number, newStatus: string) => {
     try {
       // Obtener el lead actual para verificar si ya está asignado
-      const currentLead = localActiveLeads.find(lead => lead.id === leadId)
+      const currentLead = activeLeads.find(lead => lead.id === leadId)
       
       // Si es coordinador, verificar si el lead ya está asignado a otro usuario
       if (user?.rol === 'coordinador' && currentLead?.user_id && currentLead.user_id !== user.id) {
@@ -542,10 +614,7 @@ const Leads = () => {
       
       // Si el estado es 'convertido', 'no_cerrado' o 'no_valido', el lead debe desaparecer de la lista activa
       if (newStatus === 'convertido' || newStatus === 'no_cerrado' || newStatus === 'no_valido') {
-        // Eliminar el lead de la lista local y del store global
-        setLocalActiveLeads(prevLeads => 
-          prevLeads.filter(lead => lead.id !== leadId)
-        )
+        // Eliminar el lead del store global
         removeActiveLeadLocally(leadId)
         showNotification('Lead movido al historial correctamente', 'success')
       } else {
@@ -560,16 +629,7 @@ const Leads = () => {
           } : {})
         }
 
-        // Actualizar el estado temporal del lead en la lista local
-        setLocalActiveLeads(prevLeads => 
-          prevLeads.map(lead => 
-            lead.id === leadId 
-              ? { ...lead, ...leadUpdates }
-              : lead
-          )
-        )
-        
-        // Actualizar también el store global
+        // Actualizar el store global
         updateActiveLeadLocally(leadId, leadUpdates)
         
         // Mostrar notificación de éxito
@@ -583,57 +643,7 @@ const Leads = () => {
       console.error('Error updating lead status:', error)
       showNotification('Error al actualizar el estado del lead', 'error')
     }
-  }
-
-  const handleRehusarLead = async (lead: Lead) => {
-    if (!user?.id) return
-
-    // Si es un agente, verificar que su empresa permita rehusar leads
-    if (user?.rol === 'agente' && user.id === lead.user_id) {
-      if (!userEmpresaConfiguracion?.rehusarLeadsAgentes) {
-        showNotification(
-          'Tu empresa no permite que los agentes rehúsen sus propios leads. Contacta con tu coordinador si necesitas ayuda con este lead.',
-          'error'
-        )
-        return
-      }
-    }
-
-    try {
-      // Si el lead pertenece a la empresa 15, desasignarlo en Callbell
-      if (lead.empresa_id === 15) {
-        const callbellResult = await callbellService.unassignLeadFromCallbell(lead.id, lead.user_id || undefined)
-        
-        // Si falla con 403 o 404, mostrar notificación amarilla y continuar
-        if (!callbellResult.success && callbellResult.error) {
-          showNotification(callbellResult.error, 'warning')
-        }
-      }
-      
-      await leadsService.rehusarLead(lead.id, user.id)
-      
-      // Si es un agente rehusando su propio lead, eliminarlo de la lista
-      if (user?.rol === 'agente' && user.id === lead.user_id) {
-        setLocalActiveLeads(prevLeads => 
-          prevLeads.filter(l => l.id !== lead.id)
-        )
-        showNotification('Lead rehusado correctamente. Ya no aparece en tu lista.', 'success')
-      } else {
-        // Si es un coordinador, solo actualizar el estado del lead
-        setLocalActiveLeads(prevLeads => 
-          prevLeads.map(l => 
-            l.id === lead.id 
-              ? { ...l, user_id: undefined, usuario_nombre: undefined, fecha_asignacion_usuario: undefined }
-              : l
-          )
-        )
-        showNotification('Lead rehusado correctamente', 'success')
-      }
-    } catch (error) {
-      console.error('Error rehusing lead:', error)
-      showNotification(error instanceof Error ? error.message : 'Error al rehusar el lead', 'error')
-    }
-  }
+  }, [activeLeads, user, updateLeadStatus, updateActiveLeadLocally, removeActiveLeadLocally, showNotification])
 
   const handleSolicitarLead = async () => {
     if (!user?.id || !userEmpresaId) return
@@ -1133,31 +1143,6 @@ const Leads = () => {
   const archivosStartIndex = (archivosCurrentPage - 1) * archivosPerPage
   const archivosEndIndex = archivosStartIndex + archivosPerPage
   const paginatedArchivos = archivosAdjuntos.slice(archivosStartIndex, archivosEndIndex)
-
-  const getStatusDisplayName = (status: string) => {
-    const statusMap: Record<string, string> = {
-      'sin_tratar': 'Sin Tratar',
-      'no_contesta': 'No Contesta',
-      'no_valido': 'No Valido',
-      'gestion': 'En gestión',
-      'convertido': 'Convertido',
-      'no_cerrado': 'No Cerrado',
-      'devolucion': 'Devolución'
-    }
-    return statusMap[status] || status
-  }
-
-  const getStatusTextColor = (status: string) => {
-    const colorMap: Record<string, string> = {
-      'sin_tratar': 'text-gray-700',
-      'no_contesta': 'text-yellow-700',
-      'no_valido': 'text-red-700',
-      'gestion': 'text-blue-700',
-      'convertido': 'text-green-700',
-      'no_cerrado': 'text-red-700',
-    }
-    return colorMap[status] || 'text-gray-700'
-  }
 
   const filtersGridCols =
     user?.rol === 'administrador'

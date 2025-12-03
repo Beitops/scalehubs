@@ -533,7 +533,7 @@ const Dashboard = () => {
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
-                F. Asig. Empresa
+                Fecha Entrada
               </button>
               <button
                 onClick={() => setCoordDateFieldFilter('fecha_asignacion_usuario')}
@@ -543,7 +543,7 @@ const Dashboard = () => {
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
-                F. Asig. Agente
+                Fecha asignación
               </button>
             </div>
 
