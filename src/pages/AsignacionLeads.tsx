@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
@@ -31,6 +31,13 @@ const AsignacionLeads = () => {
   }>({ show: false, message: '', type: 'info' })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  
+  // Bulk selection state (only for admin)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedLeadsForBulk, setSelectedLeadsForBulk] = useState<Set<number>>(new Set())
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const longPressTriggeredRef = useRef(false)
 
   const { user, userEmpresaId } = useAuthStore()
   const {
@@ -143,6 +150,107 @@ const AsignacionLeads = () => {
   useEffect(() => {
     setCurrentPage(1)
   }, [companyFilter, userFilter])
+
+  // Escape key handler for canceling selection mode
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSelectionMode) {
+        cancelSelectionMode()
+      }
+    }
+    
+    document.addEventListener('keydown', handleEscapeKey)
+    return () => document.removeEventListener('keydown', handleEscapeKey)
+  }, [isSelectionMode])
+
+  // Long press handlers for bulk selection (admin only)
+  const handleLongPressStart = useCallback((lead: Lead) => {
+    if (user?.rol !== 'administrador') return
+    
+    longPressTriggeredRef.current = false
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setIsSelectionMode(true)
+      setSelectedLeadsForBulk(new Set([lead.id]))
+    }, 1000) // 1 second long press
+  }, [user?.rol])
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  const handleLeadClick = useCallback((lead: Lead, e: React.MouseEvent) => {
+    // Prevent default behavior if in selection mode
+    if (isSelectionMode) {
+      e.preventDefault()
+      e.stopPropagation()
+      
+      setSelectedLeadsForBulk(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(lead.id)) {
+          newSet.delete(lead.id)
+        } else {
+          newSet.add(lead.id)
+        }
+        return newSet
+      })
+      return
+    }
+    
+    // If long press was triggered, don't do anything on click
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false
+      return
+    }
+  }, [isSelectionMode])
+
+  const cancelSelectionMode = useCallback(() => {
+    setIsSelectionMode(false)
+    setSelectedLeadsForBulk(new Set())
+  }, [])
+
+  const handleOpenBulkAssignModal = useCallback(() => {
+    if (selectedLeadsForBulk.size === 0) return
+    setCompanyFilter('')
+    setSelectedCompany(null)
+    setShowBulkAssignModal(true)
+  }, [selectedLeadsForBulk.size])
+
+  const getSelectedLeadsData = useCallback((): Lead[] => {
+    return unassignedLeads.filter(lead => selectedLeadsForBulk.has(lead.id))
+  }, [unassignedLeads, selectedLeadsForBulk])
+
+  const handleConfirmBulkAssignment = async () => {
+    if (!selectedCompany || selectedLeadsForBulk.size === 0) {
+      showNotification('Por favor selecciona una empresa', 'error')
+      return
+    }
+
+    setProcessingAction(true)
+    try {
+      const leadIds = Array.from(selectedLeadsForBulk)
+      
+      // Assign all selected leads to the company
+      for (const leadId of leadIds) {
+        await assignLeadToCompany(leadId, selectedCompany)
+      }
+      
+      refreshLeads()
+      setShowBulkAssignModal(false)
+      cancelSelectionMode()
+      setSelectedCompany(null)
+      setCompanyFilter('')
+      showNotification(`${leadIds.length} leads asignados correctamente`, 'success')
+    } catch (error) {
+      console.error('Error assigning leads in bulk:', error)
+      showNotification('Error al asignar los leads. Inténtalo de nuevo.', 'error')
+    } finally {
+      setProcessingAction(false)
+    }
+  }
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company.id)
@@ -480,6 +588,33 @@ const AsignacionLeads = () => {
 
         {/* Leads Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Bulk Selection Actions - Only for Admin */}
+          {user?.rol === 'administrador' && isSelectionMode && (
+            <div className="px-4 sm:px-6 py-3 bg-[#18cb96]/10 border-b border-[#18cb96]/20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleOpenBulkAssignModal}
+                  disabled={selectedLeadsForBulk.size === 0}
+                  className="px-4 py-2 bg-[#18cb96] text-white text-sm font-medium rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Asignar Leads Seleccionados ({selectedLeadsForBulk.size})
+                </button>
+                <button
+                  onClick={cancelSelectionMode}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <span className="text-sm text-gray-600 hidden sm:block">
+                Pulsa ESC para cancelar
+              </span>
+            </div>
+          )}
+
           {paginatedLeads.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -503,9 +638,36 @@ const AsignacionLeads = () => {
               {/* Mobile Cards View */}
               <div className="lg:hidden">
                 {paginatedLeads.map((lead) => (
-                  <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
+                  <div 
+                    key={lead.id} 
+                    className={`p-4 border-b border-gray-200 last:border-b-0 transition-colors cursor-pointer select-none ${
+                      isSelectionMode && selectedLeadsForBulk.has(lead.id) 
+                        ? 'bg-[#18cb96]/10 border-l-4 border-l-[#18cb96]' 
+                        : ''
+                    }`}
+                    onMouseDown={() => handleLongPressStart(lead)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onTouchStart={() => handleLongPressStart(lead)}
+                    onTouchEnd={handleLongPressEnd}
+                    onClick={(e) => handleLeadClick(lead, e)}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
+                        {/* Selection indicator */}
+                        {isSelectionMode && (
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                            selectedLeadsForBulk.has(lead.id) 
+                              ? 'bg-[#18cb96] border-[#18cb96]' 
+                              : 'border-gray-300'
+                          }`}>
+                            {selectedLeadsForBulk.has(lead.id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
                         <span className="inline-flex px-2 py-1 text-[10px] font-semibold rounded-full text-white bg-[#1e3a8a]">
                           {lead.campaña_nombre || 'Sin Campaña'}
                         </span>
@@ -526,14 +688,19 @@ const AsignacionLeads = () => {
                         <p><span className="font-medium">Empresa:</span> Sin asignar</p>
                       )}
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => handleAssignLead(lead)}
-                        className="flex-1 px-3 py-2 bg-[#18cb96] text-white text-xs font-medium rounded-lg hover:bg-[#15b885] transition-colors"
-                      >
-                        Asignar
-                      </button>
-                    </div>
+                    {!isSelectionMode && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAssignLead(lead)
+                          }}
+                          className="flex-1 px-3 py-2 bg-[#18cb96] text-white text-xs font-medium rounded-lg hover:bg-[#15b885] transition-colors"
+                        >
+                          Asignar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -543,6 +710,12 @@ const AsignacionLeads = () => {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
+                      {/* Selection column header for admin */}
+                      {user?.rol === 'administrador' && isSelectionMode && (
+                        <th className="px-3 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider w-12">
+                          
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                         Fecha Entrada
                       </th>
@@ -571,7 +744,34 @@ const AsignacionLeads = () => {
                   </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedLeads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-gray-50">
+                      <tr 
+                        key={lead.id} 
+                        className={`transition-colors cursor-pointer select-none ${
+                          isSelectionMode && selectedLeadsForBulk.has(lead.id) 
+                            ? 'bg-[#18cb96]/10' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onMouseDown={() => handleLongPressStart(lead)}
+                        onMouseUp={handleLongPressEnd}
+                        onMouseLeave={handleLongPressEnd}
+                        onClick={(e) => handleLeadClick(lead, e)}
+                      >
+                        {/* Selection checkbox column for admin */}
+                        {user?.rol === 'administrador' && isSelectionMode && (
+                          <td className="px-3 py-4 whitespace-nowrap">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              selectedLeadsForBulk.has(lead.id) 
+                                ? 'bg-[#18cb96] border-[#18cb96]' 
+                                : 'border-gray-300'
+                            }`}>
+                              {selectedLeadsForBulk.has(lead.id) && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                           {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                         </td>
@@ -600,12 +800,17 @@ const AsignacionLeads = () => {
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => handleAssignLead(lead)}
-                            className="px-4 py-2 bg-[#18cb96] text-white text-sm font-medium rounded-lg hover:bg-[#15b885] transition-colors"
-                          >
-                            Asignar
-                          </button>
+                          {!isSelectionMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAssignLead(lead)
+                              }}
+                              className="px-4 py-2 bg-[#18cb96] text-white text-sm font-medium rounded-lg hover:bg-[#15b885] transition-colors"
+                            >
+                              Asignar
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1002,6 +1207,177 @@ const AsignacionLeads = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Assignment Modal overlay */}
+      {showBulkAssignModal && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-51"
+          onClick={() => setShowBulkAssignModal(false)}
+        />
+      )}
+
+      {/* Bulk Assignment Modal */}
+      {showBulkAssignModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#373643]">
+                Asignar {selectedLeadsForBulk.size} Leads a Empresa
+              </h2>
+              <button
+                onClick={() => setShowBulkAssignModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Selected Leads List */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-medium text-[#373643] mb-3">
+                  Leads Seleccionados ({selectedLeadsForBulk.size})
+                </h3>
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Nombre</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Teléfono</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Fecha</th>
+                        <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">Calidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {getSelectedLeadsData().map((lead) => (
+                        <tr key={lead.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-[#373643] font-medium">{lead.nombre_cliente}</td>
+                          <td className="px-3 py-2 text-gray-600">{lead.telefono}</td>
+                          <td className="px-3 py-2 text-gray-600">{new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{lead.calidad || 1}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Company Selection */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#373643] mb-2">
+                    Seleccionar Empresa
+                  </label>
+                  
+                  {/* Company Filter Input */}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      placeholder="Buscar empresa..."
+                      value={companyFilter}
+                      onChange={(e) => setCompanyFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Selected Company Display */}
+                  {selectedCompany && (
+                    <div className="mb-3 p-3 bg-[#18cb96]/10 border border-[#18cb96]/20 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-[#18cb96]">
+                          Empresa seleccionada: {selectedCompanyName}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setSelectedCompany(null)
+                            setCompanyFilter('')
+                          }}
+                          className="text-[#18cb96] hover:text-[#15b885]"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Company List */}
+                  <div className="border border-gray-200 rounded-lg">
+                    <div className="p-3 border-b border-gray-200 bg-gray-50">
+                      <div className="text-sm font-medium text-gray-700">
+                        Empresas disponibles ({filteredCompanies.length})
+                      </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredCompanies.length === 0 ? (
+                        <div className="p-6 text-sm text-gray-500 text-center">
+                          {companyFilter ? 'No se encontraron empresas con ese nombre' : 'No hay empresas disponibles'}
+                        </div>
+                      ) : (
+                        filteredCompanies.map((company) => (
+                          <button
+                            key={company.id}
+                            onClick={() => handleCompanySelect(company)}
+                            className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors ${
+                              selectedCompany === company.id 
+                                ? 'bg-[#18cb96]/10 border-l-4 border-l-[#18cb96]' 
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium text-[#373643]">{company.nombre}</div>
+                                <div className="text-xs text-gray-500 mt-1">CIF: {company.cif}</div>
+                              </div>
+                              {selectedCompany === company.id && (
+                                <div className="w-6 h-6 bg-[#18cb96] rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkAssignModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmBulkAssignment}
+                  disabled={!selectedCompany || processingAction}
+                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {processingAction ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Asignando...
+                    </>
+                  ) : (
+                    <>
+                      Confirmar Asignación ({selectedLeadsForBulk.size} leads)
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
