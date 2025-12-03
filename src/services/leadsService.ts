@@ -1002,6 +1002,235 @@ class LeadsService {
       throw error
     }
   }
+
+  // Obtener estadísticas para el dashboard de coordinador
+  async getCoordDashboardStats(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_asignacion' | 'fecha_asignacion_usuario' = 'fecha_asignacion',
+    empresaId: number,
+    agentIds?: string[]
+  ): Promise<{
+    totalLeads: number
+    leadsConvertidos: number
+    leadsPerdidos: number
+    leadsInvalidos: number
+  }> {
+    try {
+      // Obtener todos los leads en el rango de fechas para la empresa
+      let query = supabase
+        .from('leads')
+        .select('id, estado, user_id')
+        .eq('empresa_id', empresaId)
+      
+      // Aplicar filtro según el campo de fecha seleccionado
+      if (dateField === 'fecha_asignacion_usuario') {
+        query = query
+          .not('fecha_asignacion_usuario', 'is', null)
+          .gte('fecha_asignacion_usuario', startDate)
+          .lte('fecha_asignacion_usuario', endDate)
+      } else {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+      }
+
+      // Aplicar filtro de agentes si se especifica
+      if (agentIds && agentIds.length > 0) {
+        query = query.in('user_id', agentIds)
+      }
+
+      const { data: leads, error } = await query
+
+      if (error) {
+        console.error('Error fetching coord dashboard stats:', error)
+        throw error
+      }
+
+      const allLeads = leads || []
+
+      // Calcular estadísticas
+      const totalLeads = allLeads.length
+      const leadsConvertidos = allLeads.filter(lead => lead.estado === 'convertido').length
+      const leadsPerdidos = allLeads.filter(lead => lead.estado === 'perdido').length
+      const leadsInvalidos = allLeads.filter(lead => lead.estado === 'no_valido').length
+
+      return {
+        totalLeads,
+        leadsConvertidos,
+        leadsPerdidos,
+        leadsInvalidos
+      }
+    } catch (error) {
+      console.error('Error in getCoordDashboardStats:', error)
+      throw error
+    }
+  }
+
+  // Obtener leads paginados para el dashboard de coordinador
+  async getCoordDashboardLeads(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_asignacion' | 'fecha_asignacion_usuario' = 'fecha_asignacion',
+    page: number = 1,
+    limit: number = 10,
+    empresaId: number,
+    agentIds?: string[]
+  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion?: string | null; fecha_asignacion_usuario?: string | null; user_id?: string | null; usuario_nombre?: string }[], totalCount: number }> {
+    try {
+      // Obtener leads paginados con conteo total
+      let query = supabase
+        .from('leads')
+        .select(`
+          id,
+          nombre_cliente,
+          telefono,
+          fecha_asignacion,
+          fecha_asignacion_usuario,
+          user_id,
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
+          )
+        `, { count: 'exact' })
+        .eq('empresa_id', empresaId)
+      
+      if (dateField === 'fecha_asignacion_usuario') {
+        query = query
+          .not('fecha_asignacion_usuario', 'is', null)
+          .gte('fecha_asignacion_usuario', startDate)
+          .lte('fecha_asignacion_usuario', endDate)
+          .order('fecha_asignacion_usuario', { ascending: false })
+      } else {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+          .order('fecha_asignacion', { ascending: false })
+      }
+
+      // Aplicar filtro de agentes si se especifica
+      if (agentIds && agentIds.length > 0) {
+        query = query.in('user_id', agentIds)
+      }
+
+      // Aplicar paginación
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+
+      const { data, count, error } = await query
+
+      if (error) {
+        console.error('Error fetching coord dashboard leads:', error)
+        throw error
+      }
+
+      const leads = (data as any[])?.map(lead => ({
+        ...lead,
+        usuario_nombre: lead.profiles?.nombre || 'Sin asignar'
+      })) || []
+
+      return {
+        leads,
+        totalCount: count || 0
+      }
+    } catch (error) {
+      console.error('Error in getCoordDashboardLeads:', error)
+      throw error
+    }
+  }
+
+  // Obtener estadísticas para el dashboard de agente
+  async getAgentDashboardStats(
+    startDate: string, 
+    endDate: string, 
+    empresaId: number,
+    userId: string
+  ): Promise<{
+    totalLeads: number
+    leadsConvertidos: number
+    leadsPerdidos: number
+    leadsInvalidos: number
+  }> {
+    try {
+      // Obtener todos los leads del agente en el rango de fechas
+      const { data: leads, error } = await supabase
+        .from('leads')
+        .select('id, estado')
+        .eq('empresa_id', empresaId)
+        .eq('user_id', userId)
+        .not('fecha_asignacion_usuario', 'is', null)
+        .gte('fecha_asignacion_usuario', startDate)
+        .lte('fecha_asignacion_usuario', endDate)
+
+      if (error) {
+        console.error('Error fetching agent dashboard stats:', error)
+        throw error
+      }
+
+      const allLeads = leads || []
+
+      // Calcular estadísticas
+      const totalLeads = allLeads.length
+      const leadsConvertidos = allLeads.filter(lead => lead.estado === 'convertido').length
+      const leadsPerdidos = allLeads.filter(lead => lead.estado === 'perdido').length
+      const leadsInvalidos = allLeads.filter(lead => lead.estado === 'no_valido').length
+
+      return {
+        totalLeads,
+        leadsConvertidos,
+        leadsPerdidos,
+        leadsInvalidos
+      }
+    } catch (error) {
+      console.error('Error in getAgentDashboardStats:', error)
+      throw error
+    }
+  }
+
+  // Obtener leads paginados para el dashboard de agente
+  async getAgentDashboardLeads(
+    startDate: string, 
+    endDate: string, 
+    page: number = 1,
+    limit: number = 10,
+    empresaId: number,
+    userId: string
+  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion_usuario?: string | null }[], totalCount: number }> {
+    try {
+      // Obtener leads paginados del agente
+      const { data, count, error } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          nombre_cliente,
+          telefono,
+          fecha_asignacion_usuario
+        `, { count: 'exact' })
+        .eq('empresa_id', empresaId)
+        .eq('user_id', userId)
+        .not('fecha_asignacion_usuario', 'is', null)
+        .gte('fecha_asignacion_usuario', startDate)
+        .lte('fecha_asignacion_usuario', endDate)
+        .order('fecha_asignacion_usuario', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1)
+
+      if (error) {
+        console.error('Error fetching agent dashboard leads:', error)
+        throw error
+      }
+
+      return {
+        leads: data || [],
+        totalCount: count || 0
+      }
+    } catch (error) {
+      console.error('Error in getAgentDashboardLeads:', error)
+      throw error
+    }
+  }
 }
 
 export const leadsService = new LeadsService() 

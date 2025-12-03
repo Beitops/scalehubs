@@ -2,28 +2,42 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useDashboardStore } from '../store/dashboardStore'
 import { companyService, type Company } from '../services/companyService'
+import { getUsersByCompany } from '../services/userService'
+import type { DatabaseProfile } from '../types/database'
 
 
 
 const Dashboard = () => {
-  const { user, userEmpresaNombre } = useAuthStore()
+  const { user, userEmpresaNombre, userEmpresaId } = useAuthStore()
   const { 
     loading, 
-    stats, 
     adminStats,
     adminLeads,
     adminLeadsPage,
     adminLeadsTotalCount,
+    coordStats,
+    coordLeads,
+    coordLeadsPage,
+    coordLeadsTotalCount,
+    agentStats,
+    agentLeads,
+    agentLeadsPage,
+    agentLeadsTotalCount,
     timeFilter,
     dateFieldFilter,
+    coordDateFieldFilter,
     selectedEmpresaIds,
+    selectedAgentIds,
     customDateRange,
-    rankingVendedores,
     loadDashboardData, 
     loadAdminLeadsPage,
+    loadCoordLeadsPage,
+    loadAgentLeadsPage,
     setTimeFilter,
     setDateFieldFilter,
+    setCoordDateFieldFilter,
     setSelectedEmpresaIds,
+    setSelectedAgentIds,
     setCustomDateRange,
     isInitialized 
   } = useDashboardStore()
@@ -39,6 +53,13 @@ const Dashboard = () => {
   const [empresasLoading, setEmpresasLoading] = useState(false)
   const [empresaSearch, setEmpresaSearch] = useState('')
   const [tempSelectedEmpresaIds, setTempSelectedEmpresaIds] = useState<number[]>([])
+
+  // Estado para el modal de agentes (coordinador)
+  const [showAgentModal, setShowAgentModal] = useState(false)
+  const [agents, setAgents] = useState<DatabaseProfile[]>([])
+  const [agentsLoading, setAgentsLoading] = useState(false)
+  const [agentSearch, setAgentSearch] = useState('')
+  const [tempSelectedAgentIds, setTempSelectedAgentIds] = useState<string[]>([])
 
   // Cargar datos del dashboard cuando el componente se monte
   useEffect(() => {
@@ -62,11 +83,6 @@ const Dashboard = () => {
     }
   }, [user, loadDashboardData])
 
-  // Usar estadísticas del store
-  const { totalLeads, leadsCerrados, platformDistribution } = stats
-
-  // Solo mostrar estadísticas para coordinadores y agentes
-  const shouldShowStats = user?.rol === 'coordinador' || user?.rol === 'agente'
 
   // Obtener el texto del período de tiempo actual
   const getTimeRangeText = () => {
@@ -177,90 +193,61 @@ const Dashboard = () => {
     e.nombre.toLowerCase().includes(empresaSearch.toLowerCase())
   )
 
+  // Abrir modal de agentes (para coordinador)
+  const handleOpenAgentModal = async () => {
+    setShowAgentModal(true)
+    setTempSelectedAgentIds(selectedAgentIds)
+    setAgentSearch('')
+    
+    if (agents.length === 0 && userEmpresaId) {
+      setAgentsLoading(true)
+      try {
+        const companyUsers = await getUsersByCompany(userEmpresaId)
+        // Filtrar solo agentes (rol === 'agente')
+        setAgents(companyUsers.filter(u => u.rol === 'agente'))
+      } catch (error) {
+        console.error('Error loading agents:', error)
+      } finally {
+        setAgentsLoading(false)
+      }
+    }
+  }
+
+  // Manejar selección de agente
+  const handleToggleAgent = (agentId: string) => {
+    setTempSelectedAgentIds(prev => 
+      prev.includes(agentId)
+        ? prev.filter(id => id !== agentId)
+        : [...prev, agentId]
+    )
+  }
+
+  // Aplicar filtro de agentes
+  const handleApplyAgentFilter = () => {
+    setSelectedAgentIds(tempSelectedAgentIds)
+    setShowAgentModal(false)
+  }
+
+  // Limpiar filtro de agentes
+  const handleClearAgentFilter = () => {
+    setTempSelectedAgentIds([])
+  }
+
+  // Filtrar agentes por búsqueda
+  const filteredAgents = agents.filter(a => 
+    (a.nombre?.toLowerCase() || '').includes(agentSearch.toLowerCase()) ||
+    (a.email?.toLowerCase() || '').includes(agentSearch.toLowerCase())
+  )
+
   // Verificar si es administrador
   const isAdmin = user?.rol === 'administrador'
-
-  // Obtener el ranking según el filtro de tiempo
-  const getRankingByFilter = () => {
-    switch (timeFilter) {
-      case 'hoy':
-        return rankingVendedores
-          .filter(v => v.ventas_hoy > 0)
-          .sort((a, b) => a.rank_hoy - b.rank_hoy)
-          .slice(0, 5)
-      case 'semana':
-        return rankingVendedores
-          .filter(v => v.ventas_semana > 0)
-          .sort((a, b) => a.rank_semana - b.rank_semana)
-          .slice(0, 5)
-      case 'mes':
-        return rankingVendedores
-          .filter(v => v.ventas_mes > 0)
-          .sort((a, b) => a.rank_mes - b.rank_mes)
-          .slice(0, 5)
-      case 'año':
-        return rankingVendedores
-          .filter(v => v.ventas_anio > 0)
-          .sort((a, b) => a.rank_anio - b.rank_anio)
-          .slice(0, 5)
-      default:
-        return []
-    }
-  }
-
-  const rankingActual = getRankingByFilter()
-
-  // Función para obtener el número de ventas según el filtro
-  const getVentasByFilter = (vendedor: typeof rankingVendedores[0]) => {
-    switch (timeFilter) {
-      case 'hoy':
-        return vendedor.ventas_hoy
-      case 'semana':
-        return vendedor.ventas_semana
-      case 'mes':
-        return vendedor.ventas_mes
-      case 'año':
-        return vendedor.ventas_anio
-      default:
-        return 0
-    }
-  }
-
-  // Función para obtener el rank según el filtro
-  const getRankByFilter = (vendedor: typeof rankingVendedores[0]) => {
-    switch (timeFilter) {
-      case 'hoy':
-        return vendedor.rank_hoy
-      case 'semana':
-        return vendedor.rank_semana
-      case 'mes':
-        return vendedor.rank_mes
-      case 'año':
-        return vendedor.rank_anio
-      default:
-        return 0
-    }
-  }
   
-  const statsCards = shouldShowStats ? [
-    {
-      title: 'Total de Leads',
-      value: totalLeads.toString(),
-      change: '',
-      changeType: 'positive' as const,
-      icon: '📈',
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Leads Cerrados',
-      value: leadsCerrados.toString(),
-      change: '',
-      changeType: 'positive' as const,
-      icon: '🎯',
-      color: 'bg-purple-500'
-    }
-  ] : []
-
+  // Verificar si es coordinador
+  const isCoord = user?.rol === 'coordinador'
+  
+  // Verificar si es agente
+  const isAgent = user?.rol === 'agente'
+  
   // Cards de estadísticas para administrador
   const adminStatsCards = isAdmin ? [
     {
@@ -290,6 +277,62 @@ const Dashboard = () => {
     {
       title: 'Leads Inválidos',
       value: adminStats.leadsInvalidos.toString(),
+      icon: '⚠️',
+      color: 'bg-gray-500'
+    }
+  ] : []
+
+  // Cards de estadísticas para coordinador (sin "Leads Sin Asignar")
+  const coordStatsCards = isCoord ? [
+    {
+      title: 'Total Leads',
+      value: coordStats.totalLeads.toString(),
+      icon: '📊',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Leads Convertidos',
+      value: coordStats.leadsConvertidos.toString(),
+      icon: '✅',
+      color: 'bg-[#18cb96]'
+    },
+    {
+      title: 'Leads Perdidos',
+      value: coordStats.leadsPerdidos.toString(),
+      icon: '❌',
+      color: 'bg-white'
+    },
+    {
+      title: 'Leads Inválidos',
+      value: coordStats.leadsInvalidos.toString(),
+      icon: '⚠️',
+      color: 'bg-gray-500'
+    }
+  ] : []
+
+  // Cards de estadísticas para agente
+  const agentStatsCards = isAgent ? [
+    {
+      title: 'Total Leads',
+      value: agentStats.totalLeads.toString(),
+      icon: '📊',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Leads Convertidos',
+      value: agentStats.leadsConvertidos.toString(),
+      icon: '✅',
+      color: 'bg-[#18cb96]'
+    },
+    {
+      title: 'Leads Perdidos',
+      value: agentStats.leadsPerdidos.toString(),
+      icon: '❌',
+      color: 'bg-white'
+    },
+    {
+      title: 'Leads Inválidos',
+      value: agentStats.leadsInvalidos.toString(),
       icon: '⚠️',
       color: 'bg-gray-500'
     }
@@ -476,10 +519,47 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Filtros de tiempo para coordinadores y agentes */}
-      {shouldShowStats && (
-        <div className="mb-6">
-          <div className="flex flex-wrap items-center gap-3">
+      {/* Filtros de tiempo para coordinador */}
+      {isCoord && (
+        <div className="mb-4 sm:mb-6 space-y-3">
+          {/* Selector de campo de fecha - Primera fila en móvil */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
+              <button
+                onClick={() => setCoordDateFieldFilter('fecha_asignacion')}
+                className={`flex-1 sm:flex-none px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                  coordDateFieldFilter === 'fecha_asignacion'
+                    ? 'bg-white text-[#373643] shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                F. Asig. Empresa
+              </button>
+              <button
+                onClick={() => setCoordDateFieldFilter('fecha_asignacion_usuario')}
+                className={`flex-1 sm:flex-none px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                  coordDateFieldFilter === 'fecha_asignacion_usuario'
+                    ? 'bg-white text-[#373643] shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                F. Asig. Agente
+              </button>
+            </div>
+
+            <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
+
+            {/* Período actual - visible en móvil */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <span className="text-xs text-gray-500">Período:</span>
+              <span className="text-xs font-semibold text-[#373643]">
+                {getTimeRangeText()}
+              </span>
+            </div>
+          </div>
+
+          {/* Filtros de tiempo - Segunda fila */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {[
               { key: 'hoy', label: 'Hoy' },
               { key: 'semana', label: 'Semana' },
@@ -489,7 +569,7 @@ const Dashboard = () => {
               <button
                 key={key}
                 onClick={() => setTimeFilter(key as 'hoy' | 'semana' | 'mes' | 'año')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                   timeFilter === key
                     ? 'bg-[#18cb96] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -498,9 +578,186 @@ const Dashboard = () => {
                 {label}
               </button>
             ))}
-            <div className="flex items-center gap-2 ml-2">
+            
+            {/* Botón de fecha personalizada */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 ${
+                  timeFilter === 'personalizado'
+                    ? 'bg-[#18cb96] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span>📅</span>
+                <span className="hidden xs:inline">Personalizado</span>
+              </button>
+              
+              {/* Date Picker Dropdown */}
+              {showDatePicker && (
+                <div className="fixed sm:absolute inset-x-4 sm:inset-x-auto top-1/2 sm:top-full left-auto sm:left-0 -translate-y-1/2 sm:translate-y-0 sm:mt-2 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:min-w-[300px]">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha inicio
+                      </label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha fin
+                      </label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowDatePicker(false)}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleApplyCustomDates}
+                        disabled={!customStartDate || !customEndDate}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Período - solo visible en desktop */}
+            <div className="hidden sm:flex items-center gap-2 ml-2">
               <span className="text-sm text-gray-500">•</span>
               <span className="text-sm font-semibold text-[#373643]">
+                {getTimeRangeText()}
+              </span>
+            </div>
+
+            {/* Spacer para empujar el botón Agente a la derecha */}
+            <div className="flex-1"></div>
+
+            {/* Botón de filtro por Agente */}
+            <button
+              onClick={handleOpenAgentModal}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 ${
+                selectedAgentIds.length > 0
+                  ? 'bg-[#18cb96] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span>👤</span>
+              <span>Agente</span>
+              {selectedAgentIds.length > 0 && (
+                <span className="bg-white text-[#18cb96] text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
+                  {selectedAgentIds.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros de tiempo para agente */}
+      {isAgent && (
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {[
+              { key: 'hoy', label: 'Hoy' },
+              { key: 'semana', label: 'Semana' },
+              { key: 'mes', label: 'Mes' },
+              { key: 'año', label: 'Año' }
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTimeFilter(key as 'hoy' | 'semana' | 'mes' | 'año')}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                  timeFilter === key
+                    ? 'bg-[#18cb96] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            
+            {/* Botón de fecha personalizada */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 ${
+                  timeFilter === 'personalizado'
+                    ? 'bg-[#18cb96] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span>📅</span>
+                <span className="hidden xs:inline">Personalizado</span>
+              </button>
+              
+              {/* Date Picker Dropdown */}
+              {showDatePicker && (
+                <div className="fixed sm:absolute inset-x-4 sm:inset-x-auto top-1/2 sm:top-full left-auto sm:left-0 -translate-y-1/2 sm:translate-y-0 sm:mt-2 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:min-w-[300px]">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha inicio
+                      </label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha fin
+                      </label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowDatePicker(false)}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleApplyCustomDates}
+                        disabled={!customStartDate || !customEndDate}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Período */}
+            <div className="flex items-center gap-2 ml-2">
+              <span className="text-sm text-gray-500">•</span>
+              <span className="text-xs sm:text-sm font-semibold text-[#373643]">
                 {getTimeRangeText()}
               </span>
             </div>
@@ -530,36 +787,187 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Stats Cards para Coordinadores y Agentes */}
-      {shouldShowStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 lg:mb-8">
-          {statsCards.map((stat, index) => (
-          <div 
-            key={index} 
-            className="bg-white rounded-lg shadow-md p-4 sm:p-6 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate group-hover:text-[#18cb96] transition-colors">{stat.title}</p>
-                <p className="text-xl sm:text-2xl font-bold text-[#373643] mt-1">{stat.value}</p>
-              </div>
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${stat.color} rounded-lg flex items-center justify-center text-white text-lg sm:text-xl flex-shrink-0 ml-3 transition-transform group-hover:scale-110`}>
-                {stat.icon}
+      {/* Stats Cards para Coordinador */}
+      {isCoord && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6 lg:mb-8">
+          {coordStatsCards.map((stat, index) => (
+            <div 
+              key={index} 
+              className="bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-600 truncate group-hover:text-[#18cb96] transition-colors">{stat.title}</p>
+                  <p className="text-base sm:text-xl font-bold text-[#373643] mt-0.5 sm:mt-1">{stat.value}</p>
+                </div>
+                <div className={`w-7 h-7 sm:w-10 sm:h-10 ${stat.color} rounded-lg flex items-center justify-center text-white text-sm sm:text-lg flex-shrink-0 ml-2 transition-transform group-hover:scale-110`}>
+                  {stat.icon}
+                </div>
               </div>
             </div>
-            <div className="mt-3 sm:mt-4">
-              {stat.change && (
-                <>
-                  <span className={`text-xs sm:text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' : stat.changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
-                    }`}>
-                    {stat.change}
-                  </span>
-                  <span className="text-xs sm:text-sm text-gray-500 ml-1">vs período anterior</span>
-                </>
-              )}
+          ))}
+        </div>
+      )}
+
+      {/* Stats Cards para Agente */}
+      {isAgent && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6 lg:mb-8">
+          {agentStatsCards.map((stat, index) => (
+            <div 
+              key={index} 
+              className="bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-600 truncate group-hover:text-[#18cb96] transition-colors">{stat.title}</p>
+                  <p className="text-base sm:text-xl font-bold text-[#373643] mt-0.5 sm:mt-1">{stat.value}</p>
+                </div>
+                <div className={`w-7 h-7 sm:w-10 sm:h-10 ${stat.color} rounded-lg flex items-center justify-center text-white text-sm sm:text-lg flex-shrink-0 ml-2 transition-transform group-hover:scale-110`}>
+                  {stat.icon}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Panel de Lista de Leads para Agente */}
+      {isAgent && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Header con gradiente verde */}
+          <div className="bg-gradient-to-r from-[#18cb96] to-[#15b585] p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
+              <div className="flex items-center gap-2">
+                <span className="text-white text-lg">📋</span>
+                <h2 className="text-sm sm:text-lg font-semibold text-white">Mis Leads</h2>
+              </div>
+              <span className="text-[10px] sm:text-xs text-white/80 bg-white/20 px-2 py-1 rounded-full">
+                {agentLeadsTotalCount} leads encontrados
+              </span>
             </div>
           </div>
-        ))}
+          
+          <div className="p-3 sm:p-4">
+          {agentLeads.length > 0 ? (
+            <>
+              {/* Vista móvil - Cards */}
+              <div className="sm:hidden max-h-[300px] overflow-y-auto space-y-2">
+                {agentLeads.map((lead) => (
+                  <div 
+                    key={lead.id} 
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-1.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[#373643] truncate">
+                          {lead.nombre_cliente}
+                        </p>
+                      </div>
+                      <span className="ml-2 px-1.5 py-0.5 bg-[#18cb96]/10 text-[#18cb96] text-[9px] rounded font-medium flex-shrink-0">
+                        {lead.telefono}
+                      </span>
+                    </div>
+                    <div className="text-[9px]">
+                      <div className="bg-gray-100/50 rounded p-1">
+                        <span className="text-gray-400">Fecha asignación:</span>
+                        <p className="text-gray-700 font-medium">
+                          {lead.fecha_asignacion_usuario ? new Date(lead.fecha_asignacion_usuario).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vista desktop - Tabla */}
+              <div className="hidden sm:block overflow-x-auto max-h-[350px] overflow-y-auto border border-[#18cb96]/20 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-[#e8faf5] to-[#f0fdf9] sticky top-0">
+                    <tr>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Nombre
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Teléfono
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Fecha Asignación
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {agentLeads.map((lead) => (
+                      <tr 
+                        key={lead.id} 
+                        className="hover:bg-[#18cb96]/5 transition-colors group"
+                      >
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#373643] font-medium group-hover:text-[#18cb96] transition-colors">
+                          {lead.nombre_cliente}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-600 font-mono">
+                          {lead.telefono}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-500">
+                          {lead.fecha_asignacion_usuario ? new Date(lead.fecha_asignacion_usuario).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación */}
+              {agentLeadsTotalCount > 10 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 pt-3 border-t border-[#18cb96]/20">
+                  <div className="text-[10px] sm:text-xs text-gray-600 order-2 sm:order-1">
+                    <span className="text-[#18cb96] font-semibold">{((agentLeadsPage - 1) * 10) + 1} - {Math.min(agentLeadsPage * 10, agentLeadsTotalCount)}</span>
+                    <span className="text-gray-400"> de </span>
+                    <span className="text-[#373643] font-medium">{agentLeadsTotalCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 order-1 sm:order-2">
+                    <button
+                      onClick={() => loadAgentLeadsPage(agentLeadsPage - 1)}
+                      disabled={agentLeadsPage === 1}
+                      className="px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium text-[#18cb96] bg-[#18cb96]/10 rounded-lg hover:bg-[#18cb96]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ← Anterior
+                    </button>
+                    <span className="px-3 py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-[#18cb96] rounded-lg">
+                      {agentLeadsPage} / {Math.ceil(agentLeadsTotalCount / 10)}
+                    </span>
+                    <button
+                      onClick={() => loadAgentLeadsPage(agentLeadsPage + 1)}
+                      disabled={agentLeadsPage >= Math.ceil(agentLeadsTotalCount / 10)}
+                      className="px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium text-[#18cb96] bg-[#18cb96]/10 rounded-lg hover:bg-[#18cb96]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-[#18cb96]/10 rounded-full mb-3">
+                <span className="text-2xl">📭</span>
+              </div>
+              <p className="text-gray-600 text-sm font-medium">No hay leads en este período</p>
+              <p className="text-xs text-gray-400 mt-1">Cambia el filtro de tiempo para ver más datos</p>
+            </div>
+          )}
+          </div>
         </div>
       )}
 
@@ -593,6 +1001,177 @@ const Dashboard = () => {
           ) : (
             <p className="text-gray-500 text-xs sm:text-sm">No hay datos de plataformas en este período</p>
           )}
+        </div>
+      )}
+
+      {/* Panel de Lista de Leads para Coordinador */}
+      {isCoord && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-4 sm:mb-6">
+          {/* Header con gradiente verde */}
+          <div className="bg-gradient-to-r from-[#18cb96] to-[#15b585] p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
+              <div className="flex items-center gap-2">
+                <span className="text-white text-lg">📋</span>
+                <h2 className="text-sm sm:text-lg font-semibold text-white">Listado de Leads</h2>
+              </div>
+              <span className="text-[10px] sm:text-xs text-white/80 bg-white/20 px-2 py-1 rounded-full">
+                {coordLeadsTotalCount} leads encontrados
+              </span>
+            </div>
+          </div>
+          
+          <div className="p-3 sm:p-4">
+          {coordLeads.length > 0 ? (
+            <>
+              {/* Vista móvil - Cards */}
+              <div className="sm:hidden max-h-[300px] overflow-y-auto space-y-2">
+                {coordLeads.map((lead) => (
+                  <div 
+                    key={lead.id} 
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-1.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[#373643] truncate">
+                          {lead.nombre_cliente}
+                        </p>
+                        <p className="text-[10px] text-[#18cb96] font-medium truncate">
+                          {lead.usuario_nombre || 'Sin asignar'}
+                        </p>
+                      </div>
+                      <span className="ml-2 px-1.5 py-0.5 bg-[#18cb96]/10 text-[#18cb96] text-[9px] rounded font-medium flex-shrink-0">
+                        {lead.telefono}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-[9px]">
+                      <div className="bg-gray-100/50 rounded p-1">
+                        <span className="text-gray-400">Fecha:</span>
+                        <p className="text-gray-700 font-medium">
+                          {lead.fecha_asignacion ? new Date(lead.fecha_asignacion).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit'
+                          }) : '-'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-100/50 rounded p-1">
+                        <span className="text-gray-400">F. Agente:</span>
+                        <p className="text-gray-700 font-medium">
+                          {lead.fecha_asignacion_usuario ? new Date(lead.fecha_asignacion_usuario).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit'
+                          }) : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vista desktop - Tabla */}
+              <div className="hidden sm:block overflow-x-auto max-h-[350px] overflow-y-auto border border-[#18cb96]/20 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-[#e8faf5] to-[#f0fdf9] sticky top-0">
+                    <tr>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Nombre
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Agente
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Teléfono
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Fecha
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        F. Agente
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {coordLeads.map((lead) => (
+                      <tr 
+                        key={lead.id} 
+                        className="hover:bg-[#18cb96]/5 transition-colors group"
+                      >
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#373643] font-medium group-hover:text-[#18cb96] transition-colors">
+                          {lead.nombre_cliente}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-600">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[#18cb96]/10 text-[#18cb96] font-medium">
+                            {lead.usuario_nombre || 'Sin asignar'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-600 font-mono">
+                          {lead.telefono}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-500">
+                          {lead.fecha_asignacion ? new Date(lead.fecha_asignacion).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-500">
+                          {lead.fecha_asignacion_usuario ? new Date(lead.fecha_asignacion_usuario).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación */}
+              {coordLeadsTotalCount > 10 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 pt-3 border-t border-[#18cb96]/20">
+                  <div className="text-[10px] sm:text-xs text-gray-600 order-2 sm:order-1">
+                    <span className="text-[#18cb96] font-semibold">{((coordLeadsPage - 1) * 10) + 1} - {Math.min(coordLeadsPage * 10, coordLeadsTotalCount)}</span>
+                    <span className="text-gray-400"> de </span>
+                    <span className="text-[#373643] font-medium">{coordLeadsTotalCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 order-1 sm:order-2">
+                    <button
+                      onClick={() => loadCoordLeadsPage(coordLeadsPage - 1)}
+                      disabled={coordLeadsPage === 1}
+                      className="px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium text-[#18cb96] bg-[#18cb96]/10 rounded-lg hover:bg-[#18cb96]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ← Anterior
+                    </button>
+                    <span className="px-3 py-1.5 text-[10px] sm:text-xs font-semibold text-white bg-[#18cb96] rounded-lg">
+                      {coordLeadsPage} / {Math.ceil(coordLeadsTotalCount / 10)}
+                    </span>
+                    <button
+                      onClick={() => loadCoordLeadsPage(coordLeadsPage + 1)}
+                      disabled={coordLeadsPage >= Math.ceil(coordLeadsTotalCount / 10)}
+                      className="px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium text-[#18cb96] bg-[#18cb96]/10 rounded-lg hover:bg-[#18cb96]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-[#18cb96]/10 rounded-full mb-3">
+                <span className="text-2xl">📭</span>
+              </div>
+              <p className="text-gray-600 text-sm font-medium">No hay leads en este período</p>
+              <p className="text-xs text-gray-400 mt-1">Cambia el filtro de tiempo para ver más datos</p>
+            </div>
+          )}
+          </div>
         </div>
       )}
 
@@ -767,114 +1346,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent Activity para Coordinadores y Agentes */}
-      {shouldShowStats && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-          {/* Ranking de Vendedores */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold text-[#373643] mb-4">🏆 Ranking de Vendedores</h2>
-            {rankingActual.length > 0 ? (
-              <div className="space-y-3">
-                {rankingActual.map((vendedor) => {
-                  const rank = getRankByFilter(vendedor)
-                  const ventas = getVentasByFilter(vendedor)
-                  
-                  // Medallas para los 3 primeros
-                  const getMedal = (position: number) => {
-                    switch (position) {
-                      case 1:
-                        return '🥇'
-                      case 2:
-                        return '🥈'
-                      case 3:
-                        return '🥉'
-                      default:
-                        return `${position}º`
-                    }
-                  }
-
-                  // Estilos especiales para los 3 primeros
-                  const getCardStyle = (position: number) => {
-                    switch (position) {
-                      case 1:
-                        return 'bg-gradient-to-r from-green-50 to-emerald-100 border-2 border-[#18cb96]'
-                      case 2:
-                        return 'bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-400'
-                      case 3:
-                        return 'bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-400'
-                      default:
-                        return 'bg-gray-50'
-                    }
-                  }
-
-                  return (
-                    <div 
-                      key={vendedor.user_id} 
-                      className={`flex items-center justify-between p-3 rounded-lg transition-all ${getCardStyle(rank)}`}
-                    >
-                      <div className="flex items-center flex-1 min-w-0">
-                        <div className={`flex items-center justify-center ${rank <= 3 ? 'w-10 h-10 text-2xl' : 'w-8 h-8 text-sm bg-gray-200 rounded-full'}`}>
-                          <span className={rank <= 3 ? '' : 'font-semibold text-gray-600'}>
-                            {getMedal(rank)}
-                          </span>
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <p className={`font-medium text-[#373643] text-sm sm:text-base truncate ${rank === 1 ? 'font-bold' : ''}`}>
-                            {vendedor.nombre}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {ventas} {ventas === 1 ? 'venta' : 'ventas'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0 ml-3">
-                        <div className={`px-3 py-1 rounded-full ${rank === 1 ? 'bg-[#18cb96]' : 'bg-blue-500'} text-white`}>
-                          <span className="text-sm font-bold">{ventas}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 text-sm">No hay ventas en este período</p>
-                <p className="text-xs text-gray-400 mt-1">Cambia el filtro de tiempo para ver más datos</p>
-              </div>
-            )}
-          </div>
-
-          {/* Platform Distribution */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold text-[#373643] mb-4">Distribución por Plataforma</h2>
-            {Object.keys(platformDistribution).length > 0 ? (
-              <div className="space-y-3 sm:space-y-4">
-                {Object.entries(platformDistribution).map(([platform, count], index) => {
-                  const percentage = totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0
-                  const colors = ['bg-blue-500', 'bg-[#18cb96]', 'bg-purple-500', 'bg-orange-500', 'bg-red-500']
-                  const color = colors[index % colors.length]
-
-                  return (
-                    <div key={platform} className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className={`w-3 h-3 sm:w-4 sm:h-4 ${color} rounded-full mr-2 sm:mr-3`}></div>
-                        <span className="text-[#373643] text-sm sm:text-base">{platform}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-semibold text-[#373643] text-sm sm:text-base">{percentage}%</span>
-                        <span className="text-xs text-gray-500 ml-1">({count})</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No hay datos de plataformas</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Modal de selección de empresas */}
       {showEmpresaModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -938,17 +1409,17 @@ const Dashboard = () => {
                       onClick={() => handleToggleEmpresa(empresa.id)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
                         tempSelectedEmpresaIds.includes(empresa.id)
-                          ? 'bg-[#18cb96] bg-opacity-10 border-2 border-[#18cb96]'
+                          ? 'bg-[#e8faf5] border-2 border-[#18cb96]'
                           : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
                       }`}
                     >
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${
-                          tempSelectedEmpresaIds.includes(empresa.id) ? 'text-white' : 'text-[#373643]'
+                          tempSelectedEmpresaIds.includes(empresa.id) ? 'text-[#18cb96]' : 'text-[#373643]'
                         }`}>
                           {empresa.nombre}
                         </p>
-                        <p className={`text-xs ${tempSelectedEmpresaIds.includes(empresa.id) ? 'text-white' : 'text-gray-500'} truncate`}>CIF: {empresa.cif}</p>
+                        <p className={`text-xs truncate ${tempSelectedEmpresaIds.includes(empresa.id) ? 'text-[#15b585]' : 'text-gray-500'}`}>CIF: {empresa.cif}</p>
                       </div>
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ml-2 ${
                         tempSelectedEmpresaIds.includes(empresa.id)
@@ -981,6 +1452,123 @@ const Dashboard = () => {
               </button>
               <button
                 onClick={handleApplyEmpresaFilter}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors"
+              >
+                Aplicar filtro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de selección de agentes (para coordinador) */}
+      {showAgentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
+            {/* Header del modal */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-[#373643]">Filtrar por Agente</h3>
+                <button
+                  onClick={() => setShowAgentModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Buscador */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar agente..."
+                  value={agentSearch}
+                  onChange={(e) => setAgentSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                />
+                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              
+              {/* Contador de seleccionados */}
+              {tempSelectedAgentIds.length > 0 && (
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-gray-500">
+                    {tempSelectedAgentIds.length} agente{tempSelectedAgentIds.length !== 1 ? 's' : ''} seleccionado{tempSelectedAgentIds.length !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={handleClearAgentFilter}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium"
+                  >
+                    Limpiar selección
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Lista de agentes */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {agentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#18cb96]"></div>
+                  <span className="ml-2 text-gray-500 text-sm">Cargando agentes...</span>
+                </div>
+              ) : filteredAgents.length > 0 ? (
+                <div className="space-y-1">
+                  {filteredAgents.map((agent) => (
+                    <button
+                      key={agent.user_id}
+                      onClick={() => handleToggleAgent(agent.user_id)}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
+                        tempSelectedAgentIds.includes(agent.user_id)
+                          ? 'bg-[#e8faf5] border-2 border-[#18cb96]'
+                          : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${
+                          tempSelectedAgentIds.includes(agent.user_id) ? 'text-[#18cb96]' : 'text-[#373643]'
+                        }`}>
+                          {agent.nombre || 'Sin nombre'}
+                        </p>
+                        <p className={`text-xs truncate ${tempSelectedAgentIds.includes(agent.user_id) ? 'text-[#15b585]' : 'text-gray-500'}`}>
+                          {agent.email}
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ml-2 ${
+                        tempSelectedAgentIds.includes(agent.user_id)
+                          ? 'bg-[#18cb96] text-white'
+                          : 'bg-gray-200'
+                      }`}>
+                        {tempSelectedAgentIds.includes(agent.user_id) && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-sm">No se encontraron agentes</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer del modal */}
+            <div className="p-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => setShowAgentModal(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApplyAgentFilter}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors"
               >
                 Aplicar filtro

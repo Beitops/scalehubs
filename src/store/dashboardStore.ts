@@ -1,29 +1,10 @@
 import { create } from 'zustand'
-import { leadsService, type Lead } from '../services/leadsService'
-import { salesService, type VentaRealizada, type RankingVendedor } from '../services/salesService'
+import { leadsService } from '../services/leadsService'
 import { useAuthStore } from './authStore'
-import { platformConverter } from '../utils/platformConverter'
-interface DashboardLead {
-  id: number
-  fecha_entrada: string
-  nombre_cliente: string
-  telefono: string
-  plataforma: string
-  empresa_id: number
-  empresa_nombre?: string
-  estado_temporal?: string
-  estado?: string
-  plataforma_lead?: string
-}
 
 type TimeFilter = 'hoy' | 'semana' | 'mes' | 'año' | 'personalizado'
 type DateFieldFilter = 'fecha_entrada' | 'fecha_asignacion'
-
-interface DashboardStats {
-  totalLeads: number
-  leadsCerrados: number
-  platformDistribution: Record<string, number>
-}
+type CoordDateFieldFilter = 'fecha_asignacion' | 'fecha_asignacion_usuario'
 
 interface AdminStats {
   totalLeads: number
@@ -44,29 +25,69 @@ interface AdminLead {
   empresa_nombre?: string
 }
 
+interface CoordStats {
+  totalLeads: number
+  leadsConvertidos: number
+  leadsPerdidos: number
+  leadsInvalidos: number
+}
+
+interface CoordLead {
+  id: number
+  nombre_cliente: string
+  telefono: string
+  fecha_asignacion?: string | null
+  fecha_asignacion_usuario?: string | null
+  user_id?: string | null
+  usuario_nombre?: string
+}
+
+interface AgentStats {
+  totalLeads: number
+  leadsConvertidos: number
+  leadsPerdidos: number
+  leadsInvalidos: number
+}
+
+interface AgentLead {
+  id: number
+  nombre_cliente: string
+  telefono: string
+  fecha_asignacion_usuario?: string | null
+}
+
 interface DashboardState {
-  dashboardLeads: DashboardLead[]
-  ventas: VentaRealizada[]
-  leadsConvertidos: number[]
-  rankingVendedores: RankingVendedor[]
   loading: boolean
   error: string | null
   isInitialized: boolean
   timeFilter: TimeFilter
   dateFieldFilter: DateFieldFilter
+  coordDateFieldFilter: CoordDateFieldFilter
   selectedEmpresaIds: number[]
-  stats: DashboardStats
+  selectedAgentIds: string[]
   adminStats: AdminStats
   adminLeads: AdminLead[]
   adminLeadsPage: number
   adminLeadsTotalCount: number
+  coordStats: CoordStats
+  coordLeads: CoordLead[]
+  coordLeadsPage: number
+  coordLeadsTotalCount: number
+  agentStats: AgentStats
+  agentLeads: AgentLead[]
+  agentLeadsPage: number
+  agentLeadsTotalCount: number
   customDateRange: { startDate: string; endDate: string } | null
   loadDashboardData: (timeFilter?: TimeFilter, customRange?: { startDate: string; endDate: string }) => Promise<void>
   loadDashboardLeads: () => Promise<void> // Mantener compatibilidad
   loadAdminLeadsPage: (page: number) => Promise<void>
+  loadCoordLeadsPage: (page: number) => Promise<void>
+  loadAgentLeadsPage: (page: number) => Promise<void>
   setTimeFilter: (filter: TimeFilter) => void
   setDateFieldFilter: (field: DateFieldFilter) => void
+  setCoordDateFieldFilter: (field: CoordDateFieldFilter) => void
   setSelectedEmpresaIds: (ids: number[]) => void
+  setSelectedAgentIds: (ids: string[]) => void
   setCustomDateRange: (range: { startDate: string; endDate: string }) => void
   resetInitialized: () => void
 }
@@ -114,21 +135,14 @@ const getDateRange = (filter: TimeFilter, customRange?: { startDate: string; end
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
-  dashboardLeads: [],
-  ventas: [],
-  leadsConvertidos: [],
-  rankingVendedores: [],
   loading: false,
   error: null,
   isInitialized: false,
   timeFilter: 'hoy',
   dateFieldFilter: 'fecha_entrada',
+  coordDateFieldFilter: 'fecha_asignacion',
   selectedEmpresaIds: [],
-  stats: {
-    totalLeads: 0,
-    leadsCerrados: 0,
-    platformDistribution: {}
-  },
+  selectedAgentIds: [],
   adminStats: {
     totalLeads: 0,
     leadsConvertidos: 0,
@@ -140,10 +154,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   adminLeads: [],
   adminLeadsPage: 1,
   adminLeadsTotalCount: 0,
+  coordStats: {
+    totalLeads: 0,
+    leadsConvertidos: 0,
+    leadsPerdidos: 0,
+    leadsInvalidos: 0
+  },
+  coordLeads: [],
+  coordLeadsPage: 1,
+  coordLeadsTotalCount: 0,
+  agentStats: {
+    totalLeads: 0,
+    leadsConvertidos: 0,
+    leadsPerdidos: 0,
+    leadsInvalidos: 0
+  },
+  agentLeads: [],
+  agentLeadsPage: 1,
+  agentLeadsTotalCount: 0,
   customDateRange: null,
 
   setTimeFilter: (filter: TimeFilter) => {
-    set({ timeFilter: filter, adminLeadsPage: 1 })
+    set({ timeFilter: filter, adminLeadsPage: 1, coordLeadsPage: 1, agentLeadsPage: 1 })
     if (filter !== 'personalizado') {
       get().loadDashboardData(filter)
     }
@@ -154,8 +186,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     get().loadDashboardData()
   },
 
+  setCoordDateFieldFilter: (field: CoordDateFieldFilter) => {
+    set({ coordDateFieldFilter: field, coordLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
   setSelectedEmpresaIds: (ids: number[]) => {
     set({ selectedEmpresaIds: ids, adminLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
+  setSelectedAgentIds: (ids: string[]) => {
+    set({ selectedAgentIds: ids, coordLeadsPage: 1 })
     get().loadDashboardData()
   },
 
@@ -177,11 +219,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      let Dleads: Lead[] = []
-      let ventas: VentaRealizada[] = []
-      let leadsConvertidos: number[] = []
-      let rankingVendedores: RankingVendedor[] = []
-      
       if (user?.rol === 'administrador') {
         // Para administradores, obtener estadísticas con filtro de fecha y empresas
         const empresaIdsToUse = empresaIds.length > 0 ? empresaIds : undefined
@@ -204,19 +241,46 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       } else if (userEmpresaId) {
         // Usuario no admin, verificar rol
         if (user?.rol === 'coordinador') {
-          // Coordinador ve todos los leads de su empresa, filtrados por fecha_asignacion
-          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, undefined, 'fecha_asignacion')
-          ventas = await salesService.getVentasByCompany(userEmpresaId, startDate, endDate)
-          leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, undefined, startDate, endDate)
-          rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
+          // Coordinador: vista similar a admin pero con filtros específicos
+          const coordDateField = get().coordDateFieldFilter
+          const agentIds = get().selectedAgentIds
+          const agentIdsToUse = agentIds.length > 0 ? agentIds : undefined
+          
+          const [coordStats, coordLeadsData] = await Promise.all([
+            leadsService.getCoordDashboardStats(startDate, endDate, coordDateField, userEmpresaId, agentIdsToUse),
+            leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, 1, 10, userEmpresaId, agentIdsToUse)
+          ])
+          
+          
+          set({ 
+            coordStats,
+            coordLeads: coordLeadsData.leads,
+            coordLeadsPage: 1,
+            coordLeadsTotalCount: coordLeadsData.totalCount,
+            timeFilter: filter,
+            customDateRange: filter === 'personalizado' ? rangeToUse : null,
+            isInitialized: true, 
+            loading: false 
+          })
+          return
         } else if (user?.rol === 'agente') {
-          // Agente solo ve los leads asignados a él, filtrados por fecha_asignacion_usuario
-          Dleads = await leadsService.getLeadsInDateRange(startDate, endDate, userEmpresaId, 'activo', 'fecha_asignacion_usuario')
-          // Filtrar leads asignados al usuario
-          Dleads = Dleads.filter(lead => lead.user_id === user.id)
-          ventas = await salesService.getVentasByUser(userEmpresaId, user.id, startDate, endDate)
-          leadsConvertidos = await salesService.getLeadsConvertidosConVenta(userEmpresaId, user.id, startDate, endDate)
-          rankingVendedores = await salesService.getRankingVendedores(userEmpresaId)
+          // Agente: vista simplificada con solo sus leads asignados, filtrados por fecha_asignacion_usuario
+          const [agentStats, agentLeadsData] = await Promise.all([
+            leadsService.getAgentDashboardStats(startDate, endDate, userEmpresaId, user.id),
+            leadsService.getAgentDashboardLeads(startDate, endDate, 1, 10, userEmpresaId, user.id)
+          ])
+          
+          set({ 
+            agentStats,
+            agentLeads: agentLeadsData.leads,
+            agentLeadsPage: 1,
+            agentLeadsTotalCount: agentLeadsData.totalCount,
+            timeFilter: filter,
+            customDateRange: filter === 'personalizado' ? rangeToUse : null,
+            isInitialized: true, 
+            loading: false 
+          })
+          return
         } else {
           // Rol no reconocido, mostrar error
           console.error('❌ Unknown user role:', user.rol)
@@ -227,48 +291,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         console.error('❌ User without company assigned:', user)
         throw new Error('Usuario sin empresa asignada. Contacta al administrador.')
       }
-      // Convertir a DashboardLead y solo incluir datos necesarios para dashboard
-      const dashboardLeads: DashboardLead[] = Dleads.map(lead => ({
-        id: lead.id,
-        fecha_entrada: lead.fecha_entrada,
-        nombre_cliente: lead.nombre_cliente,
-        telefono: lead.telefono,
-        plataforma: platformConverter(lead.plataforma),
-        empresa_id: lead.empresa_id,
-        empresa_nombre: lead.empresa_nombre,
-        estado_temporal: lead.estado_temporal,
-        estado: lead.estado,
-        plataforma_lead_id: lead.plataforma_lead_id
-      }))
-
-
-      // Calcular estadísticas
-      const totalLeads = dashboardLeads.length
-      const leadsCerrados = leadsConvertidos.length
-
-      // Calcular distribución de plataformas
-      const platformDistribution = dashboardLeads.reduce((acc, lead) => {
-        const platform = lead.plataforma || 'Sin plataforma'
-        acc[platform] = (acc[platform] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-
-      const stats: DashboardStats = {
-        totalLeads,
-        leadsCerrados,
-        platformDistribution
-      }
-
-      set({ 
-        dashboardLeads, 
-        ventas,
-        leadsConvertidos,
-        rankingVendedores,
-        stats,
-        timeFilter: filter,
-        isInitialized: true, 
-        loading: false 
-      })
     } catch (error) {
       console.error('Error loading dashboard data:', error)
       set({ 
@@ -307,17 +329,53 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
+  loadCoordLeadsPage: async (page: number) => {
+    const { user, userEmpresaId } = useAuthStore.getState()
+    if (!user || user.rol !== 'coordinador' || !userEmpresaId) return
+
+    const filter = get().timeFilter
+    const coordDateField = get().coordDateFieldFilter
+    const agentIds = get().selectedAgentIds
+    const rangeToUse = get().customDateRange
+    const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
+
+    try {
+      const agentIdsToUse = agentIds.length > 0 ? agentIds : undefined
+      const coordLeadsData = await leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, page, 10, userEmpresaId, agentIdsToUse)
+      
+      set({ 
+        coordLeads: coordLeadsData.leads,
+        coordLeadsPage: page,
+        coordLeadsTotalCount: coordLeadsData.totalCount
+      })
+    } catch (error) {
+      console.error('Error loading coord leads page:', error)
+    }
+  },
+
+  loadAgentLeadsPage: async (page: number) => {
+    const { user, userEmpresaId } = useAuthStore.getState()
+    if (!user || user.rol !== 'agente' || !userEmpresaId) return
+
+    const filter = get().timeFilter
+    const rangeToUse = get().customDateRange
+    const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
+
+    try {
+      const agentLeadsData = await leadsService.getAgentDashboardLeads(startDate, endDate, page, 10, userEmpresaId, user.id)
+      
+      set({ 
+        agentLeads: agentLeadsData.leads,
+        agentLeadsPage: page,
+        agentLeadsTotalCount: agentLeadsData.totalCount
+      })
+    } catch (error) {
+      console.error('Error loading agent leads page:', error)
+    }
+  },
+
   resetInitialized: () => {
     set({ 
-      dashboardLeads: [], 
-      ventas: [],
-      leadsConvertidos: [],
-      rankingVendedores: [],
-      stats: {
-        totalLeads: 0,
-        leadsCerrados: 0,
-        platformDistribution: {}
-      },
       adminStats: {
         totalLeads: 0,
         leadsConvertidos: 0,
@@ -329,9 +387,29 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       adminLeads: [],
       adminLeadsPage: 1,
       adminLeadsTotalCount: 0,
+      coordStats: {
+        totalLeads: 0,
+        leadsConvertidos: 0,
+        leadsPerdidos: 0,
+        leadsInvalidos: 0
+      },
+      coordLeads: [],
+      coordLeadsPage: 1,
+      coordLeadsTotalCount: 0,
+      agentStats: {
+        totalLeads: 0,
+        leadsConvertidos: 0,
+        leadsPerdidos: 0,
+        leadsInvalidos: 0
+      },
+      agentLeads: [],
+      agentLeadsPage: 1,
+      agentLeadsTotalCount: 0,
       customDateRange: null,
       dateFieldFilter: 'fecha_entrada',
+      coordDateFieldFilter: 'fecha_asignacion',
       selectedEmpresaIds: [],
+      selectedAgentIds: [],
       isInitialized: false 
     })
   }
