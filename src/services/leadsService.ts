@@ -447,19 +447,23 @@ class LeadsService {
     }
   }
 
-  // Asignar lead a una empresa (para administradores)
-  async assignLeadToCompany(leadId: number, empresaId: number): Promise<void> {
+  // Asignar leads a una empresa (para administradores) - soporta uno o múltiples leads
+  async assignLeadToCompany(leadIds: number | number[], empresaId: number): Promise<void> {
     try {
+      const idsArray = Array.isArray(leadIds) ? leadIds : [leadIds]
+      
+      if (idsArray.length === 0) return
+
       const { error } = await supabase
         .from('leads')
         .update({ 
           empresa_id: empresaId,
           fecha_asignacion: new Date().toISOString()
         })
-        .eq('id', leadId)
+        .in('id', idsArray)
 
       if (error) {
-        console.error('Error assigning lead to company:', error)
+        console.error('Error assigning leads to company:', error)
         throw error
       }
     } catch (error) {

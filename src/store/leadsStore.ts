@@ -63,7 +63,7 @@ interface LeadsState {
   cancelDevolucion: (devolucionId: number, leadId: number) => Promise<void>,
   loadUnassignedLeads: () => Promise<void>
   loadUnassignedLeadsByCompany: (empresaId: number) => Promise<void>
-  assignLeadToCompany: (leadId: number, empresaId: number) => Promise<void>
+  assignLeadToCompany: (leadIds: number | number[], empresaId: number) => Promise<void>
   assignLeadToAgent: (leadId: number, userId: string) => Promise<void>
   getLeadById: (leadId: number) => Promise<Lead | null>
   resetInitialized: () => void
@@ -482,9 +482,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  assignLeadToCompany: async (leadId: number, empresaId: number) => {
+  assignLeadToCompany: async (leadIds: number | number[], empresaId: number) => {
     try {
-      await leadsService.assignLeadToCompany(leadId, empresaId)
+      await leadsService.assignLeadToCompany(leadIds, empresaId)
       // Recargar leads sin asignar después de la asignación
       await get().loadUnassignedLeads()
     } catch (error) {

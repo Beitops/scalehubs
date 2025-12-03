@@ -233,10 +233,8 @@ const AsignacionLeads = () => {
     try {
       const leadIds = Array.from(selectedLeadsForBulk)
       
-      // Assign all selected leads to the company
-      for (const leadId of leadIds) {
-        await assignLeadToCompany(leadId, selectedCompany)
-      }
+      // Assign all selected leads to the company in a single database call
+      await assignLeadToCompany(leadIds, selectedCompany)
       
       refreshLeads()
       setShowBulkAssignModal(false)
