@@ -4,10 +4,6 @@ import { supabase } from '../lib/supabase'
 import type { FrontendUser } from '../types/database'
 import type { Session } from '@supabase/supabase-js'
 
-
-
-
-
 interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
@@ -24,7 +20,6 @@ interface AuthState {
     userEmpresaId: number | null
     userEmpresaNombre: string
     userEmpresaConfiguracion: EmpresaConfiguracion | null
-    session: Session | null
     login: (email: string, password: string) => Promise<void>
     signup: (email: string, password: string) => Promise<void>
     logout: () => void
@@ -45,12 +40,11 @@ export const useAuthStore = create<AuthState>()(
             (set, get) => ({
                 user: null,
                 isAuthenticated: false,
-                isLoading: false,
+                isLoading: true,
                 error: null,
                 userEmpresaId: null,
                 userEmpresaNombre: '',
                 userEmpresaConfiguracion: null,
-                session: null,
 
                 getUserEmpresaInfo: async () => {
                     const { user } = get()
@@ -64,7 +58,6 @@ export const useAuthStore = create<AuthState>()(
                             .single()
 
                         if (!profileError && profile?.empresa_id) {
-                            // Obtener nombre de la empresa
                             const { data: empresa, error: empresaError } = await supabase
                                 .from('empresas')
                                 .select('nombre')
@@ -77,21 +70,19 @@ export const useAuthStore = create<AuthState>()(
                                 return { userEmpresaId: profile.empresa_id, userEmpresaNombre: '' }
                             }
                         } else {
-                            // Si no hay empresa_id o hay error, retornar valores por defecto
                             return { userEmpresaId: null, userEmpresaNombre: '' }
                         }
                     } catch (error) {
                         console.error('Error getting user empresa info:', error)
-                        // En caso de error, retornar valores por defecto
                         return { userEmpresaId: null, userEmpresaNombre: '' }
                     }
                 },
 
                 login: async (email: string, password: string) => {
+                    set({ isLoading: true, error: null })
 
                     try {
-                        // Iniciar sesión con Supabase
-                        const { data, error } = await supabase.auth.signInWithPassword({
+                        const { error } = await supabase.auth.signInWithPassword({
                             email,
                             password
                         })
@@ -99,12 +90,7 @@ export const useAuthStore = create<AuthState>()(
                         if (error) {
                             throw new Error(error.message)
                         }
-
-                        if (!data.user) {
-                            throw new Error('No se pudo autenticar al usuario')
-                        }
-
-
+                        // onAuthStateChange manejará el resto
                     } catch (error) {
                         set({
                             isLoading: false,
@@ -113,18 +99,16 @@ export const useAuthStore = create<AuthState>()(
                     }
                 },
 
-                signup: async (email: string, password: string) => {
+                signup: async (_email: string, password: string) => {
                     set({ isLoading: true, error: null })
 
                     try {
-                        // Obtener el usuario actual de Supabase (el usuario invitado)
                         const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
 
                         if (userError || !currentUser) {
                             throw new Error('No se pudo obtener la información del usuario')
                         }
 
-                        // Actualizar solo la contraseña del usuario invitado
                         const { error: updateError } = await supabase.auth.updateUser({
                             password: password
                         })
@@ -132,31 +116,82 @@ export const useAuthStore = create<AuthState>()(
                         if (updateError) {
                             throw new Error(updateError.message)
                         }
+                        // onAuthStateChange manejará el resto
+                    } catch (error) {
+                        set({
+                            isLoading: false,
+                            error: error instanceof Error ? error.message : 'Error al crear la cuenta'
+                        })
+                    }
+                },
 
-                        // Obtener los datos del usuario actualizado
-                        const { data: { user: updatedUser }, error: getUserError } = await supabase.auth.getUser()
+                logout: async () => {
+                    try {
+                        await supabase.auth.signOut()
+                    } catch (error) {
+                        console.error('Error al cerrar sesión:', error)
+                    } finally {
+                        set({
+                            user: null,
+                            isAuthenticated: false,
+                            isLoading: false,
+                            error: null,
+                            userEmpresaId: null,
+                            userEmpresaNombre: '',
+                            userEmpresaConfiguracion: null
+                        })
+                    }
+                },
 
-                        if (getUserError || !updatedUser) {
-                            throw new Error('Error al obtener el usuario actualizado')
-                        }
+                clearError: () => {
+                    set({ error: null })
+                },
 
-                        // Obtener el perfil existente (ya creado por la edge function)
+                checkAuth: async (session: Session | null) => {
+                    // Si no hay sesión, limpiar estado
+                    if (!session?.user?.id) {
+                        set({
+                            user: null,
+                            isAuthenticated: false,
+                            isLoading: false,
+                            userEmpresaId: null,
+                            userEmpresaNombre: '',
+                            userEmpresaConfiguracion: null
+                        })
+                        return
+                    }
+
+                    // Si ya estamos autenticados con el mismo usuario, no hacer nada
+                    const currentUser = get().user
+                    if (currentUser?.id === session.user.id && get().isAuthenticated) {
+                        set({ isLoading: false })
+                        return
+                    }
+
+                    set({ isLoading: true, error: null })
+
+                    try {
                         const { data: profileWithEmpresa, error: profileError } = await supabase
                             .from('profiles')
                             .select(`
                                 *,
-                                empresas!inner(
+                                empresas(
                                     id,
                                     nombre,
                                     cif
                                 )
                             `)
-                            .eq('user_id', updatedUser.id)
+                            .eq('user_id', session.user.id)
                             .single()
 
                         if (profileError) {
                             console.error('Error al obtener perfil:', profileError)
-                            throw new Error('Perfil de usuario no encontrado')
+                            set({
+                                user: null,
+                                isAuthenticated: false,
+                                isLoading: false
+                            })
+                            return
                         }
 
                         const { data: roles, error: rolesError } = await supabase
@@ -169,33 +204,29 @@ export const useAuthStore = create<AuthState>()(
                             console.error('Error al obtener roles:', rolesError)
                             throw new Error('Error al obtener roles')
                         }
-                        
 
-                        // Extraer información de la empresa
                         const empresa = profileWithEmpresa.empresas
                         const companyCif = empresa?.cif || ''
-                        const userEmpresaId = empresa?.id || null
-                        const userEmpresaNombre = empresa?.nombre || ''
+                        const empresaId = empresa?.id || null
+                        const empresaNombre = empresa?.nombre || ''
 
-                        // Cargar configuración de la empresa si existe
                         let empresaConfiguracion = null
-                        if (userEmpresaId) {
+                        if (empresaId) {
                             const { data: configData } = await supabase
                                 .from('configuraciones_empresa')
                                 .select('configuraciones')
-                                .eq('empresa_id', userEmpresaId)
+                                .eq('empresa_id', empresaId)
                                 .single()
-                            
+
                             if (configData?.configuraciones) {
                                 empresaConfiguracion = configData.configuraciones as EmpresaConfiguracion
                             }
                         }
 
-                        // Crear objeto de usuario para el store
                         const frontendUser: FrontendUser = {
-                            id: updatedUser.id,
+                            id: profileWithEmpresa.user_id,
                             nombre: profileWithEmpresa.nombre || 'Usuario',
-                            email: email,
+                            email: session.user.email || '',
                             empresa: companyCif,
                             rol: roles.nombre
                         }
@@ -204,47 +235,17 @@ export const useAuthStore = create<AuthState>()(
                             user: frontendUser,
                             isAuthenticated: true,
                             isLoading: false,
-                            error: null,
-                            userEmpresaId: userEmpresaId,
-                            userEmpresaNombre: userEmpresaNombre,
+                            userEmpresaId: empresaId,
+                            userEmpresaNombre: empresaNombre,
                             userEmpresaConfiguracion: empresaConfiguracion
                         })
                     } catch (error) {
+                        console.error('Error checking auth:', error)
                         set({
                             isLoading: false,
-                            error: error instanceof Error ? error.message : 'Error al crear la cuenta'
+                            error: error instanceof Error ? error.message : 'Error al verificar la autenticación'
                         })
                     }
-                },
-
-                logout: async () => {
-                    try {
-                        // Cerrar sesión en Supabase
-                        const { error } = await supabase.auth.signOut()
-
-                        if (error) {
-                            console.error('Error al cerrar sesión:', error)
-                        }
-                    } catch (error) {
-                        console.error('Error al cerrar sesión:', error)
-                    } finally {
-                        // Limpiar estado local independientemente del resultado
-                        set({
-                            user: null,
-                            isAuthenticated: false,
-                            isLoading: false,
-                            error: null,
-                            userEmpresaId: null,
-                            userEmpresaNombre: '',
-                            userEmpresaConfiguracion: null,
-                            session: null
-                        })
-                        window.location.reload()
-                    }
-                },
-
-                clearError: () => {
-                    set({ error: null })
                 },
 
                 updateEmpresaConfiguracion: async (config: EmpresaConfiguracion) => {
@@ -254,7 +255,6 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     try {
-                        // Si maximoAgentes no se proporciona, no se incluye en la actualización
                         const configToSave = {
                             ...config,
                             ...(config.maximoAgentes !== undefined && { maximoAgentes: config.maximoAgentes })
@@ -285,10 +285,9 @@ export const useAuthStore = create<AuthState>()(
                             .select('configuraciones, dias_exclusividad')
                             .eq('empresa_id', empresaId)
                             .single()
-                        
+
                         if (error) {
                             if (error.code === 'PGRST116') {
-                                // No existe configuración, retornar valores por defecto
                                 return {
                                     maxSolicitudesPorAgente: 1,
                                     solicitudesAutomaticas: false,
@@ -302,7 +301,6 @@ export const useAuthStore = create<AuthState>()(
 
                         if (configData?.configuraciones) {
                             const config = configData.configuraciones as EmpresaConfiguracion
-                            // Asegurar que el nuevo campo existe
                             return {
                                 maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
                                 solicitudesAutomaticas: config.solicitudesAutomaticas || false,
@@ -326,9 +324,8 @@ export const useAuthStore = create<AuthState>()(
 
                 updateEmpresaConfiguracionById: async (empresaId: number, config: EmpresaConfiguracion) => {
                     try {
-                        // Extraer diasExclusividad del config para guardarlo en su campo separado
                         const { diasExclusividad, ...configJSON } = config
-                        
+
                         const { error } = await supabase
                             .from('configuraciones_empresa')
                             .upsert({
@@ -362,7 +359,6 @@ export const useAuthStore = create<AuthState>()(
 
                 getAgentesCountByEmpresa: async (empresaId: number) => {
                     try {
-                        // Obtener el ID del rol 'agente'
                         const { data: rolAgente, error: rolError } = await supabase
                             .from('roles')
                             .select('id')
@@ -373,7 +369,6 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error('No se pudo obtener el rol de agente')
                         }
 
-                        // Contar agentes de la empresa
                         const { count, error: countError } = await supabase
                             .from('profiles')
                             .select('*', { count: 'exact', head: true })
@@ -392,21 +387,19 @@ export const useAuthStore = create<AuthState>()(
 
                 canAddAgente: async (empresaId: number) => {
                     try {
-                        // Obtener configuración de la empresa
                         const { data: configData, error: configError } = await supabase
                             .from('configuraciones_empresa')
                             .select('configuraciones')
                             .eq('empresa_id', empresaId)
                             .single()
-                        
-                        let maxAgentes = 1 // Valor por defecto
-                        
+
+                        let maxAgentes = 1
+
                         if (!configError && configData?.configuraciones) {
-                            const config = configData.configuraciones as any
+                            const config = configData.configuraciones as EmpresaConfiguracion
                             maxAgentes = config.maximoAgentes !== undefined ? config.maximoAgentes : 1
                         }
 
-                        // Contar agentes actuales
                         const currentCount = await get().getAgentesCountByEmpresa(empresaId)
 
                         return {
@@ -417,108 +410,18 @@ export const useAuthStore = create<AuthState>()(
                     } catch (error) {
                         throw error
                     }
-                },
-
-                // Función para verificar el estado de autenticación al cargar la app
-                checkAuth: async (session: Session | null) => {
-
-
-                    try {
-                        if (session?.user && session.user.id) {
-                            set({ isLoading: true, error: null })
-                            // Obtener el perfil del usuario y la información de la empresa en una sola consulta
-                            const { data: profileWithEmpresa, error: profileError } = await supabase
-                                .from('profiles')
-                                .select(`
-                                    *,
-                                    empresas(
-                                        id,
-                                        nombre,
-                                        cif
-                                    )
-                                `)
-                                .eq('user_id', session.user.id)
-                                .single()
-                            
-
-
-
-                            if (profileError) {
-                                console.error('Error al obtener perfil:', profileError)
-                                // Si no hay perfil, limpiar el estado
-                                set({
-                                    user: null,
-                                    isAuthenticated: false,
-                                    isLoading: false
-                                })
-                                return
-                            }
-
-                            const { data: roles, error: rolesError } = await supabase
-                                .from('roles')
-                                .select('nombre')
-                                .eq('id', profileWithEmpresa.rol_id)
-                                .single()
-
-                            if (rolesError || !roles) {
-                                console.error('Error al obtener roles:', rolesError)
-                                throw new Error('Error al obtener roles')
-                            }
-
-                            // Extraer información de la empresa (puede ser null para admins)
-                            const empresa = profileWithEmpresa.empresas
-                            const companyCif = empresa?.cif || ''
-                            const empresaId = empresa?.id || null
-                            const empresaNombre = empresa?.nombre || ''
-
-                            // Cargar configuración de la empresa si existe
-                            let empresaConfiguracion = null
-                            if (empresaId) {
-                                const { data: configData } = await supabase
-                                    .from('configuraciones_empresa')
-                                    .select('configuraciones')
-                                    .eq('empresa_id', empresaId)
-                                    .single()
-                                
-                                if (configData?.configuraciones) {
-                                    empresaConfiguracion = configData.configuraciones as EmpresaConfiguracion
-                                }
-                            }
-
-                            const frontendUser: FrontendUser = {
-                                id: profileWithEmpresa.user_id,
-                                nombre: profileWithEmpresa.nombre || 'Usuario',
-                                email: session.user.email || '',
-                                empresa: companyCif,
-                                rol: roles.nombre
-                            }
-
-                            set({
-                                user: frontendUser,
-                                isAuthenticated: true,
-                                isLoading: false,
-                                userEmpresaId: empresaId,
-                                userEmpresaNombre: empresaNombre,
-                                userEmpresaConfiguracion: empresaConfiguracion,
-                                session: session
-                            })
-                        }
-                    } catch (error) {
-                        console.error('Error checking auth:', error)
-                        set({ isLoading: false, error: error instanceof Error ? error.message : 'Error al verificar la autenticación' })
-                    }
                 }
             }),
             {
-                name: 'auth-storage', // name of the item in localStorage
+                name: 'auth-storage',
                 partialize: (state) => ({
                     user: state.user,
                     isAuthenticated: state.isAuthenticated,
                     userEmpresaId: state.userEmpresaId,
                     userEmpresaNombre: state.userEmpresaNombre,
-                    userEmpresaConfiguracion: state.userEmpresaConfiguracion,
-                    session: state.session
-                }), // persist these fields
+                    userEmpresaConfiguracion: state.userEmpresaConfiguracion
+                    // NO persistimos isLoading, error, ni session
+                })
             }
         ),
         {
@@ -526,5 +429,3 @@ export const useAuthStore = create<AuthState>()(
         }
     )
 )
-
-// Listener para cambios de autenticación de Supabase

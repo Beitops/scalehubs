@@ -21,8 +21,7 @@ const Register = () => {
   const [isValidHash, setIsValidHash] = useState(false)
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true)
 
-  const { signup, isLoading, error, clearError } = useAuthStore()
-
+  const { isLoading, error, clearError, isAuthenticated, user } = useAuthStore()
 
   const getTokensFromUrl = () => {
     const raw = window.location.hash?.substring(1) || window.location.search?.substring(1) || ''
@@ -32,10 +31,9 @@ const Register = () => {
       refresh_token: params.get('refresh_token') || undefined,
     }
   }
+
   // Verificar si hay hash en la URL y obtener metadata
   useEffect(() => {
-
-
     const getSessionAndMetadata = async () => {
       try {
         setIsLoadingMetadata(true)
@@ -48,11 +46,12 @@ const Register = () => {
           return
         }
 
-        // 2) ESTABLECER sesión (no refresh)
+        // 2) ESTABLECER sesión - esto disparará SIGNED_IN en el listener
         const { data: setData, error: setErr } = await supabase.auth.setSession({
           access_token,
           refresh_token
         })
+
         if (setErr || !setData.session) {
           console.error('Error setSession:', setErr)
           navigate('/auth')
@@ -129,6 +128,15 @@ const Register = () => {
     getSessionAndMetadata()
   }, [navigate, clearError])
 
+  // Redirigir cuando el usuario ya está completamente autenticado
+  // (después de establecer la contraseña)
+  useEffect(() => {
+    // Solo redirigir si ya terminamos de cargar metadata y el usuario está autenticado
+    if (!isLoadingMetadata && isAuthenticated && user && formData.password) {
+      navigate('/')
+    }
+  }, [isAuthenticated, user, isLoadingMetadata, formData.password, navigate])
+
   const validatePassword = (password: string, confirmPassword: string) => {
     if (password.length < 6) {
       return 'La contraseña debe tener al menos 6 caracteres'
@@ -152,13 +160,20 @@ const Register = () => {
     setPasswordError('')
 
     try {
-      // Solo actualizar la contraseña del usuario
-      await signup(formData.email, formData.password)
+      // Actualizar la contraseña del usuario
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: formData.password
+      })
 
-      // Redirigir después del signup exitoso
-      navigate('/')
+      if (updateError) {
+        throw new Error(updateError.message)
+      }
+
+      // El listener onAuthStateChange manejará el evento USER_UPDATED
+      // y actualizará el store, lo cual disparará la redirección
     } catch (error) {
       console.error('Register error:', error)
+      setPasswordError(error instanceof Error ? error.message : 'Error al configurar la contraseña')
     }
   }
 
@@ -365,4 +380,4 @@ const Register = () => {
   )
 }
 
-export default Register 
+export default Register

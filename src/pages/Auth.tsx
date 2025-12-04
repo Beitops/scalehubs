@@ -16,20 +16,21 @@ const Auth = () => {
   // Clear error when component mounts
   useEffect(() => {
     clearError()
-  }, [])
+  }, [clearError])
 
   // Redirect to platform when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/')
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       await login(formData.email, formData.password)
+      // El listener onAuthStateChange manejará la autenticación
     } catch (error) {
       console.error('Auth error:', error)
     }
@@ -144,4 +145,4 @@ const Auth = () => {
   )
 }
 
-export default Auth 
+export default Auth
