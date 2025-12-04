@@ -4,6 +4,16 @@ import { supabase } from '../lib/supabase'
 import type { FrontendUser } from '../types/database'
 import type { Session } from '@supabase/supabase-js'
 
+// Función para resetear todos los stores cuando cambia el usuario
+const resetAllStores = async () => {
+    // Importar dinámicamente para evitar dependencias circulares
+    const { useLeadsStore } = await import('./leadsStore')
+    const { useDashboardStore } = await import('./dashboardStore')
+    
+    useLeadsStore.getState().resetInitialized()
+    useDashboardStore.getState().resetInitialized()
+}
+
 interface EmpresaConfiguracion {
     maxSolicitudesPorAgente: number
     solicitudesAutomaticas: boolean
@@ -131,6 +141,9 @@ export const useAuthStore = create<AuthState>()(
                     } catch (error) {
                         console.error('Error al cerrar sesión:', error)
                     } finally {
+                        // Resetear todos los stores
+                        await resetAllStores()
+                        
                         set({
                             user: null,
                             isAuthenticated: false,
@@ -150,6 +163,7 @@ export const useAuthStore = create<AuthState>()(
                 checkAuth: async (session: Session | null) => {
                     // Si no hay sesión, limpiar estado
                     if (!session?.user?.id) {
+                        await resetAllStores()
                         set({
                             user: null,
                             isAuthenticated: false,
@@ -166,6 +180,11 @@ export const useAuthStore = create<AuthState>()(
                     if (currentUser?.id === session.user.id && get().isAuthenticated) {
                         set({ isLoading: false })
                         return
+                    }
+
+                    // Si hay un usuario diferente, resetear los stores
+                    if (currentUser && currentUser.id !== session.user.id) {
+                        await resetAllStores()
                     }
 
                     set({ isLoading: true, error: null })

@@ -518,7 +518,20 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   },
 
   resetInitialized: () => {
-    set({ leads: [], devoluciones: [], unassignedLeads: [], isInitialized: false })
+    set({ 
+      leads: [], 
+      leadsHistorial: [],
+      activeLeads: [],
+      unassignedLeads: [],
+      devoluciones: [], 
+      leadsInDevolucion: [],
+      leadsInTramite: [],
+      historialTotalCount: 0,
+      historialCurrentPage: 1,
+      historialTotalPages: 0,
+      isInitialized: false,
+      error: null
+    })
   },
 
   updateActiveLeadLocally: (leadId: number, updates: Partial<Lead>) => {
