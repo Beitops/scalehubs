@@ -244,6 +244,8 @@ const Leads = () => {
   const [campaigns, setCampaigns] = useState<Array<{id: number, nombre: string, meta_plataforma_id: string | null}>>([])
   const [hubs, setHubs] = useState<Array<{id: number, nombre: string}>>([])
   const [assignedUsers, setAssignedUsers] = useState<AssignedUserProfile[]>([])
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [userSearchText, setUserSearchText] = useState('')
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
@@ -312,6 +314,18 @@ const Leads = () => {
     () => createAssignedUsersById(assignedUsers),
     [assignedUsers]
   )
+
+  // Filtrar usuarios para el dropdown basado en el texto de búsqueda
+  const filteredAssignedUsers = useMemo(() => {
+    if (!userSearchText.trim()) return assignedUsers
+    const searchLower = userSearchText.toLowerCase()
+    return assignedUsers.filter(userProfile => {
+      const nombre = (userProfile.nombre || '').toLowerCase()
+      const email = (userProfile.email || '').toLowerCase()
+      const rol = (userProfile.rol || '').toLowerCase()
+      return nombre.includes(searchLower) || email.includes(searchLower) || rol.includes(searchLower)
+    })
+  }, [assignedUsers, userSearchText])
 
   const filteredLeads = useMemo(() => {
     const filtered = filterLeads(activeLeads, {
@@ -1242,33 +1256,107 @@ const Leads = () => {
                 </select>
               </div>
               {user?.rol === 'coordinador' && (
-                <div>
+                <div className="relative">
                   <label htmlFor="assignedUserFilter" className="block text-sm font-medium text-[#373643] mb-2">
                     Filtrar por usuario asignado
                   </label>
-                  <input
-                    type="text"
-                    id="assignedUserFilter"
-                    placeholder="Buscar por nombre, email o rol..."
-                    value={assignedUserFilter}
-                    onChange={(e) => setAssignedUserFilter(e.target.value)}
-                    list={assignedUsers.length > 0 ? 'assignedUserFilterList' : undefined}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
-                  />
-                  {assignedUsers.length > 0 && (
-                    <datalist id="assignedUserFilterList">
-                      {assignedUsers.map(userProfile => {
-                        const displayName = userProfile.nombre || userProfile.email || 'Sin nombre'
-                        const label = `${displayName}${userProfile.rol ? ` (${userProfile.rol})` : ''}`
-                        return (
-                          <option
-                            key={userProfile.user_id}
-                            value={displayName}
-                            label={label}
-                          />
-                        )
-                      })}
-                    </datalist>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="assignedUserFilter"
+                      placeholder="Buscar usuario..."
+                      value={showUserDropdown ? userSearchText : assignedUserFilter}
+                      onChange={(e) => {
+                        setUserSearchText(e.target.value)
+                        if (!showUserDropdown) setShowUserDropdown(true)
+                      }}
+                      onFocus={() => {
+                        setShowUserDropdown(true)
+                        setUserSearchText(assignedUserFilter)
+                      }}
+                      className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowUserDropdown(!showUserDropdown)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className={`w-4 h-4 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Dropdown */}
+                  {showUserDropdown && (
+                    <>
+                      {/* Overlay para cerrar el dropdown al hacer clic fuera */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => {
+                          setShowUserDropdown(false)
+                          setUserSearchText('')
+                        }}
+                      />
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {/* Opción para limpiar filtro */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssignedUserFilter('')
+                            setUserSearchText('')
+                            setShowUserDropdown(false)
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition-colors cursor-pointer ${
+                            !assignedUserFilter ? 'bg-[#e8faf5] text-[#18cb96] font-medium' : 'text-gray-600'
+                          }`}
+                        >
+                          Todos los usuarios
+                        </button>
+                        
+                        {/* Lista de usuarios */}
+                        {filteredAssignedUsers.length > 0 ? (
+                          filteredAssignedUsers.map(userProfile => {
+                            const displayName = userProfile.nombre || userProfile.email || 'Sin nombre'
+                            const isSelected = assignedUserFilter === displayName
+                            return (
+                              <button
+                                type="button"
+                                key={userProfile.user_id}
+                                onClick={() => {
+                                  setAssignedUserFilter(displayName)
+                                  setUserSearchText('')
+                                  setShowUserDropdown(false)
+                                }}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition-colors cursor-pointer flex items-center justify-between ${
+                                  isSelected ? 'bg-[#e8faf5]' : ''
+                                }`}
+                              >
+                                <div className="flex flex-col min-w-0">
+                                  <span className={`truncate ${isSelected ? 'text-[#18cb96] font-medium' : 'text-[#373643]'}`}>
+                                    {displayName}
+                                  </span>
+                                  {userProfile.email && userProfile.nombre && (
+                                    <span className="text-xs text-gray-400 truncate">{userProfile.email}</span>
+                                  )}
+                                </div>
+                                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                                  userProfile.rol === 'coordinador' 
+                                    ? 'bg-purple-100 text-purple-700' 
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {userProfile.rol === 'coordinador' ? 'Coord.' : 'Agente'}
+                                </span>
+                              </button>
+                            )
+                          })
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                            No se encontraron usuarios
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               )}

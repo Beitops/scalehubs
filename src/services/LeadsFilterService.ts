@@ -55,7 +55,7 @@ export const fetchAssignedUsers = async (
     )
     .eq('empresa_id', empresaId)
     .eq('es_admin', false)
-    .or('roles.nombre.eq.agente,roles.nombre.eq.coordinador')
+    .in('roles.id', [2, 3])
     .order('nombre', { ascending: true })
 
   if (error) {
