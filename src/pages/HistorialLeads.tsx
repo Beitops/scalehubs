@@ -564,7 +564,7 @@ const HistorialLeads = () => {
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Estado</label>
-                  <div className="mt-1">{getStatusBadge(selectedLeadDetails.estado || '')}</div>
+                  <div className="mt-1">{getStatusBadge(selectedLeadDetails.estado_temporal || '')}</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Usuario Asignado</label>
@@ -729,7 +729,7 @@ const HistorialLeads = () => {
                   <div className="text-xs text-gray-600 mt-3">
                     <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
                     <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
-                    <p><strong>Estado actual:</strong> {getStatusBadge(selectedLead.estado || '')}</p>
+                    <p><strong>Estado actual:</strong> {getStatusBadge(selectedLead.estado_temporal || '')}</p>
                     <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                   </div>
                 )}

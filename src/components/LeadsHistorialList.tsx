@@ -1,5 +1,6 @@
 import type { Lead } from '../services/leadsService'
 import { ActionMenu } from './ActionMenu'
+import { formatEstado } from '../utils/estadoConverter'
 
 interface LeadsHistorialListProps {
   leads: Lead[]
@@ -9,37 +10,51 @@ interface LeadsHistorialListProps {
   onCancelStatus: (lead: Lead) => void
 }
 
-const getStatusBadge = (status: string) => {
-  if (status === 'convertido') {
-    return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-green-700 bg-green-100">
-        Convertido
-      </span>
-    )
-  } else if (status === 'perdido') {
-    return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
-        Perdido
-      </span>
-    )
-  } else if (status === 'no_valido') {
-    return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-orange-700 bg-orange-100">
-        No válido
-      </span>
-    )
-  } else if (status === 'activo') {
-    return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-emerald-700 bg-emerald-100">
-        Activo
-      </span>
-    )
+const getStatusBadge = (estadoTemporal: string) => {
+  switch (estadoTemporal) {
+    case 'convertido':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-green-700 bg-green-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    case 'no_cerrado':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-red-700 bg-red-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    case 'no_valido':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-orange-700 bg-orange-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    case 'no_contesta':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-yellow-700 bg-yellow-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    case 'gestion':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-blue-700 bg-blue-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    case 'sin_tratar':
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-gray-700 bg-gray-100">
+          {formatEstado(estadoTemporal)}
+        </span>
+      )
+    default:
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-gray-700 bg-gray-100">
+          {formatEstado(estadoTemporal) || 'N/A'}
+        </span>
+      )
   }
-  return (
-    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-gray-700 bg-gray-100">
-      {status || 'N/A'}
-    </span>
-  )
 }
 
 export const LeadsHistorialList = ({
@@ -104,7 +119,7 @@ export const LeadsHistorialList = ({
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
                 <div className="flex items-center gap-2">
-                  {getStatusBadge(lead.estado || '')}
+                  {getStatusBadge(lead.estado_temporal || '')}
                 </div>
               </div>
               <div className="space-y-1 text-xs text-gray-600">
@@ -176,7 +191,7 @@ export const LeadsHistorialList = ({
                     {lead.telefono}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(lead.estado || '')}
+                    {getStatusBadge(lead.estado_temporal || '')}
                   </td>
                   {userRole === 'administrador' && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
