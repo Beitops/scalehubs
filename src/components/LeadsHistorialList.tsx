@@ -117,7 +117,9 @@ export const LeadsHistorialList = ({
           leads.map((lead) => (
             <div key={lead.id} className="p-4 border-b border-gray-200 last:border-b-0">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
+                <h3 className="font-medium text-[#373643] text-sm" title={lead.nombre_cliente}>
+                  {lead.nombre_cliente.length > 50 ? `${lead.nombre_cliente.slice(0, 50)}...` : lead.nombre_cliente}
+                </h3>
                 <div className="flex items-center gap-2">
                   {getStatusBadge(lead.estado_temporal || '')}
                 </div>
@@ -185,7 +187,9 @@ export const LeadsHistorialList = ({
                       : new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-[#373643]">{lead.nombre_cliente}</div>
+                    <div className="text-sm font-medium text-[#373643]" title={lead.nombre_cliente}>
+                      {lead.nombre_cliente.length > 50 ? `${lead.nombre_cliente.slice(0, 50)}...` : lead.nombre_cliente}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                     {lead.telefono}

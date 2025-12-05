@@ -540,7 +540,9 @@ const HistorialLeads = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Nombre del Cliente</label>
-                  <p className="text-sm text-gray-700">{selectedLeadDetails.nombre_cliente}</p>
+                  <p className="text-sm text-gray-700" title={selectedLeadDetails.nombre_cliente}>
+                    {selectedLeadDetails.nombre_cliente.length > 50 ? `${selectedLeadDetails.nombre_cliente.slice(0, 50)}...` : selectedLeadDetails.nombre_cliente}
+                  </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Teléfono</label>
@@ -727,7 +729,7 @@ const HistorialLeads = () => {
                 </div>
                 {selectedLead && (
                   <div className="text-xs text-gray-600 mt-3">
-                    <p><strong>Nombre:</strong> {selectedLead.nombre_cliente}</p>
+                    <p title={selectedLead.nombre_cliente}><strong>Nombre:</strong> {selectedLead.nombre_cliente.length > 50 ? `${selectedLead.nombre_cliente.slice(0, 50)}...` : selectedLead.nombre_cliente}</p>
                     <p><strong>Teléfono:</strong> {selectedLead.telefono}</p>
                     <p><strong>Estado actual:</strong> {getStatusBadge(selectedLead.estado_temporal || '')}</p>
                     <p><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
