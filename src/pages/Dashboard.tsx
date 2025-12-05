@@ -3,7 +3,39 @@ import { useAuthStore } from '../store/authStore'
 import { useDashboardStore } from '../store/dashboardStore'
 import { companyService, type Company } from '../services/companyService'
 import { getUsersByCompany } from '../services/userService'
+import { leadsService } from '../services/leadsService'
+import { formatEstado } from '../utils/estadoConverter'
 import type { DatabaseProfile } from '../types/database'
+
+// Tipos para los leads de exportación
+interface AdminExportLead {
+  id: number
+  nombre_cliente: string
+  telefono: string
+  fecha_entrada: string
+  fecha_asignacion?: string | null
+  fecha_asignacion_usuario?: string | null
+  empresa_nombre?: string
+  user_id?: string | null
+  usuario_nombre?: string
+  hub_nombre?: string
+  plataforma?: string
+  estado_temporal?: string
+  observaciones?: string
+  campaña_nombre?: string
+}
+
+interface CoordExportLead {
+  id: number
+  nombre_cliente: string
+  telefono: string
+  fecha_asignacion?: string | null
+  fecha_asignacion_usuario?: string | null
+  user_id?: string | null
+  usuario_nombre?: string
+  estado_temporal?: string
+  observaciones?: string
+}
 
 
 
@@ -60,6 +92,12 @@ const Dashboard = () => {
   const [agentsLoading, setAgentsLoading] = useState(false)
   const [agentSearch, setAgentSearch] = useState('')
   const [tempSelectedAgentIds, setTempSelectedAgentIds] = useState<string[]>([])
+
+  // Estado para el modal de exportación
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportFilename, setExportFilename] = useState('')
+  const [exportLeads, setExportLeads] = useState<AdminExportLead[] | CoordExportLead[]>([])
+  const [exportLoading, setExportLoading] = useState(false)
 
   // Cargar datos del dashboard cuando el componente se monte
   useEffect(() => {
@@ -238,6 +276,204 @@ const Dashboard = () => {
     (a.nombre?.toLowerCase() || '').includes(agentSearch.toLowerCase()) ||
     (a.email?.toLowerCase() || '').includes(agentSearch.toLowerCase())
   )
+
+  // Función auxiliar para obtener el rango de fechas actual
+  const getDateRangeForExport = (): { startDate: string; endDate: string } => {
+    const now = new Date()
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    const endDate = endOfDay.toISOString()
+    
+    switch (timeFilter) {
+      case 'hoy': {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        return { startDate: startOfDay.toISOString(), endDate }
+      }
+      case 'semana': {
+        const startOfWeek = new Date(now)
+        startOfWeek.setDate(now.getDate() - 7)
+        startOfWeek.setHours(0, 0, 0, 0)
+        return { startDate: startOfWeek.toISOString(), endDate }
+      }
+      case 'mes': {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        return { startDate: startOfMonth.toISOString(), endDate }
+      }
+      case 'año': {
+        const startOfYear = new Date(now.getFullYear(), 0, 1)
+        return { startDate: startOfYear.toISOString(), endDate }
+      }
+      case 'personalizado': {
+        if (customDateRange) {
+          const customStart = new Date(customDateRange.startDate)
+          customStart.setHours(0, 0, 0, 0)
+          const customEnd = new Date(customDateRange.endDate)
+          customEnd.setHours(23, 59, 59, 999)
+          return { startDate: customStart.toISOString(), endDate: customEnd.toISOString() }
+        }
+        return { startDate: '', endDate: '' }
+      }
+      default:
+        return { startDate: '', endDate: '' }
+    }
+  }
+
+  // Abrir modal de exportación
+  const handleOpenExportModal = async () => {
+    setShowExportModal(true)
+    setExportFilename('')
+    setExportLoading(true)
+    
+    const { startDate, endDate } = getDateRangeForExport()
+    
+    try {
+      if (isAdmin) {
+        const empresaIdsToUse = selectedEmpresaIds.length > 0 ? selectedEmpresaIds : undefined
+        const leads = await leadsService.getAdminDashboardLeadsForExport(
+          startDate, 
+          endDate, 
+          dateFieldFilter, 
+          empresaIdsToUse
+        )
+        setExportLeads(leads)
+      } else if (isCoord && userEmpresaId) {
+        const agentIdsToUse = selectedAgentIds.length > 0 ? selectedAgentIds : undefined
+        const leads = await leadsService.getCoordDashboardLeadsForExport(
+          startDate, 
+          endDate, 
+          coordDateFieldFilter, 
+          userEmpresaId, 
+          agentIdsToUse
+        )
+        setExportLeads(leads)
+      }
+    } catch (error) {
+      console.error('Error loading leads for export:', error)
+      setExportLeads([])
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  // Formatear fecha para CSV
+  const formatDateForCSV = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // Escapar valor para CSV
+  const escapeCSV = (value: string | null | undefined, isPhone: boolean = false): string => {
+    if (value === null || value === undefined) return ''
+    const str = String(value)
+    
+    // Para teléfonos, usar formato ="valor" para forzar a Excel a tratarlo como texto
+    // Esto preserva el signo + y evita que Excel lo interprete como número
+    if (isPhone) {
+      return `="${str.replace(/"/g, '""')}"`
+    }
+    
+    // Si contiene comas, comillas o saltos de línea, envolver en comillas
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`
+    }
+    return str
+  }
+
+  // Generar y descargar CSV
+  const handleExportCSV = () => {
+    if (!exportFilename.trim()) return
+    
+    let csvContent = ''
+    const BOM = '\uFEFF' // BOM para Excel reconozca UTF-8
+    
+    if (isAdmin) {
+      // Headers para admin
+      const headers = [
+        'Nombre',
+        'Teléfono',
+        'Fecha Entrada',
+        'Fecha Asignación',
+        'Fecha Asignación Usuario',
+        'Empresa',
+        'Usuario',
+        'Hub',
+        'Plataforma',
+        'Estado',
+        'Observaciones',
+        'Campaña'
+      ]
+      csvContent = headers.join(',') + '\n'
+      
+      // Datos para admin
+      const adminLeadsExport = exportLeads as AdminExportLead[]
+      adminLeadsExport.forEach(lead => {
+        const row = [
+          escapeCSV(lead.nombre_cliente),
+          escapeCSV(lead.telefono, true),
+          escapeCSV(formatDateForCSV(lead.fecha_entrada)),
+          escapeCSV(formatDateForCSV(lead.fecha_asignacion)),
+          escapeCSV(formatDateForCSV(lead.fecha_asignacion_usuario)),
+          escapeCSV(lead.empresa_nombre || 'Sin Empresa'),
+          escapeCSV(lead.usuario_nombre || 'Sin usuario'),
+          escapeCSV(lead.hub_nombre || 'Sin Hub'),
+          escapeCSV(lead.plataforma || 'Sin plataforma'),
+          escapeCSV(formatEstado(lead.estado_temporal) || 'Sin Tratar'),
+          escapeCSV(lead.observaciones || ''),
+          escapeCSV(lead.campaña_nombre || 'Sin Campaña')
+        ]
+        csvContent += row.join(',') + '\n'
+      })
+    } else if (isCoord) {
+      // Headers para coordinador
+      const headers = [
+        'Nombre',
+        'Teléfono',
+        'Fecha',
+        'Fecha Asignación Usuario',
+        'Usuario',
+        'Estado',
+        'Observaciones'
+      ]
+      csvContent = headers.join(',') + '\n'
+      
+      // Datos para coordinador
+      const coordLeadsExport = exportLeads as CoordExportLead[]
+      coordLeadsExport.forEach(lead => {
+        const row = [
+          escapeCSV(lead.nombre_cliente),
+          escapeCSV(lead.telefono, true),
+          escapeCSV(formatDateForCSV(lead.fecha_asignacion)),
+          escapeCSV(formatDateForCSV(lead.fecha_asignacion_usuario)),
+          escapeCSV(lead.usuario_nombre || 'Sin usuario'),
+          escapeCSV(formatEstado(lead.estado_temporal) || 'Sin Tratar'),
+          escapeCSV(lead.observaciones || '')
+        ]
+        csvContent += row.join(',') + '\n'
+      })
+    }
+    
+    // Crear blob y descargar
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${exportFilename.trim()}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Cerrar modal
+    setShowExportModal(false)
+    setExportFilename('')
+    setExportLeads([])
+  }
 
   // Verificar si es administrador
   const isAdmin = user?.rol === 'administrador'
@@ -515,6 +751,15 @@ const Dashboard = () => {
                 </span>
               )}
             </button>
+
+            {/* Botón de exportar */}
+            <button
+              onClick={handleOpenExportModal}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 bg-blue-500 text-white hover:bg-blue-600"
+            >
+              <span>📥</span>
+              <span>Exportar</span>
+            </button>
           </div>
         </div>
       )}
@@ -666,6 +911,15 @@ const Dashboard = () => {
                   {selectedAgentIds.length}
                 </span>
               )}
+            </button>
+
+            {/* Botón de exportar */}
+            <button
+              onClick={handleOpenExportModal}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2 bg-blue-500 text-white hover:bg-blue-600"
+            >
+              <span>📥</span>
+              <span>Exportar</span>
             </button>
           </div>
         </div>
@@ -1572,6 +1826,186 @@ const Dashboard = () => {
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors"
               >
                 Aplicar filtro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de exportación */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            {/* Header del modal */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-[#373643] flex items-center gap-2">
+                  <span>📥</span>
+                  Exportar Leads
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowExportModal(false)
+                    setExportFilename('')
+                    setExportLeads([])
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Campo de nombre de archivo */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del archivo <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    placeholder="Ingresa el nombre del archivo"
+                    value={exportFilename}
+                    onChange={(e) => setExportFilename(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-sm text-gray-500">
+                    .csv
+                  </span>
+                </div>
+              </div>
+              
+              {/* Contador de leads */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-500">Leads a exportar:</span>
+                <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  {exportLeads.length}
+                </span>
+              </div>
+            </div>
+            
+            {/* Lista de leads */}
+            <div className="flex-1 overflow-hidden p-4 min-h-0">
+              {exportLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <span className="ml-3 text-gray-500">Cargando leads...</span>
+                </div>
+              ) : exportLeads.length > 0 ? (
+                <div className="h-full max-h-[400px] overflow-y-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                          Nombre
+                        </th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                          Teléfono
+                        </th>
+                        {isAdmin && (
+                          <>
+                            <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                              Empresa
+                            </th>
+                            <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                              Plataforma
+                            </th>
+                          </>
+                        )}
+                        {isCoord && (
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                            Usuario
+                          </th>
+                        )}
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase">
+                          Estado
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {isAdmin && (exportLeads as AdminExportLead[]).map((lead) => (
+                        <tr key={lead.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs text-gray-900 truncate max-w-[150px]">
+                            {lead.nombre_cliente}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 font-mono">
+                            {lead.telefono}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 truncate max-w-[120px]">
+                            {lead.empresa_nombre || 'Sin Empresa'}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600">
+                            {lead.plataforma || 'Sin plataforma'}
+                          </td>
+                            <td className="px-3 py-2 text-xs">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                                lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                                lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {formatEstado(lead.estado_temporal) || 'Sin Tratar'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {isCoord && (exportLeads as CoordExportLead[]).map((lead) => (
+                        <tr key={lead.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs text-gray-900 truncate max-w-[150px]">
+                            {lead.nombre_cliente}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 font-mono">
+                            {lead.telefono}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 truncate max-w-[120px]">
+                            {lead.usuario_nombre || 'Sin usuario'}
+                          </td>
+                            <td className="px-3 py-2 text-xs">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                                lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                                lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {formatEstado(lead.estado_temporal) || 'Sin Tratar'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <span className="text-3xl">📭</span>
+                  </div>
+                  <p className="text-gray-600 font-medium">No hay leads para exportar</p>
+                  <p className="text-xs text-gray-400 mt-1">Ajusta los filtros para obtener resultados</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer del modal */}
+            <div className="p-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowExportModal(false)
+                  setExportFilename('')
+                  setExportLeads([])
+                }}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleExportCSV}
+                disabled={!exportFilename.trim() || exportLeads.length === 0}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <span>📥</span>
+                Exportar CSV
               </button>
             </div>
           </div>

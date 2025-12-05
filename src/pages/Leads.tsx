@@ -207,14 +207,9 @@ const Leads = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [empresaFilter, setEmpresaFilter] = useState('')
   const [assignedUserFilter, setAssignedUserFilter] = useState('')
-  const [showExportModal, setShowExportModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [observations, setObservations] = useState('')
-  const [exportDateRange, setExportDateRange] = useState({
-    startDate: '',
-    endDate: ''
-  })
   const [showSolicitudModal, setShowSolicitudModal] = useState(false)
   const [solicitudLoading, setSolicitudLoading] = useState(false)
   const [notification, setNotification] = useState<{
@@ -257,7 +252,6 @@ const Leads = () => {
     refreshLeads, 
     updateLeadStatus, 
     updateLeadObservations,
-    getLeadsInDateRange,
     activeLeads,
     updateActiveLeadLocally,
     removeActiveLeadLocally,
@@ -369,86 +363,9 @@ const Leads = () => {
     setCurrentPage(1)
   }, [dateFilter, phoneFilter, statusFilter, empresaFilter, assignedUserFilter])
 
-  // Calcular leads en el rango de fechas para exportación
-  const [leadsToExport, setLeadsToExport] = useState<Lead[]>([])
-
-  useEffect(() => {
-    const fetchLeadsInRange = async () => {
-      if (exportDateRange.startDate && exportDateRange.endDate) {
-        try {
-          const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          const leadsInRange = await getLeadsInDateRange(
-            exportDateRange.startDate, 
-            exportDateRange.endDate, 
-            empresaId || undefined
-          )
-          setLeadsToExport(leadsInRange)
-        } catch (error) {
-          console.error('Error fetching leads in date range:', error)
-          setLeadsToExport([])
-        }
-      } else {
-        setLeadsToExport([])
-      }
-    }
-
-    fetchLeadsInRange()
-  }, [exportDateRange, user?.rol, userEmpresaId, getLeadsInDateRange])
 
 
 
-  const handleExport = () => {
-    setShowExportModal(true)
-  }
-
-  const handleExportConfirm = () => {
-    if (leadsToExport.length === 0) return
-
-    // Crear CSV content
-    const headers = ['Fecha', 'Nombre', 'Teléfono', 'Plataforma', 'Estado']
-    if (user?.rol === 'administrador') {
-      headers.push('Empresa')
-    }
-
-    const csvContent = [
-      headers.join(','),
-      ...leadsToExport.map(lead => {
-        const row = [
-          new Date(lead.fecha_entrada).toLocaleDateString('es-ES'),
-          `"${lead.nombre_cliente}"`,
-          lead.telefono,
-          lead.plataforma,
-          getStatusDisplayName(lead.estado_temporal || 'sin_tratar')
-        ]
-        if (user?.rol === 'administrador') {
-          row.push(`"${lead.empresa_nombre || ''}"`)
-        }
-        return row.join(',')
-      })
-    ].join('\n')
-
-    // Crear y descargar archivo
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `leads_${exportDateRange.startDate}_${exportDateRange.endDate}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    // Cerrar modal
-    setShowExportModal(false)
-    setExportDateRange({ startDate: '', endDate: '' })
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setExportDateRange({
-      ...exportDateRange,
-      [e.target.name]: e.target.value
-    })
-  }
 
 
 
@@ -1377,9 +1294,9 @@ const Leads = () => {
               )}
             </div>
             
-            {/* Export and Import Buttons */}
-            <div className="flex justify-end gap-3">
-              {user?.rol === 'administrador' && (
+            {/* Import Button */}
+            {user?.rol === 'administrador' && (
+              <div className="flex justify-end">
                 <button
                   onClick={handleImport}
                   className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
@@ -1387,15 +1304,8 @@ const Leads = () => {
                   <span className="mr-2">📥</span>
                   Importar
                 </button>
-              )}
-              <button
-                onClick={handleExport}
-                className="w-full sm:w-auto px-6 py-2 bg-[#18cb96] text-white font-medium rounded-lg hover:bg-[#15b885] transition-colors flex items-center justify-center"
-              >
-                <span className="mr-2">📊</span>
-                Exportar
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1503,98 +1413,6 @@ const Leads = () => {
           </div>
         </div>
       </div>
-
-      {/* Export Modal overlay */}
-      {showExportModal && (
-        <div
-          className="fixed inset-0 bg-black opacity-50 z-51"
-          onClick={() => setShowExportModal(false)}
-        />
-      )}
-
-      {/* Export Modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[#373643]">Exportar Leads</h2>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Date Range Inputs */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-[#373643] mb-2">
-                    Fecha inicio
-                  </label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    name="startDate"
-                    value={exportDateRange.startDate}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-[#373643] mb-2">
-                    Fecha fin
-                  </label>
-                  <input
-                    type="date"
-                    id="endDate"
-                    name="endDate"
-                    value={exportDateRange.endDate}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Leads Count Info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#373643]">Leads a exportar:</span>
-                  <span className="text-lg font-bold text-[#18cb96]">{leadsToExport.length}</span>
-                </div>
-                {leadsToExport.length > 0 && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Desde {new Date(exportDateRange.startDate).toLocaleDateString('es-ES')} hasta {new Date(exportDateRange.endDate).toLocaleDateString('es-ES')}
-                  </p>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowExportModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleExportConfirm}
-                  disabled={leadsToExport.length === 0}
-                  className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Exportar ({leadsToExport.length})
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Details Modal overlay */}
       {showDetailsModal && (

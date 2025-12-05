@@ -1235,6 +1235,188 @@ class LeadsService {
       throw error
     }
   }
+
+  // Exportar TODOS los leads para admin (sin paginación)
+  async getAdminDashboardLeadsForExport(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_entrada' | 'fecha_asignacion' = 'fecha_entrada',
+    empresaIds?: number[]
+  ): Promise<{
+    id: number
+    nombre_cliente: string
+    telefono: string
+    fecha_entrada: string
+    fecha_asignacion?: string | null
+    fecha_asignacion_usuario?: string | null
+    empresa_nombre?: string
+    user_id?: string | null
+    usuario_nombre?: string
+    hub_nombre?: string
+    plataforma?: string
+    estado_temporal?: string
+    observaciones?: string
+    campaña_nombre?: string
+  }[]> {
+    try {
+      let query = supabase
+        .from('leads')
+        .select(`
+          id,
+          nombre_cliente,
+          telefono,
+          fecha_entrada,
+          fecha_asignacion,
+          fecha_asignacion_usuario,
+          empresa_id,
+          user_id,
+          hub_id,
+          plataforma,
+          estado_temporal,
+          observaciones,
+          campaña_id,
+          empresas!leads_empresa_id_fkey (
+            id,
+            nombre
+          ),
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
+          ),
+          hubs!leads_hub_id_fkey (
+            id,
+            nombre
+          ),
+          campañas!leads_campaña_id_fkey (
+            id,
+            nombre
+          )
+        `)
+      
+      if (dateField === 'fecha_asignacion') {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+          .order('fecha_asignacion', { ascending: false })
+      } else {
+        query = query
+          .gte('fecha_entrada', startDate)
+          .lte('fecha_entrada', endDate)
+          .order('fecha_entrada', { ascending: false })
+      }
+
+      if (empresaIds && empresaIds.length > 0) {
+        query = query.in('empresa_id', empresaIds)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching admin dashboard leads for export:', error)
+        throw error
+      }
+
+      return (data as any[])?.map(lead => ({
+        id: lead.id,
+        nombre_cliente: lead.nombre_cliente,
+        telefono: lead.telefono,
+        fecha_entrada: lead.fecha_entrada,
+        fecha_asignacion: lead.fecha_asignacion,
+        fecha_asignacion_usuario: lead.fecha_asignacion_usuario,
+        empresa_nombre: lead.empresas?.nombre || 'Sin Empresa',
+        user_id: lead.user_id,
+        usuario_nombre: lead.profiles?.nombre || 'Sin usuario',
+        hub_nombre: lead.hubs?.nombre || 'Sin Hub',
+        plataforma: lead.plataforma || 'Sin plataforma',
+        estado_temporal: lead.estado_temporal || 'sin_tratar',
+        observaciones: lead.observaciones || '',
+        campaña_nombre: lead.campañas?.nombre || 'Sin Campaña'
+      })) || []
+    } catch (error) {
+      console.error('Error in getAdminDashboardLeadsForExport:', error)
+      throw error
+    }
+  }
+
+  // Exportar TODOS los leads para coordinador (sin paginación)
+  async getCoordDashboardLeadsForExport(
+    startDate: string, 
+    endDate: string, 
+    dateField: 'fecha_asignacion' | 'fecha_asignacion_usuario' = 'fecha_asignacion',
+    empresaId: number,
+    agentIds?: string[]
+  ): Promise<{
+    id: number
+    nombre_cliente: string
+    telefono: string
+    fecha_asignacion?: string | null
+    fecha_asignacion_usuario?: string | null
+    user_id?: string | null
+    usuario_nombre?: string
+    estado_temporal?: string
+    observaciones?: string
+  }[]> {
+    try {
+      let query = supabase
+        .from('leads')
+        .select(`
+          id,
+          nombre_cliente,
+          telefono,
+          fecha_asignacion,
+          fecha_asignacion_usuario,
+          user_id,
+          estado_temporal,
+          observaciones,
+          profiles!leads_user_id_fkey (
+            user_id,
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+      
+      if (dateField === 'fecha_asignacion_usuario') {
+        query = query
+          .not('fecha_asignacion_usuario', 'is', null)
+          .gte('fecha_asignacion_usuario', startDate)
+          .lte('fecha_asignacion_usuario', endDate)
+          .order('fecha_asignacion_usuario', { ascending: false })
+      } else {
+        query = query
+          .not('fecha_asignacion', 'is', null)
+          .gte('fecha_asignacion', startDate)
+          .lte('fecha_asignacion', endDate)
+          .order('fecha_asignacion', { ascending: false })
+      }
+
+      if (agentIds && agentIds.length > 0) {
+        query = query.in('user_id', agentIds)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching coord dashboard leads for export:', error)
+        throw error
+      }
+
+      return (data as any[])?.map(lead => ({
+        id: lead.id,
+        nombre_cliente: lead.nombre_cliente,
+        telefono: lead.telefono,
+        fecha_asignacion: lead.fecha_asignacion,
+        fecha_asignacion_usuario: lead.fecha_asignacion_usuario,
+        user_id: lead.user_id,
+        usuario_nombre: lead.profiles?.nombre || 'Sin usuario',
+        estado_temporal: lead.estado_temporal || 'sin_tratar',
+        observaciones: lead.observaciones || ''
+      })) || []
+    } catch (error) {
+      console.error('Error in getCoordDashboardLeadsForExport:', error)
+      throw error
+    }
+  }
 }
 
 export const leadsService = new LeadsService() 
