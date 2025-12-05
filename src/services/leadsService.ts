@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { platformConverter } from '../utils/platformConverter'
 import { useAuthStore } from '../store/authStore'
+import { getDateFieldByRole, type DateFieldType } from '../utils/dateFieldByRole'
 
 export interface Lead {
   id: number
@@ -57,6 +58,7 @@ export interface ImportResult {
   errors: string[]
   duplicatePhones: string[]
 }
+
 export interface LeadDevolucion extends Lead {
   audio_devolucion?: string
   imagen_devolucion?: string
@@ -276,9 +278,9 @@ class LeadsService {
     }
   }
 
-    async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estado?: string, dateField: 'fecha_entrada' | 'fecha_asignacion' | 'fecha_asignacion_usuario' = 'fecha_entrada'): Promise<Lead[]> {
+    async getLeadsInDateRange(startDate: string, endDate: string, empresaId?: number, estados?: string | string[], dateField: DateFieldType = 'fecha_entrada'): Promise<Lead[]> {
     try {
-      // Obtener leads con estados 'perdido', 'convertido' y 'no_valido'
+      // Obtener todos los leads en el rango de fechas
       let query = supabase
         .from('leads')
         .select(`
@@ -305,22 +307,25 @@ class LeadsService {
         `)
         .gte(dateField, startDate)
         .lte(dateField, endDate)
-        .in('estado', ['perdido', 'convertido', 'no_valido'])
         .order(dateField, { ascending: false })
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
       }
 
-      // Filtrar por estado si se especifica
-      if (estado) {
-        query = query.eq('estado', estado)
+      // Filtrar por estado(s) si se especifica
+      if (estados) {
+        if (Array.isArray(estados)) {
+          query = query.in('estado', estados)
+        } else {
+          query = query.eq('estado', estados)
+        }
       }
 
       const { data, error } = await query
 
       if (error) {
-        console.error('Error fetching historial leads in date range:', error)
+        console.error('Error fetching leads in date range:', error)
         throw error
       }
 
@@ -697,11 +702,10 @@ class LeadsService {
   // Obtener conteo de leads en historial
   async getHistorialLeadsCount(empresaId?: number, estado?: string, userId?: string, userRole?: string, phoneFilter?: string): Promise<number> {
     try {
-      // Obtener conteo de leads con estados 'perdido', 'convertido' y 'no_valido'
+      // Obtener conteo de todos los leads (sin filtrar por estado)
       let query = supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })
-        .in('estado', ['perdido', 'convertido', 'no_valido'])
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)
@@ -739,7 +743,10 @@ class LeadsService {
   // Obtener leads del historial con paginación
   async getHistorialLeads(empresaId?: number, estado?: string, page: number = 1, limit: number = 10, userId?: string, userRole?: string, phoneFilter?: string): Promise<Lead[]> {
     try {
-      // Obtener leads con estados 'perdido', 'convertido' y 'no_valido'
+      // Usar util para determinar el campo de ordenamiento según el rol del usuario
+      const orderField = getDateFieldByRole(userRole)
+
+      // Obtener todos los leads (sin filtrar por estado)
       let query = supabase
         .from('leads')
         .select(`
@@ -753,8 +760,7 @@ class LeadsService {
             nombre
           )
         `)
-        .in('estado', ['perdido', 'convertido', 'no_valido'])
-        .order('fecha_entrada', { ascending: false })
+        .order(orderField, { ascending: false })
 
       if (empresaId) {
         query = query.eq('empresa_id', empresaId)

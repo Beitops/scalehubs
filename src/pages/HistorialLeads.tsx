@@ -11,6 +11,8 @@ import {
   filterLeads
 } from '../services/LeadsFilterService'
 import { LeadsHistorialList, getStatusBadge } from '../components/LeadsHistorialList'
+import { platformConverter } from '../utils/platformConverter'
+import { getDateFieldByRole } from '../utils/dateFieldByRole'
 
 const HistorialLeads = () => {
   const [dateFilter, setDateFilter] = useState('')
@@ -135,33 +137,14 @@ const HistorialLeads = () => {
       if (exportDateRange.startDate && exportDateRange.endDate) {
         try {
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId : undefined
-          // Cargar leads devolucion, perdido, convertido y no_valido por separado para el rango de fechas
-          const leadsDevolucion = await getLeadsInDateRange(
+          // Cargar todos los leads con una sola llamada usando array de estados
+          const allLeads = await getLeadsInDateRange(
             exportDateRange.startDate, 
             exportDateRange.endDate, 
             empresaId || undefined,
-            'devolucion'
+            ['activo', 'perdido', 'convertido', 'no_valido']
           )
-          const leadsPerdidos = await getLeadsInDateRange(
-            exportDateRange.startDate, 
-            exportDateRange.endDate, 
-            empresaId || undefined,
-            'perdido'
-          )
-          const leadsConvertidos = await getLeadsInDateRange(
-            exportDateRange.startDate, 
-            exportDateRange.endDate, 
-            empresaId || undefined,
-            'convertido'
-          )
-          const leadsNoValidos = await getLeadsInDateRange(
-            exportDateRange.startDate, 
-            exportDateRange.endDate, 
-            empresaId || undefined,
-            'no_valido'
-          )
-          const historialInRange = [...leadsDevolucion, ...leadsPerdidos, ...leadsConvertidos, ...leadsNoValidos]
-          setLeadsToExport(historialInRange)
+          setLeadsToExport(allLeads)
         } catch (error) {
           console.error('Error fetching leads in date range:', error)
           setLeadsToExport([])
@@ -417,7 +400,7 @@ const HistorialLeads = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
                 >
                   <option value="">Todos los estados</option>
-                  <option value="devolucion">Devolución</option>
+                  <option value="activo">Activo</option>
                   <option value="convertido">Convertido</option>
                   <option value="perdido">Perdido</option>
                   <option value="no_valido">No válido</option>
@@ -565,11 +548,19 @@ const HistorialLeads = () => {
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Plataforma</label>
-                  <p className="text-sm text-gray-700">{selectedLeadDetails.plataforma || 'Sin plataforma'}</p>
+                  <p className="text-sm text-gray-700">{selectedLeadDetails.plataforma ? platformConverter(selectedLeadDetails.plataforma) : 'Sin plataforma'}</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
-                  <label className="block text-sm font-medium text-[#373643] mb-1">Fecha de Entrada</label>
-                  <p className="text-sm text-gray-700">{new Date(selectedLeadDetails.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                  <label className="block text-sm font-medium text-[#373643] mb-1">
+                    {user?.rol === 'coordinador' ? 'Fecha de Asignación' : user?.rol === 'agente' ? 'Fecha de Asignación Agente' : 'Fecha de Entrada'}
+                  </label>
+                  <p className="text-sm text-gray-700">
+                    {(() => {
+                      const dateField = getDateFieldByRole(user?.rol)
+                      const dateValue = selectedLeadDetails[dateField]
+                      return dateValue ? new Date(dateValue).toLocaleDateString('es-ES') : 'Sin fecha'
+                    })()}
+                  </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96]">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Estado</label>

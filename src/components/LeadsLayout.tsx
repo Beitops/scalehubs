@@ -5,7 +5,7 @@ import { useLeadsStore } from '../store/leadsStore'
 
 const LeadsLayout = () => {
   const { user, userEmpresaNombre, userEmpresaId } = useAuthStore()
-  const { loadInitialLeads, loadDevoluciones, loadHistorialLeads } = useLeadsStore()
+  const { loadInitialLeads, loadHistorialLeads } = useLeadsStore()
 
   // Cargar leads cuando el componente se monte
   useEffect(() => {
@@ -16,7 +16,6 @@ const LeadsLayout = () => {
       if (isReady) {
         try {
           await loadInitialLeads()
-          loadDevoluciones()
           // Cargar también el historial para que esté disponible en todas las rutas
           const empresaId = user?.rol !== 'administrador' ? userEmpresaId || undefined : undefined
           await loadHistorialLeads(empresaId)
@@ -31,7 +30,7 @@ const LeadsLayout = () => {
     return () => {
       isReady = false
     }
-  }, [user, loadInitialLeads, loadDevoluciones])
+  }, [user, loadInitialLeads, loadHistorialLeads, userEmpresaId])
 
   return (
     <>

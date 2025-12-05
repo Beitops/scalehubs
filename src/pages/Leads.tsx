@@ -17,6 +17,7 @@ import {
   fetchAssignedUsers,
   filterLeads
 } from '../services/LeadsFilterService'
+import { getDateFieldByRole } from '../utils/dateFieldByRole'
 
 interface ActionMenuItem {
   label: string
@@ -338,23 +339,15 @@ const Leads = () => {
       statusGetter: (lead: Lead) => lead.estado_temporal
     })
 
-    if (user?.rol === 'agente') {
-      return [...filtered].sort((a, b) => {
-        const fechaA = a.fecha_asignacion_usuario ? new Date(a.fecha_asignacion_usuario).getTime() : 0
-        const fechaB = b.fecha_asignacion_usuario ? new Date(b.fecha_asignacion_usuario).getTime() : 0
-        return fechaB - fechaA
-      })
-    }
-
-    if (user?.rol === 'coordinador') {
-      return [...filtered].sort((a, b) => {
-        const fechaA = a.fecha_asignacion ? new Date(a.fecha_asignacion).getTime() : 0
-        const fechaB = b.fecha_asignacion ? new Date(b.fecha_asignacion).getTime() : 0
-        return fechaB - fechaA
-      })
-    }
-
-    return filtered
+    // Usar util para determinar el campo de ordenamiento según el rol
+    const dateField = getDateFieldByRole(user?.rol)
+    
+    // Ordenar por el campo de fecha correspondiente al rol
+    return [...filtered].sort((a, b) => {
+      const fechaA = a[dateField] ? new Date(a[dateField] as string).getTime() : 0
+      const fechaB = b[dateField] ? new Date(b[dateField] as string).getTime() : 0
+      return fechaB - fechaA
+    })
   }, [
     activeLeads,
     dateFilter,
@@ -1542,8 +1535,16 @@ const Leads = () => {
                   <p className="text-sm text-gray-700">{selectedLead.plataforma_lead}</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
-                  <label className="block text-sm font-medium text-[#373643] mb-1">Fecha de Entrada</label>
-                  <p className="text-sm text-gray-700">{new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</p>
+                  <label className="block text-sm font-medium text-[#373643] mb-1">
+                    {user?.rol === 'coordinador' ? 'Fecha de Asignación' : user?.rol === 'agente' ? 'Fecha de Asignación Agente' : 'Fecha de Entrada'}
+                  </label>
+                  <p className="text-sm text-gray-700">
+                    {(() => {
+                      const dateField = getDateFieldByRole(user?.rol)
+                      const dateValue = selectedLead[dateField]
+                      return dateValue ? new Date(dateValue).toLocaleDateString('es-ES') : 'Sin fecha'
+                    })()}
+                  </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-[#18cb96] hover:border-[#15b885] hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
                   <label className="block text-sm font-medium text-[#373643] mb-1">Estado Actual</label>

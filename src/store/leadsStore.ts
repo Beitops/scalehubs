@@ -1,28 +1,6 @@
 import { create } from 'zustand'
-import { leadsService, type Lead, type LeadDevolucion } from '../services/leadsService'
+import { leadsService, type Lead} from '../services/leadsService'
 import { useAuthStore } from './authStore'
-import { supabase } from '../lib/supabase'
-import { platformConverter } from '../utils/platformConverter'
-
-
-interface Devolucion {
-  id: number
-  lead_id: number
-  usuario_id: string
-  comentario_admin: string | null
-  fecha_resolucion: string | null
-  fecha_solicitud: string
-  estado: string
-  lead: {
-    id: number
-    nombre_cliente: string
-    telefono: string
-    plataforma: string
-    fecha_entrada: string
-    empresa_id: number
-    empresa_nombre?: string
-  }
-}
 
 interface LeadsState {
   leads: Lead[]
@@ -33,9 +11,6 @@ interface LeadsState {
   error: string | null
   isInitialized: boolean
   reloadKey: number
-  devoluciones: Devolucion[]
-  leadsInDevolucion: LeadDevolucion[]
-  leadsInTramite: LeadDevolucion[]
   historialTotalCount: number
   historialCurrentPage: number
   historialTotalPages: number
@@ -48,19 +23,9 @@ interface LeadsState {
   loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
   loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number, phoneFilter?: string) => Promise<void>
   loadInitialLeads: () => Promise<void>
-  getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estado?: string) => Promise<Lead[]>
+  getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estados?: string | string[]) => Promise<Lead[]>
   refreshLeads: () => Promise<void>
   triggerReload: () => void
-  loadDevoluciones: () => Promise<void>
-  loadDevolucionArchivos: (devolucionId: number) => Promise<Array<{
-    id: number
-    devolucion_id: number
-    ruta_archivo: string
-    nombre_archivo: string
-    fecha_subida: string
-    tipo: string
-  }>>,
-  cancelDevolucion: (devolucionId: number, leadId: number) => Promise<void>,
   loadUnassignedLeads: () => Promise<void>
   loadUnassignedLeadsByCompany: (empresaId: number) => Promise<void>
   assignLeadToCompany: (leadIds: number | number[], empresaId: number) => Promise<void>
@@ -80,9 +45,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   error: null,
   isInitialized: false,
   reloadKey: 0,
-  devoluciones: [],
-  leadsInDevolucion: [],
-  leadsInTramite: [],
   historialTotalCount: 0,
   historialCurrentPage: 1,
   historialTotalPages: 0,
@@ -286,9 +248,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  getLeadsInDateRange: async (startDate: string, endDate: string, empresaId?: number, estado?: string) => {
+  getLeadsInDateRange: async (startDate: string, endDate: string, empresaId?: number, estados?: string | string[]) => {
     try {
-      return await leadsService.getLeadsInDateRange(startDate, endDate, empresaId, estado)
+      return await leadsService.getLeadsInDateRange(startDate, endDate, empresaId, estados)
     } catch (error) {
       console.error('Error getting leads in date range:', error)
       throw error
@@ -297,161 +259,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
   triggerReload: () => {
     set(state => ({ reloadKey: state.reloadKey + 1 }))
-  },
-
-  loadDevoluciones: async () => {
-    const { user, userEmpresaId } = useAuthStore.getState()
-    
-    if (!user) {
-      set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
-    }
-
-    try {
-      let query = supabase
-        .from('devoluciones')
-        .select(`
-          *,
-          lead:leads(
-            id,
-            nombre_cliente,
-            telefono,
-            plataforma,
-            fecha_entrada,
-            empresa_id,
-            empresas!leads_empresa_id_fkey (
-              id,
-              nombre
-            )
-          )
-        `)
-        .or('estado.is.null,estado.not.in.("cancelado","resuelto","rechazado")')
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error loading devoluciones:', error)
-        set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
-      }
-
-      // Filtrar por empresa_id si el usuario no es admin
-      let filteredData = data || []
-      if (user?.rol !== 'administrador' && userEmpresaId) {
-        filteredData = filteredData.filter(d => d.lead?.empresa_id === userEmpresaId)
-      }
-
-      // Filtrar según el rol del usuario
-      if (user?.rol === 'administrador') {
-        // Para admin: mostrar solo las que tengan estado 'tramite'
-        const tramiteDevoluciones = filteredData.filter(d => d.estado === 'tramite') || []
-        const leadsInTramite = tramiteDevoluciones.map(d => ({
-          ...d.lead,
-          empresa_nombre: d.lead.empresas?.nombre,
-          motivo: d.motivo || '',
-          audio_devolucion: '',
-          imagen_devolucion: '',
-          devolucion_id: d.id,
-          plataforma_lead: platformConverter(d.lead.plataforma || '')
-        }))
-        set({ devoluciones: filteredData, leadsInTramite })
-      } else {
-        // Para clientes: mostrar solo las que tengan estado 'pendiente'
-        const pendienteDevoluciones = filteredData.filter(d => d.estado === 'pendiente') || []
-        const leadsInDevolucion = pendienteDevoluciones.map(d => ({
-          ...d.lead,
-          empresa_nombre: d.lead.empresas?.nombre,
-          motivo: d.motivo || '',
-          audio_devolucion: '',
-          imagen_devolucion: '',
-          devolucion_id: d.id,
-          plataforma_lead: platformConverter(d.lead.plataforma || '')
-        }))
-
-        set({ devoluciones: filteredData, leadsInDevolucion })
-      }
-    } catch (error) {
-      console.error('Error loading devoluciones:', error)
-      set({ devoluciones: [], leadsInDevolucion: [], leadsInTramite: [] })
-    }
-  },
-
-  loadDevolucionArchivos: async (devolucionId: number) => {
-    try {
-      // Obtener el audio más reciente
-      const { data: audioData, error: audioError } = await supabase
-        .from('devolucion_archivos')
-        .select('*')
-        .eq('devolucion_id', devolucionId)
-        .eq('tipo', 'audio')
-        .order('fecha_subida', { ascending: false })
-        .limit(1)
-
-      // Obtener la imagen más reciente
-      const { data: imagenData, error: imagenError } = await supabase
-        .from('devolucion_archivos')
-        .select('*')
-        .eq('devolucion_id', devolucionId)
-        .eq('tipo', 'imagen')
-        .order('fecha_subida', { ascending: false })
-        .limit(1)
-
-      if (audioError) {
-        console.error('Error loading audio archivos:', audioError)
-      }
-      if (imagenError) {
-        console.error('Error loading imagen archivos:', imagenError)
-      }
-
-      // Combinar los resultados
-      const archivos = []
-      if (audioData && audioData.length > 0) {
-        archivos.push(...audioData)
-      }
-      if (imagenData && imagenData.length > 0) {
-        archivos.push(...imagenData)
-      }
-
-      return archivos
-    } catch (error) {
-      console.error('Error in loadDevolucionArchivos:', error)
-      return []
-    }
-  },
-
-  cancelDevolucion: async (devolucionId: number, leadId: number) => {
-    try {
-      // Actualizar el estado de la devolución a 'cancelado'
-      const { error: updateDevolucionError } = await supabase
-        .from('devoluciones')
-        .update({
-          estado: 'cancelado',
-          fecha_resolucion: new Date().toISOString()
-        })
-        .eq('id', devolucionId)
-
-      if (updateDevolucionError) {
-        console.error('Error updating devolucion:', updateDevolucionError)
-        throw updateDevolucionError
-      }
-
-      // Actualizar el estado del lead a 'activo'
-      const { error: updateLeadError } = await supabase
-        .from('leads')
-        .update({
-          estado: 'activo'
-        })
-        .eq('id', leadId)
-
-      if (updateLeadError) {
-        console.error('Error updating lead:', updateLeadError)
-        throw updateLeadError
-      }
-
-      // Recargar devoluciones después de la actualización exitosa
-      await get().loadDevoluciones()
-    } catch (error) {
-      console.error('Error in cancelDevolucion:', error)
-      throw error
-    }
   },
 
   loadUnassignedLeads: async () => {
@@ -523,9 +330,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       leadsHistorial: [],
       activeLeads: [],
       unassignedLeads: [],
-      devoluciones: [], 
-      leadsInDevolucion: [],
-      leadsInTramite: [],
       historialTotalCount: 0,
       historialCurrentPage: 1,
       historialTotalPages: 0,
