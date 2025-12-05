@@ -1,5 +1,5 @@
 /**
- * Determina el campo de fecha a usar para ordenar/filtrar según el rol del usuario
+ * Este util determina el campo de fecha a usar para ordenar/filtrar según el rol del usuario
  */
 export type DateFieldType = 'fecha_entrada' | 'fecha_asignacion' | 'fecha_asignacion_usuario'
 
