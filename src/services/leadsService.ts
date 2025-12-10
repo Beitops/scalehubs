@@ -68,7 +68,7 @@ export interface LeadDevolucion extends Lead {
 }
 
 class LeadsService {
-  async getLeadsByCompany(empresaId: number, estado?: string, page?: number, limit?: number): Promise<Lead[]> {
+  async getLeadsByCompany(empresaId: number, estado?: string, page?: number, limit?: number, startDate?: string, endDate?: string, dateField: DateFieldType = 'fecha_entrada'): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -84,11 +84,16 @@ class LeadsService {
           )
         `)
         .eq('empresa_id', empresaId)
-        .order('fecha_entrada', { ascending: false })
+        .order(dateField, { ascending: false })
       
       // Filtrar por estado si se especifica
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Filtrar por rango de fechas si se especifica
+      if (startDate && endDate) {
+        query = query.gte(dateField, startDate).lte(dateField, endDate)
       }
 
       // Aplicar paginación si se especifica
@@ -117,7 +122,7 @@ class LeadsService {
     }
   }
 
-  async getLeadsByCompanyAndUser(empresaId: number, userId: string, estado?: string): Promise<Lead[]> {
+  async getLeadsByCompanyAndUser(empresaId: number, userId: string, estado?: string, startDate?: string, endDate?: string, dateField: DateFieldType = 'fecha_asignacion_usuario'): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -134,11 +139,16 @@ class LeadsService {
         `)
         .eq('empresa_id', empresaId)
         .eq('user_id', userId)
-        .order('fecha_entrada', { ascending: false })
+        .order(dateField, { ascending: false })
       
       // Filtrar por estado si se especifica
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Filtrar por rango de fechas si se especifica
+      if (startDate && endDate) {
+        query = query.gte(dateField, startDate).lte(dateField, endDate)
       }
 
       const { data, error } = await query
@@ -160,7 +170,7 @@ class LeadsService {
     }
   }
 
-  async getAllLeads(estado?: string): Promise<Lead[]> {
+  async getAllLeads(estado?: string, startDate?: string, endDate?: string, dateField: DateFieldType = 'fecha_entrada'): Promise<Lead[]> {
     try {
       let query = supabase
         .from('leads')
@@ -175,11 +185,16 @@ class LeadsService {
             nombre
           )
         `)
-        .order('fecha_entrada', { ascending: false })
+        .order(dateField, { ascending: false })
       
       // Filtrar por estado si se especifica
       if (estado) {
         query = query.eq('estado', estado)
+      }
+
+      // Filtrar por rango de fechas si se especifica
+      if (startDate && endDate) {
+        query = query.gte(dateField, startDate).lte(dateField, endDate)
       }
 
       const { data, error } = await query

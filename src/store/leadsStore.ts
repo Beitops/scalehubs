@@ -3,7 +3,6 @@ import { leadsService, type Lead} from '../services/leadsService'
 import { useAuthStore } from './authStore'
 
 interface LeadsState {
-  leads: Lead[]
   leadsHistorial: Lead[]
   activeLeads: Lead[]
   unassignedLeads: Lead[]
@@ -19,12 +18,12 @@ interface LeadsState {
   updateLeadStatus: (leadId: number, estadoTemporal: string, userId?: string) => Promise<void>
   updateLeadObservations: (leadId: number, observaciones: string) => Promise<void>
   cancelLeadStatus: (leadId: number) => Promise<void>
-  loadLeads: (empresaId?: number) => Promise<void>
-  loadLeadsByUser: (empresaId: number, userId: string) => Promise<void>
+  loadLeads: (empresaId?: number, startDate?: string, endDate?: string, dateField?: string) => Promise<void>
+  loadLeadsByUser: (empresaId: number, userId: string, startDate?: string, endDate?: string, dateField?: string) => Promise<void>
   loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number, phoneFilter?: string) => Promise<void>
-  loadInitialLeads: () => Promise<void>
+  loadInitialLeads: (startDate?: string, endDate?: string) => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estados?: string | string[]) => Promise<Lead[]>
-  refreshLeads: () => Promise<void>
+  refreshLeads: (startDate?: string, endDate?: string) => Promise<void>
   triggerReload: () => void
   loadUnassignedLeads: () => Promise<void>
   loadUnassignedLeadsByCompany: (empresaId: number) => Promise<void>
@@ -37,7 +36,6 @@ interface LeadsState {
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
-  leads: [],
   leadsHistorial: [],
   activeLeads: [],
   unassignedLeads: [],
@@ -49,7 +47,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   historialCurrentPage: 1,
   historialTotalPages: 0,
 
-  loadInitialLeads: async () => {
+  loadInitialLeads: async (startDate?: string, endDate?: string) => {
     const { user, userEmpresaId } = useAuthStore.getState()
 
     if (!user) return
@@ -60,15 +58,15 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     try {
       if (user?.rol === 'administrador') {
         // Administrador ve todos los leads
-        await get().loadLeads()
+        await get().loadLeads(undefined, startDate, endDate)
       } else if (userEmpresaId) {
         // Usuario no admin, verificar rol
         if (user?.rol === 'coordinador') {
           // Coordinador ve todos los leads de su empresa
-          await get().loadLeads(userEmpresaId)
+          await get().loadLeads(userEmpresaId, startDate, endDate)
         } else if (user?.rol === 'agente') {
           // Agente solo ve los leads asignados a él
-          await get().loadLeadsByUser(userEmpresaId, user.id)
+          await get().loadLeadsByUser(userEmpresaId, user.id, startDate, endDate)
         } else {
           // Rol no reconocido, mostrar error
           console.error('❌ Unknown user role:', user.rol)
@@ -89,7 +87,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  refreshLeads: async () => {
+  refreshLeads: async (startDate?: string, endDate?: string) => {
     const { user, userEmpresaId } = useAuthStore.getState()
     
     if (!user) return
@@ -97,15 +95,15 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       if (user.rol === 'administrador') {
-        await get().loadLeads()
+        await get().loadLeads(undefined, startDate, endDate)
       } else if (userEmpresaId) {
         // Usuario no admin, verificar rol
         if (user.rol === 'coordinador') {
           // Coordinador ve todos los leads de su empresa
-          await get().loadLeads(userEmpresaId)
+          await get().loadLeads(userEmpresaId, startDate, endDate)
         } else if (user.rol === 'agente') {
           // Agente solo ve los leads asignados a él
-          await get().loadLeadsByUser(userEmpresaId, user.id)
+          await get().loadLeadsByUser(userEmpresaId, user.id, startDate, endDate)
         } else {
           // Rol no reconocido, mostrar error
           console.error('❌ Unknown user role:', user.rol)
@@ -125,14 +123,17 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  loadLeads: async (empresaId?: number) => {
+  loadLeads: async (empresaId?: number, startDate?: string, endDate?: string, dateField?: string) => {
     set({ loading: true, error: null })
     try {
-      const leads = empresaId 
-        ? await leadsService.getLeadsByCompany(empresaId, 'activo')
-        : await leadsService.getAllLeads('activo')
+      const { user } = useAuthStore.getState()
+      const field = (dateField as any) || (user?.rol === 'coordinador' ? 'fecha_asignacion' : user?.rol === 'agente' ? 'fecha_asignacion_usuario' : 'fecha_entrada')
       
-      set({ leads, activeLeads: leads, loading: false })
+      const leads = empresaId 
+        ? await leadsService.getLeadsByCompany(empresaId, 'activo', undefined, undefined, startDate, endDate, field)
+        : await leadsService.getAllLeads('activo', startDate, endDate, field)
+      
+      set({ activeLeads: leads, loading: false })
     } catch (error) {
       console.error('Error loading leads:', error)
       set({ 
@@ -142,10 +143,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     }
   },
 
-  loadLeadsByUser: async (empresaId: number, userId: string) => {
+  loadLeadsByUser: async (empresaId: number, userId: string, startDate?: string, endDate?: string, dateField?: string) => {
     set({ loading: true, error: null })
     try {
-      const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId, 'activo')
+      const field = (dateField as any) || 'fecha_asignacion_usuario'
+      const leads = await leadsService.getLeadsByCompanyAndUser(empresaId, userId, 'activo', startDate, endDate, field)
       
       set({ activeLeads: leads, loading: false })
     } catch (error) {
@@ -326,7 +328,6 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
   resetInitialized: () => {
     set({ 
-      leads: [], 
       leadsHistorial: [],
       activeLeads: [],
       unassignedLeads: [],
@@ -342,17 +343,13 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     set(state => ({
       activeLeads: state.activeLeads.map(lead =>
         lead.id === leadId ? { ...lead, ...updates } : lead
-      ),
-      leads: state.leads.map(lead =>
-        lead.id === leadId ? { ...lead, ...updates } : lead
       )
     }))
   },
 
   removeActiveLeadLocally: (leadId: number) => {
     set(state => ({
-      activeLeads: state.activeLeads.filter(lead => lead.id !== leadId),
-      leads: state.leads.filter(lead => lead.id !== leadId)
+      activeLeads: state.activeLeads.filter(lead => lead.id !== leadId)
     }))
   }
 })) 

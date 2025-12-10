@@ -203,7 +203,19 @@ const LeadDesktopRow = memo(({
 })
 
 const Leads = () => {
-  const [dateFilter, setDateFilter] = useState('')
+  // Calcular fechas por defecto (últimos 7 días)
+  const getDefaultDateRange = () => {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 7)
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    }
+  }
+
+  const [dateRange, setDateRange] = useState(getDefaultDateRange())
+  const [appliedDateRange, setAppliedDateRange] = useState(getDefaultDateRange())
   const [phoneFilter, setPhoneFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [empresaFilter, setEmpresaFilter] = useState('')
@@ -329,8 +341,8 @@ const Leads = () => {
   }, [assignedUsers, userSearchText])
 
   const filteredLeads = useMemo(() => {
+    // Los leads ya vienen filtrados por fecha del backend, solo aplicar otros filtros
     const filtered = filterLeads(activeLeads, {
-      dateFilter,
       phoneFilter,
       statusFilter,
       empresaFilter,
@@ -350,7 +362,6 @@ const Leads = () => {
     })
   }, [
     activeLeads,
-    dateFilter,
     phoneFilter,
     statusFilter,
     empresaFilter,
@@ -368,7 +379,24 @@ const Leads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [dateFilter, phoneFilter, statusFilter, empresaFilter, assignedUserFilter])
+  }, [phoneFilter, statusFilter, empresaFilter, assignedUserFilter])
+
+  // Función para aplicar el filtro de fecha manualmente
+  const handleApplyDateFilter = async () => {
+    if (!user) return
+    
+    try {
+      const startDateISO = dateRange.startDate ? `${dateRange.startDate}T00:00:00.000Z` : undefined
+      const endDateISO = dateRange.endDate ? `${dateRange.endDate}T23:59:59.999Z` : undefined
+      
+      setCurrentPage(1)
+      await refreshLeads(startDateISO, endDateISO)
+      // Actualizar el rango aplicado solo después del fetch exitoso
+      setAppliedDateRange({ ...dateRange })
+    } catch (error) {
+      console.error('Error loading leads with date range:', error)
+    }
+  }
 
 
 
@@ -1199,25 +1227,146 @@ const Leads = () => {
           </div>
         )}
 
+        {/* Botón Importar - arriba a la derecha en desktop */}
+        {user?.rol === 'administrador' && (
+          <div className="hidden lg:flex justify-end mb-3">
+            <button
+              onClick={handleImport}
+              className="px-5 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center text-sm"
+            >
+              <span className="mr-2">📥</span>
+              Importar
+            </button>
+          </div>
+        )}
+
+        {/* Filtro de rango de fechas - destacado en verde, arriba en desktop, oculto en móvil */}
+        <div className="hidden lg:block bg-gradient-to-r from-[#18cb96]/10 to-[#15b885]/10 border-2 border-[#18cb96] rounded-lg p-4 mb-4">
+          {/* Contenido centrado con max-width */}
+          <div className="max-w-md mx-auto">
+            <label className="text-sm font-semibold text-[#18cb96] mb-3 flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Rango de Fechas
+            </label>
+            <div className="flex items-center justify-center gap-4 mb-2">
+              <div className="w-40">
+                <label htmlFor="startDate" className="block text-xs font-medium text-[#373643] mb-1 text-center">
+                  Desde
+                </label>
+                <input
+                  type="date"
+                  id="startDate"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  className="w-full px-3 py-2 border-2 border-[#18cb96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm bg-white"
+                />
+              </div>
+              <div className="w-40">
+                <label htmlFor="endDate" className="block text-xs font-medium text-[#373643] mb-1 text-center">
+                  Hasta
+                </label>
+                <input
+                  type="date"
+                  id="endDate"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  className="w-full px-3 py-2 border-2 border-[#18cb96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm bg-white"
+                />
+              </div>
+              <button
+                onClick={handleApplyDateFilter}
+                disabled={loading}
+                className="px-4 py-2 bg-[#18cb96] text-white font-medium rounded-lg hover:bg-[#15b885] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed self-end"
+              >
+                {loading ? 'Cargando...' : 'Aplicar'}
+              </button>
+            </div>
+            <div className="mt-2 p-2 bg-[#18cb96]/20 rounded-md">
+              <p className="text-xs font-medium text-[#15b885] flex items-center justify-center gap-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {(() => {
+                  const start = new Date(appliedDateRange.startDate)
+                  const end = new Date(appliedDateRange.endDate)
+                  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                  const isLast7Days = daysDiff === 7 && end.toDateString() === new Date().toDateString()
+                  return isLast7Days 
+                    ? 'Mostrando leads de los últimos 7 días'
+                    : `Mostrando leads del ${start.toLocaleDateString('es-ES')} al ${end.toLocaleDateString('es-ES')}`
+                })()}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Filters and Export */}
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
           <div className="flex flex-col gap-4">
             {/* Filters Row */}
             <div className={`grid grid-cols-1 gap-4 ${filtersGridCols}`}>
-              <div>
-                <label htmlFor="dateFilter" className="block text-sm font-medium text-[#373643] mb-2">
-                  Filtrar por fecha
-                </label>
-                <input
-                  type="date"
-                  id="dateFilter"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="phoneFilter" className="block text-sm font-medium text-[#373643] mb-2">
+                {/* Filtro de rango de fechas - solo visible en móvil */}
+                <div className="lg:hidden bg-gradient-to-r from-[#18cb96]/10 to-[#15b885]/10 border-2 border-[#18cb96] rounded-lg p-4">
+                  <label className="text-sm font-semibold text-[#18cb96] mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Rango de Fechas
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label htmlFor="startDateMobile" className="text-xs font-medium text-[#373643] mb-1">
+                        Desde
+                      </label>
+                      <input
+                        type="date"
+                        id="startDateMobile"
+                        value={dateRange.startDate}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                        className="w-full px-3 py-2 border-2 border-[#18cb96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="endDateMobile" className="text-xs font-medium text-[#373643] mb-1">
+                        Hasta
+                      </label>
+                      <input
+                        type="date"
+                        id="endDateMobile"
+                        value={dateRange.endDate}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                        className="w-full px-3 py-2 border-2 border-[#18cb96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleApplyDateFilter}
+                    disabled={loading}
+                    className="w-full px-4 py-2 bg-[#18cb96] text-white font-medium rounded-lg hover:bg-[#15b885] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed mb-2"
+                  >
+                    {loading ? 'Cargando...' : 'Aplicar'}
+                  </button>
+                  <div className="mt-2 p-2 bg-[#18cb96]/20 rounded-md">
+                    <p className="text-xs font-medium text-[#15b885] flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {(() => {
+                        const start = new Date(appliedDateRange.startDate)
+                        const end = new Date(appliedDateRange.endDate)
+                        const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                        const isLast7Days = daysDiff === 7 && end.toDateString() === new Date().toDateString()
+                        return isLast7Days 
+                          ? 'Mostrando leads de los últimos 7 días'
+                          : `Mostrando leads del ${start.toLocaleDateString('es-ES')} al ${end.toLocaleDateString('es-ES')}`
+                      })()}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="phoneFilter" className="block text-sm font-medium text-[#373643] mb-2">
                   Filtrar por teléfono
                 </label>
                 <input
@@ -1375,9 +1524,9 @@ const Leads = () => {
               )}
             </div>
             
-            {/* Import Button */}
+            {/* Import Button - solo visible en móvil */}
             {user?.rol === 'administrador' && (
-              <div className="flex justify-end">
+              <div className="flex justify-end lg:hidden">
                 <button
                   onClick={handleImport}
                   className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"

@@ -4,10 +4,10 @@ import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
 
 const LeadsLayout = () => {
-  const { user, userEmpresaNombre, userEmpresaId } = useAuthStore()
-  const { loadInitialLeads, loadHistorialLeads } = useLeadsStore()
+  const { user, userEmpresaNombre } = useAuthStore()
+  const { loadInitialLeads } = useLeadsStore()
 
-  // Cargar leads cuando el componente se monte
+  // Cargar leads activos cuando el componente se monte (últimos 7 días por defecto)
   useEffect(() => {
     if (!user) return
 
@@ -15,10 +15,14 @@ const LeadsLayout = () => {
     const loadData = async () => {
       if (isReady) {
         try {
-          await loadInitialLeads()
-          // Cargar también el historial para que esté disponible en todas las rutas
-          const empresaId = user?.rol !== 'administrador' ? userEmpresaId || undefined : undefined
-          await loadHistorialLeads(empresaId)
+          // Calcular fechas por defecto (últimos 7 días)
+          const endDate = new Date()
+          const startDate = new Date()
+          startDate.setDate(startDate.getDate() - 7)
+          const startDateISO = startDate.toISOString()
+          const endDateISO = endDate.toISOString()
+          
+          await loadInitialLeads(startDateISO, endDateISO)
         } catch (error) {
           console.error('Error loading data:', error)
         }
@@ -30,7 +34,7 @@ const LeadsLayout = () => {
     return () => {
       isReady = false
     }
-  }, [user, loadInitialLeads, loadHistorialLeads, userEmpresaId])
+  }, [user, loadInitialLeads])
 
   return (
     <>
