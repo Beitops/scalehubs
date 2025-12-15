@@ -6,8 +6,11 @@ import { companyService, type Company } from '../services/companyService'
 import { getUsersByCompany } from '../services/userService'
 import type { DatabaseProfile } from '../types/database'
 import type { Lead } from '../services/leadsService'
+import { leadsService, type ImportLeadData } from '../services/leadsService'
 import { leadSolicitudesService, type LeadSolicitud } from '../services/leadSolicitudesService'
 import { callbellService } from '../services/callbellService'
+import { supabase } from '../lib/supabase'
+import axios from 'axios'
 
 const AsignacionLeads = () => {
   const [companies, setCompanies] = useState<Company[]>([])
@@ -38,6 +41,22 @@ const AsignacionLeads = () => {
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
   const longPressTriggeredRef = useRef(false)
+  
+  // Estados para importación
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importMode, setImportMode] = useState<'manual' | 'csv'>('manual')
+  const [importLoading, setImportLoading] = useState(false)
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [manualFormData, setManualFormData] = useState({
+    nombre_cliente: '',
+    telefono: '',
+    empresa_id: '',
+    campaña_id: '',
+    hub_id: ''
+  })
+  const [sendCallbell, setSendCallbell] = useState(false)
+  const [campaigns, setCampaigns] = useState<Array<{id: number, nombre: string, meta_plataforma_id: string | null}>>([])
+  const [hubs, setHubs] = useState<Array<{id: number, nombre: string}>>([])
 
   const { user, userEmpresaId } = useAuthStore()
   const {
@@ -98,6 +117,14 @@ const AsignacionLeads = () => {
 
     loadInitialData()
   }, [user, userEmpresaId])
+
+  // Cargar datos adicionales cuando se abra el modal de importación
+  useEffect(() => {
+    if (showImportModal) {
+      loadCampaigns()
+      loadHubs()
+    }
+  }, [showImportModal])
 
 
 
@@ -409,6 +436,370 @@ const AsignacionLeads = () => {
     return ''
   }
 
+  // Funciones para importación
+  const handleImport = () => {
+    setShowImportModal(true)
+    setImportMode('manual')
+    setManualFormData({ nombre_cliente: '', telefono: '', empresa_id: '', campaña_id: '', hub_id: '' })
+    setCsvFile(null)
+    setSendCallbell(false)
+  }
+
+  const loadCampaigns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('campañas')
+        .select('id, nombre, meta_plataforma_id')
+        .order('nombre')
+      
+      if (error) {
+        console.error('Error loading campaigns:', error)
+        return
+      }
+      
+      setCampaigns(data || [])
+    } catch (error) {
+      console.error('Error loading campaigns:', error)
+    }
+  }
+
+  const loadHubs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hubs')
+        .select('id, nombre')
+        .order('nombre')
+      
+      if (error) {
+        console.error('Error loading hubs:', error)
+        return
+      }
+      
+      setHubs(data || [])
+    } catch (error) {
+      console.error('Error loading hubs:', error)
+    }
+  }
+
+  const handleManualFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setManualFormData({
+      ...manualFormData,
+      [e.target.name]: e.target.value
+    })
+  }
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file)
+    } else {
+      showNotification('Por favor selecciona un archivo CSV válido', 'error')
+    }
+  }
+
+  const parseCSV = (csvText: string): ImportLeadData[] => {
+    const lines = csvText.split('\n').filter(line => line.trim())
+    if (lines.length < 2) {
+      throw new Error('El archivo CSV debe tener al menos una fila de datos')
+    }
+
+    // Función para normalizar headers (quitar tildes y convertir a minúsculas)
+    const normalizeHeader = (header: string): string => {
+      return header
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Quitar tildes y acentos
+    }
+
+    // Mapeo de variantes de nombres de columnas
+    const headerVariants: Record<string, string> = {
+      'nombre': 'nombre_cliente',
+      'nombre cliente': 'nombre_cliente',
+      'nombre_cliente': 'nombre_cliente',
+      'cliente': 'nombre_cliente',
+      'nombrecliente': 'nombre_cliente',
+      
+      'telefono': 'telefono',
+      'teléfono': 'telefono',
+      'tlf': 'telefono',
+      'phone': 'telefono',
+      
+      'empresa': 'empresa_id',
+      'empresa_id': 'empresa_id',
+      'id empresa': 'empresa_id',
+      'idempresa': 'empresa_id',
+      'empresaid': 'empresa_id',
+      
+      'campaña': 'campaña_id',
+      'campana': 'campaña_id',
+      'campaña_id': 'campaña_id',
+      'campana_id': 'campaña_id',
+      'id campaña': 'campaña_id',
+      'idcampana': 'campaña_id',
+      'campañaid': 'campaña_id',
+      
+      'hub': 'hub_id',
+      'hub_id': 'hub_id',
+      'id hub': 'hub_id',
+      'idhub': 'hub_id',
+      'hubid': 'hub_id',
+      
+      'plataforma': 'plataforma',
+      
+      'estado temporal': 'estado_temporal',
+      'estado_temporal': 'estado_temporal',
+      'estadotemporal': 'estado_temporal',
+      
+      'estado_general': 'estado',
+      'estado': 'estado',
+      'estado_lead': 'estado',
+      
+      'observaciones': 'observaciones',
+      'observacion': 'observaciones',
+      'comentarios': 'observaciones',
+      'comentario': 'observaciones',
+      'notas': 'observaciones',
+      'nota': 'observaciones',
+      
+      'calidad': 'calidad'
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim())
+    const normalizedHeaders = headers.map(h => {
+      const normalized = normalizeHeader(h)
+      return headerVariants[normalized] || normalized
+    })
+
+    // Verificar que estén los headers requeridos (aceptando cualquier variante)
+    const hasNombreCliente = normalizedHeaders.some(h => h === 'nombre_cliente')
+    const hasTelefono = normalizedHeaders.some(h => h === 'telefono')
+    
+    if (!hasNombreCliente || !hasTelefono) {
+      const missing: string[] = []
+      if (!hasNombreCliente) missing.push('nombre/nombre_cliente')
+      if (!hasTelefono) missing.push('telefono/teléfono')
+      throw new Error(`Faltan las siguientes columnas requeridas: ${missing.join(', ')}`)
+    }
+
+    const leads: ImportLeadData[] = []
+    const errors: string[] = []
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+      
+      if (values.length !== headers.length) {
+        errors.push(`Fila ${i + 1}: Número de columnas incorrecto`)
+        continue
+      }
+
+      const getColumnValue = (columnName: string): string => {
+        const index = normalizedHeaders.indexOf(columnName)
+        return index >= 0 ? values[index] || '' : ''
+      }
+
+      const lead: ImportLeadData = {
+        nombre_cliente: getColumnValue('nombre_cliente'),
+        telefono: getColumnValue('telefono'),
+        plataforma: 'scalehubs',
+        empresa_id: getColumnValue('empresa_id') ? parseInt(getColumnValue('empresa_id')) : undefined,
+        campaña_id: getColumnValue('campaña_id') ? parseInt(getColumnValue('campaña_id')) : undefined,
+        hub_id: getColumnValue('hub_id') ? parseInt(getColumnValue('hub_id')) : undefined,
+        estado_temporal: getColumnValue('estado_temporal') || 'sin_tratar',
+        estado: getColumnValue('estado') || 'activo',
+        observaciones: getColumnValue('observaciones') || undefined,
+        calidad: getColumnValue('calidad') ? parseInt(getColumnValue('calidad')) : 1
+      }
+
+      // Validar campos requeridos
+      if (!lead.nombre_cliente) {
+        errors.push(`Fila ${i + 1}: Nombre del cliente es requerido`)
+        continue
+      }
+      if (!lead.telefono) {
+        errors.push(`Fila ${i + 1}: Teléfono es requerido`)
+        continue
+      }
+
+      leads.push(lead)
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Errores encontrados:\n${errors.join('\n')}`)
+    }
+
+    return leads
+  }
+
+  // Función para generar un lead_id pseudoaleatorio
+  const generateLeadId = (): string => {
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 11)
+    const phoneHash = manualFormData.telefono.split('').reduce((acc, char) => {
+      return ((acc << 5) - acc) + char.charCodeAt(0)
+    }, 0).toString(36)
+    return `${timestamp}-${phoneHash}-${random}`
+  }
+
+  const handleManualImport = async () => {
+    if (!manualFormData.nombre_cliente || !manualFormData.telefono) {
+      showNotification('Por favor completa todos los campos requeridos', 'error')
+      return
+    }
+
+    // Validar campos requeridos si se envía a Callbell
+    if (sendCallbell) {
+      if (!manualFormData.campaña_id) {
+        showNotification('La campaña es requerida cuando se envía mensaje a Callbell', 'error')
+        return
+      }
+      if (!manualFormData.hub_id) {
+        showNotification('El hub es requerido cuando se envía mensaje a Callbell', 'error')
+        return
+      }
+    }
+
+    setImportLoading(true)
+    try {
+      // Si se marcó enviar a Callbell, enviar directamente a la edge function
+      if (sendCallbell) {
+        // Obtener la campaña seleccionada
+        const selectedCampaign = campaigns.find(c => c.id === parseInt(manualFormData.campaña_id))
+        const campaignName = selectedCampaign?.nombre || ''
+        const metaPlataformaId = selectedCampaign?.meta_plataforma_id
+
+        if (!metaPlataformaId) {
+          showNotification('La campaña seleccionada no tiene meta_plataforma_id configurado', 'error')
+          setImportLoading(false)
+          return
+        }
+
+        // Obtener el token de acceso
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) {
+          throw new Error('No hay sesión activa')
+        }
+
+        // Generar lead_id pseudoaleatorio
+        const leadId = generateLeadId()
+
+        // Preparar el payload según la estructura JSON
+        const callbellPayload = {
+          campaign_id: metaPlataformaId,
+          campaign_name: campaignName,
+          field_data: {
+            name: manualFormData.nombre_cliente,
+            phone: manualFormData.telefono
+          },
+          fecha: new Date().toISOString(),
+          platform: 'scalehubs',
+          empresa: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : null,
+          hub: parseInt(manualFormData.hub_id),
+          lead_id: leadId
+        }
+
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+        const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/insert-lead-callbell`
+
+        // Si hay un error al enviar a Callbell, lanzar el error para que no se cree el lead
+        let response: any = null
+        try {
+          response = await axios.post(
+            edgeFunctionUrl,
+            callbellPayload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            }
+          )
+
+          // Verificar si la respuesta tiene un warning (aunque success sea true)
+          if (response.data?.warning) {
+            const warningMessage = response.data?.message || 'Error al enviar el lead a Callbell'
+            throw new Error(warningMessage) // Lanzar error para detener el flujo
+          }
+
+          // Solo si la llamada a Callbell es exitosa y sin warnings, mostrar éxito y refrescar
+          showNotification('Lead importado y mensaje enviado a Callbell correctamente', 'success')
+          setShowImportModal(false)
+          await loadUnassignedLeads()
+        } catch (callbellError) {
+          console.error('Error sending to Callbell:', callbellError)
+          // Obtener el mensaje de error
+          const errorMessage = response?.data?.warning 
+            ? response.data?.message || 'Error al enviar el lead a Callbell'
+            : axios.isAxiosError(callbellError) 
+              ? callbellError.response?.data?.message || callbellError.response?.data?.error || callbellError.message || 'Error al enviar el lead a Callbell'
+              : callbellError instanceof Error 
+                ? callbellError.message 
+                : 'Error al enviar el lead a Callbell'
+          showNotification(errorMessage, 'error')
+          throw callbellError // Lanzar el error para detener el flujo
+        }
+      } else {
+        // Si no se envía a Callbell, crear el lead normalmente
+        const leadData: ImportLeadData = {
+          nombre_cliente: manualFormData.nombre_cliente,
+          telefono: manualFormData.telefono,
+          plataforma: 'scalehubs',
+          empresa_id: manualFormData.empresa_id ? parseInt(manualFormData.empresa_id) : undefined,
+          campaña_id: manualFormData.campaña_id ? parseInt(manualFormData.campaña_id) : undefined,
+          hub_id: manualFormData.hub_id ? parseInt(manualFormData.hub_id) : undefined,
+          estado_temporal: 'sin_tratar',
+          estado: 'activo',
+          calidad: 1
+        }
+
+        await leadsService.createImportLead(leadData)
+        showNotification('Lead importado correctamente', 'success')
+        setShowImportModal(false)
+        await loadUnassignedLeads()
+      }
+    } catch (error) {
+      console.error('Error importing lead:', error)
+      // Solo mostrar error si no se mostró ya (para evitar duplicados)
+      if (!sendCallbell || (sendCallbell && !axios.isAxiosError(error))) {
+        showNotification('Error al importar el lead', 'error')
+      }
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const handleCsvImport = async () => {
+    if (!csvFile) {
+      showNotification('Por favor selecciona un archivo CSV', 'error')
+      return
+    }
+
+    setImportLoading(true)
+    try {
+      const csvText = await csvFile.text()
+      const leadsData = parseCSV(csvText)
+      
+      const result = await leadsService.importLeadsFromCSV(leadsData, true)
+      
+      if (result.success) {
+        let message = `Se importaron ${result.created} leads correctamente`
+        if (result.duplicatePhones.length > 0) {
+          message += `. ${result.duplicatePhones.length} leads no se importaron por teléfonos duplicados`
+        }
+        showNotification(message, 'success')
+        setShowImportModal(false)
+        await loadUnassignedLeads()
+      } else {
+        showNotification(`Error al importar: ${result.errors.join(', ')}`, 'error')
+      }
+    } catch (error) {
+      console.error('Error importing CSV:', error)
+      showNotification(error instanceof Error ? error.message : 'Error al procesar el archivo CSV', 'error')
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   if (loading || loadingCompanies || loadingUsers) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -493,16 +884,28 @@ const AsignacionLeads = () => {
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 lg:mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Link 
-              to="/leads"
-              className="text-[#18cb96] hover:text-[#15b885] transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">{getPageTitle()}</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Link 
+                to="/leads"
+                className="text-[#18cb96] hover:text-[#15b885] transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#373643]">{getPageTitle()}</h1>
+            </div>
+            {/* Botón Importar - solo para administradores */}
+            {user?.rol === 'administrador' && (
+              <button
+                onClick={handleImport}
+                className="px-5 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center text-sm"
+              >
+                <span className="mr-2">📥</span>
+                Importar
+              </button>
+            )}
           </div>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
             {getPageDescription()}
@@ -1382,6 +1785,280 @@ const AsignacionLeads = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal overlay */}
+      {showImportModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999]"
+          onClick={() => setShowImportModal(false)}
+        />
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold text-[#373643]">Importar Leads</h2>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Toggle Buttons */}
+              <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setImportMode('manual')}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    importMode === 'manual'
+                      ? 'bg-white text-[#373643] shadow-sm'
+                      : 'text-gray-600 hover:text-[#373643]'
+                  }`}
+                >
+                  Importar Manual
+                </button>
+                <button
+                  onClick={() => setImportMode('csv')}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    importMode === 'csv'
+                      ? 'bg-white text-[#373643] shadow-sm'
+                      : 'text-gray-600 hover:text-[#373643]'
+                  }`}
+                >
+                  Importar por CSV
+                </button>
+              </div>
+
+              {/* Manual Import Form */}
+              {importMode === 'manual' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="nombre_cliente" className="block text-sm font-medium text-[#373643] mb-2">
+                      Nombre del Cliente *
+                    </label>
+                    <input
+                      type="text"
+                      id="nombre_cliente"
+                      name="nombre_cliente"
+                      value={manualFormData.nombre_cliente}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      placeholder="Ingresa el nombre del cliente"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="telefono" className="block text-sm font-medium text-[#373643] mb-2">
+                      Teléfono *
+                    </label>
+                    <input
+                      type="tel"
+                      id="telefono"
+                      name="telefono"
+                      value={manualFormData.telefono}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                      placeholder="Ingresa el teléfono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="empresa_id" className="block text-sm font-medium text-[#373643] mb-2">
+                      Empresa (Opcional)
+                    </label>
+                    <select
+                      id="empresa_id"
+                      name="empresa_id"
+                      value={manualFormData.empresa_id}
+                      onChange={handleManualFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    >
+                      <option value="">Selecciona una empresa</option>
+                      {companies.map(company => (
+                        <option key={company.id} value={company.id}>
+                          {company.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Checkbox para enviar mensaje a Callbell */}
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="sendCallbell"
+                      checked={sendCallbell}
+                      onChange={(e) => setSendCallbell(e.target.checked)}
+                      className="h-4 w-4 text-[#18cb96] focus:ring-[#18cb96] border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendCallbell" className="ml-2 block text-sm font-medium text-[#373643]">
+                      Enviar mensaje callbell
+                    </label>
+                  </div>
+
+                  {/* Campos adicionales cuando se marca el checkbox */}
+                  {sendCallbell && (
+                    <>
+                      <div>
+                        <label htmlFor="campaña_id" className="block text-sm font-medium text-[#373643] mb-2">
+                          Campaña *
+                        </label>
+                        <select
+                          id="campaña_id"
+                          name="campaña_id"
+                          value={manualFormData.campaña_id}
+                          onChange={handleManualFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                          required
+                        >
+                          <option value="">Selecciona una campaña</option>
+                          {campaigns.map(campaign => (
+                            <option key={campaign.id} value={campaign.id}>
+                              {campaign.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="hub_id" className="block text-sm font-medium text-[#373643] mb-2">
+                          Hub *
+                        </label>
+                        <select
+                          id="hub_id"
+                          name="hub_id"
+                          value={manualFormData.hub_id}
+                          onChange={handleManualFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                          required
+                        >
+                          <option value="">Selecciona un hub</option>
+                          {hubs.map(hub => (
+                            <option key={hub.id} value={hub.id}>
+                              {hub.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">Información automática</h3>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• Plataforma: scalehubs</p>
+                      <p>• Estado: Activo</p>
+                      <p>• Estado Temporal: Sin Tratar</p>
+                      <p>• Calidad: 1</p>
+                      <p>• Fecha de entrada: Ahora</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleManualImport}
+                      disabled={importLoading}
+                      className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {importLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Importando...
+                        </>
+                      ) : (
+                        'Importar Lead'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CSV Import Form */}
+              {importMode === 'csv' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="csvFile" className="block text-sm font-medium text-[#373643] mb-2">
+                      Archivo CSV *
+                    </label>
+                    <input
+                      type="file"
+                      id="csvFile"
+                      accept=".csv"
+                      onChange={handleCsvFileChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                    />
+                    {csvFile && (
+                      <p className="mt-2 text-sm text-green-600">
+                        Archivo seleccionado: {csvFile.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-yellow-800 mb-2">Formato requerido del CSV</h3>
+                    <div className="text-sm text-yellow-700 space-y-1">
+                      <p><strong>Columnas requeridas:</strong> Nombre/Nombre Cliente/Nombre_Cliente, Teléfono/Teléfono/Telefono</p>
+                      <p><strong>Columnas opcionales:</strong> Plataforma, Empresa/Empresa_ID, Campaña/Campaña_ID, Hub/Hub_ID (número entero), Estado Temporal/Estado_Temporal, Estado, Observaciones, Calidad</p>
+                      <p><strong>Formato flexible:</strong> Se aceptan tildes, mayúsculas/minúsculas y diferentes variantes de nombres</p>
+                      <p><strong>Nota:</strong> Los teléfonos duplicados no se importarán</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-800 mb-2">Valores por defecto</h3>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p>• Plataforma: scalehubs (siempre se usa este valor)</p>
+                      <p>• Estado: Activo (si no se especifica)</p>
+                      <p>• Estado Temporal: Sin Tratar (si no se especifica)</p>
+                      <p>• Calidad: 1 (si no se especifica)</p>
+                      <p>• Fecha de entrada: Ahora</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleCsvImport}
+                      disabled={importLoading || !csvFile}
+                      className="flex-1 px-4 py-2 bg-[#18cb96] text-white rounded-lg hover:bg-[#15b885] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {importLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Importando...
+                        </>
+                      ) : (
+                        'Importar CSV'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
