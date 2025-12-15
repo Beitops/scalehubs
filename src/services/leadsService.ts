@@ -16,6 +16,7 @@ export interface Lead {
   estado?: string
   campaña_id?: number
   hub_id?: number
+  hub_nombre?: string
   plataforma_lead_id?: string
   fecha_asignacion?: string
   fecha_asignacion_usuario?: string
@@ -391,6 +392,10 @@ class LeadsService {
           campañas!leads_campaña_id_fkey (
             id,
             nombre
+          ),
+          hubs!leads_hub_id_fkey (
+            id,
+            nombre
           )
         `)
         .is('empresa_id', null)
@@ -406,6 +411,7 @@ class LeadsService {
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         campaña_nombre: lead.campañas?.nombre,
+        hub_nombre: lead.hubs?.nombre,
         plataforma_lead: platformConverter(lead.plataforma || ''),
         calidad: lead.calidad || 1
       })) || []
@@ -442,6 +448,10 @@ class LeadsService {
           campañas!leads_campaña_id_fkey (
             id,
             nombre
+          ),
+          hubs!leads_hub_id_fkey (
+            id,
+            nombre
           )
         `)
         .eq('empresa_id', empresaId)
@@ -458,6 +468,7 @@ class LeadsService {
         ...lead,
         empresa_nombre: lead.empresas?.nombre,
         campaña_nombre: lead.campañas?.nombre,
+        hub_nombre: lead.hubs?.nombre,
         plataforma_lead: platformConverter(lead.plataforma || ''),
         calidad: lead.calidad || 1
       })) || []

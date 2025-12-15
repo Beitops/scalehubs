@@ -666,9 +666,11 @@ const AsignacionLeads = () => {
                             )}
                           </div>
                         )}
-                        <span className="inline-flex px-2 py-1 text-[10px] font-semibold rounded-full text-white bg-[#1e3a8a]">
-                          {lead.campaña_nombre || 'Sin Campaña'}
-                        </span>
+                        {user?.rol !== 'coordinador' && (
+                          <span className="inline-flex px-2 py-1 text-[10px] font-semibold rounded-full text-white bg-[#1e3a8a]">
+                            {lead.campaña_nombre || 'Sin Campaña'}
+                          </span>
+                        )}
                         <h3 className="font-medium text-[#373643] text-sm">{lead.nombre_cliente}</h3>
                       </div>
                       <span className="inline-flex items-center justify-center w-8 h-8">
@@ -683,7 +685,7 @@ const AsignacionLeads = () => {
                       <p><span className="font-medium">Teléfono:</span> {lead.telefono}</p>
                       <p><span className="font-medium">Fecha:</span> {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}</p>
                       {user?.rol === 'administrador' && (
-                        <p><span className="font-medium">Empresa:</span> Sin asignar</p>
+                        <p><span className="font-medium">Hub:</span> {lead.hub_nombre || 'Sin Hub'}</p>
                       )}
                     </div>
                     {!isSelectionMode && (
@@ -717,9 +719,11 @@ const AsignacionLeads = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                         Fecha Entrada
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                        Campaña
-                      </th>
+                      {user?.rol !== 'coordinador' && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
+                          Campaña
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
                         Calidad
                       </th>
@@ -732,7 +736,7 @@ const AsignacionLeads = () => {
                       
                       {user?.rol === 'administrador' && (
                         <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
-                          Empresa
+                          Hub
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-[#373643] uppercase tracking-wider">
@@ -773,9 +777,11 @@ const AsignacionLeads = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
                           {new Date(lead.fecha_entrada).toLocaleDateString('es-ES')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
-                          {lead.campaña_nombre || 'Sin Campaña'}
-                        </td>
+                        {user?.rol !== 'coordinador' && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-[#373643]">
+                            {lead.campaña_nombre || 'Sin Campaña'}
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="inline-flex items-center justify-center w-10 h-10">
                             <img 
@@ -794,7 +800,7 @@ const AsignacionLeads = () => {
                         
                         {user?.rol === 'administrador' && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            Sin asignar
+                            {lead.hub_nombre || 'Sin Hub'}
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
