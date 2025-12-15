@@ -27,7 +27,70 @@ export interface CreateSolicitudData {
   solicitante_user_id: string
 }
 
+export interface PuedeSolicitarResult {
+  puedeSolicitar: boolean
+  numLeadsSinTratar: number
+  numSolicitudesPendientes: number
+  maxSolicitudes: number
+  razon?: 'leads_sin_tratar' | 'solicitudes_pendientes' | 'ambos'
+}
+
+export interface EmpresaConfiguracionSolicitudes {
+  maxSolicitudesPorAgente: number
+  solicitudesAutomaticas: boolean
+}
+
 class LeadSolicitudesService {
+  // Obtener configuración de empresa desde la base de datos
+  async getEmpresaConfiguracion(empresaId: number): Promise<EmpresaConfiguracionSolicitudes> {
+    try {
+      const { data: configData, error } = await supabase
+        .from('configuraciones_empresa')
+        .select('configuraciones')
+        .eq('empresa_id', empresaId)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No existe configuración, retornar valores por defecto
+          return {
+            maxSolicitudesPorAgente: 1,
+            solicitudesAutomaticas: false
+          }
+        }
+        console.error('Error obteniendo configuración de empresa:', error)
+        // En caso de error, retornar valores por defecto para no bloquear la solicitud
+        return {
+          maxSolicitudesPorAgente: 1,
+          solicitudesAutomaticas: false
+        }
+      }
+
+      if (configData?.configuraciones) {
+        const config = configData.configuraciones as {
+          maxSolicitudesPorAgente?: number
+          solicitudesAutomaticas?: boolean
+        }
+        return {
+          maxSolicitudesPorAgente: config.maxSolicitudesPorAgente || 1,
+          solicitudesAutomaticas: config.solicitudesAutomaticas || false
+        }
+      }
+
+      // Si no hay configuración, retornar valores por defecto
+      return {
+        maxSolicitudesPorAgente: 1,
+        solicitudesAutomaticas: false
+      }
+    } catch (error) {
+      console.error('Error in getEmpresaConfiguracion:', error)
+      // En caso de error, retornar valores por defecto
+      return {
+        maxSolicitudesPorAgente: 1,
+        solicitudesAutomaticas: false
+      }
+    }
+  }
   // Crear una nueva solicitud de lead
   async createSolicitud(solicitudData: CreateSolicitudData): Promise<LeadSolicitud> {
     try {
@@ -281,7 +344,7 @@ class LeadSolicitudesService {
   }
 
   // Verificar si un agente puede solicitar más leads según la configuración de empresa
-  async puedeSolicitarLead(agenteUserId: string, _empresaId: number, maxSolicitudes: number): Promise<boolean> {
+  async puedeSolicitarLead(agenteUserId: string, _empresaId: number, maxSolicitudes: number): Promise<PuedeSolicitarResult> {
     try {
       // Contar leads activos del agente con estado 'sin_tratar'
       const { data: leadsActivos, error: leadsError } = await supabase
@@ -311,8 +374,40 @@ class LeadSolicitudesService {
       const numLeadsSinTratar = leadsActivos?.length || 0
       const numSolicitudesPendientes = solicitudesPendientes?.length || 0
       const total = numLeadsSinTratar + numSolicitudesPendientes
+      const puedeSolicitar = total < maxSolicitudes
 
-      return total < maxSolicitudes
+      // Determinar la razón si no puede solicitar
+      let razon: 'leads_sin_tratar' | 'solicitudes_pendientes' | 'ambos' | undefined
+      if (!puedeSolicitar) {
+        // Si solo los leads sin tratar alcanzan o superan el límite
+        if (numLeadsSinTratar >= maxSolicitudes && numSolicitudesPendientes === 0) {
+          razon = 'leads_sin_tratar'
+        } 
+        // Si solo las solicitudes pendientes alcanzan o superan el límite
+        else if (numSolicitudesPendientes >= maxSolicitudes && numLeadsSinTratar === 0) {
+          razon = 'solicitudes_pendientes'
+        }
+        // Si ambos contribuyen al límite (ambos tienen valores y juntos alcanzan el límite)
+        else if (numLeadsSinTratar > 0 && numSolicitudesPendientes > 0) {
+          razon = 'ambos'
+        }
+        // Caso por defecto: si solo hay leads sin tratar pero no alcanzan el límite solos
+        else if (numLeadsSinTratar > 0) {
+          razon = 'leads_sin_tratar'
+        }
+        // Caso por defecto: si solo hay solicitudes pendientes pero no alcanzan el límite solas
+        else if (numSolicitudesPendientes > 0) {
+          razon = 'solicitudes_pendientes'
+        }
+      }
+
+      return {
+        puedeSolicitar,
+        numLeadsSinTratar,
+        numSolicitudesPendientes,
+        maxSolicitudes,
+        razon
+      }
     } catch (error) {
       console.error('Error in puedeSolicitarLead:', error)
       throw error

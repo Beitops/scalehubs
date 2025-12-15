@@ -602,24 +602,30 @@ const Leads = () => {
 
     setSolicitudLoading(true)
     try {
-      // Obtener configuración de empresa
-      const configuracion = userEmpresaConfiguracion || {
-        maxSolicitudesPorAgente: 1,
-        solicitudesAutomaticas: false
-      }
+      // Obtener configuración de empresa desde la base de datos
+      const configuracion = await leadSolicitudesService.getEmpresaConfiguracion(userEmpresaId)
 
       // Verificar si el agente puede solicitar más leads
-      const puedeSolicitar = await leadSolicitudesService.puedeSolicitarLead(
+      const puedeSolicitarResult = await leadSolicitudesService.puedeSolicitarLead(
         user.id, 
         userEmpresaId, 
         configuracion.maxSolicitudesPorAgente
       )
 
-      if (!puedeSolicitar) {
-        showNotification(
-          `No puedes solicitar más leads. Ya tienes el máximo permitido (${configuracion.maxSolicitudesPorAgente}) con estado 'sin tratar'.`, 
-          'error'
-        )
+      if (!puedeSolicitarResult.puedeSolicitar) {
+        let mensajeError = ''
+        
+        if (puedeSolicitarResult.razon === 'leads_sin_tratar') {
+          mensajeError = `No puedes solicitar más leads. Ya tienes ${puedeSolicitarResult.numLeadsSinTratar} lead(s) sin tratar (máximo permitido: ${configuracion.maxSolicitudesPorAgente}).`
+        } else if (puedeSolicitarResult.razon === 'solicitudes_pendientes') {
+          mensajeError = `No puedes solicitar más leads. Ya tienes ${puedeSolicitarResult.numSolicitudesPendientes} solicitud(es) pendiente(s) sin respuesta (máximo permitido: ${configuracion.maxSolicitudesPorAgente}).`
+        } else if (puedeSolicitarResult.razon === 'ambos') {
+          mensajeError = `No puedes solicitar más leads. Ya tienes ${puedeSolicitarResult.numLeadsSinTratar} lead(s) sin tratar y ${puedeSolicitarResult.numSolicitudesPendientes} solicitud(es) pendiente(s) (máximo permitido: ${configuracion.maxSolicitudesPorAgente}).`
+        } else {
+          mensajeError = `No puedes solicitar más leads. Ya tienes el máximo permitido (${configuracion.maxSolicitudesPorAgente}).`
+        }
+        
+        showNotification(mensajeError, 'error')
         setSolicitudLoading(false)
         return
       }
