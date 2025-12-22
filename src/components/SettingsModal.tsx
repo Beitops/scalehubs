@@ -88,6 +88,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         throw new Error('El máximo de solicitudes debe estar entre 1 y 3')
       }
 
+      // La función updateEmpresaConfiguracion ahora obtiene la configuración actual
+      // y solo actualiza los campos que han cambiado
       await updateEmpresaConfiguracion({
         maxSolicitudesPorAgente: maxSolicitudes,
         solicitudesAutomaticas: solicitudesAutomaticas,

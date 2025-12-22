@@ -241,9 +241,11 @@ const Empresas = () => {
     setConfigSuccess(null)
 
     try {
-      // Asegurar que los valores numéricos tengan valores por defecto si están vacíos
+      // La función updateEmpresaConfiguracionById ahora obtiene la configuración actual
+      // y solo actualiza los campos que han cambiado
       const configToSave = {
-        ...empresaConfiguracion,
+        maxSolicitudesPorAgente: empresaConfiguracion.maxSolicitudesPorAgente,
+        solicitudesAutomaticas: empresaConfiguracion.solicitudesAutomaticas,
         maximoAgentes: empresaConfiguracion.maximoAgentes !== undefined ? empresaConfiguracion.maximoAgentes : 1,
         diasExclusividad: empresaConfiguracion.diasExclusividad !== undefined ? empresaConfiguracion.diasExclusividad : 0,
         rehusarLeadsAgentes: empresaConfiguracion.rehusarLeadsAgentes || false
@@ -251,6 +253,18 @@ const Empresas = () => {
       
       await updateEmpresaConfiguracionById(selectedCompany.id, configToSave)
       setConfigSuccess('Configuraciones actualizadas correctamente')
+      
+      // Recargar la configuración para reflejar los cambios
+      const updatedConfig = await getEmpresaConfiguracion(selectedCompany.id)
+      if (updatedConfig) {
+        setEmpresaConfiguracion({
+          maxSolicitudesPorAgente: updatedConfig.maxSolicitudesPorAgente || 1,
+          solicitudesAutomaticas: updatedConfig.solicitudesAutomaticas || false,
+          maximoAgentes: updatedConfig.maximoAgentes !== undefined ? updatedConfig.maximoAgentes : 1,
+          diasExclusividad: updatedConfig.diasExclusividad ?? 0,
+          rehusarLeadsAgentes: updatedConfig.rehusarLeadsAgentes || false
+        })
+      }
     } catch (error) {
       console.error('Error updating company config:', error)
       setConfigError('Error al actualizar las configuraciones')

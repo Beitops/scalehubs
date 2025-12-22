@@ -274,9 +274,73 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     try {
-                        const configToSave = {
-                            ...config,
-                            ...(config.maximoAgentes !== undefined && { maximoAgentes: config.maximoAgentes })
+                        // Obtener la configuración actual de la base de datos (una sola llamada)
+                        const { data: currentDbConfig } = await supabase
+                            .from('configuraciones_empresa')
+                            .select('configuraciones, dias_exclusividad')
+                            .eq('empresa_id', userEmpresaId)
+                            .single()
+
+                        // Normalizar la configuración actual para comparación
+                        const currentConfigJson = currentDbConfig?.configuraciones as EmpresaConfiguracion | null
+                        const currentDiasExclusividad = currentDbConfig?.dias_exclusividad ?? 0
+                        
+                        const normalizedCurrent: EmpresaConfiguracion = currentConfigJson ? {
+                            maxSolicitudesPorAgente: currentConfigJson.maxSolicitudesPorAgente || 1,
+                            solicitudesAutomaticas: currentConfigJson.solicitudesAutomaticas || false,
+                            maximoAgentes: currentConfigJson.maximoAgentes !== undefined ? currentConfigJson.maximoAgentes : 1,
+                            diasExclusividad: currentDiasExclusividad,
+                            rehusarLeadsAgentes: currentConfigJson.rehusarLeadsAgentes || false
+                        } : {
+                            maxSolicitudesPorAgente: 1,
+                            solicitudesAutomaticas: false,
+                            maximoAgentes: 1,
+                            diasExclusividad: 0,
+                            rehusarLeadsAgentes: false
+                        }
+                        
+                        // Comparar y obtener solo los campos que han cambiado
+                        const changedFields: Partial<EmpresaConfiguracion> = {}
+                        
+                        if (config.maxSolicitudesPorAgente !== normalizedCurrent.maxSolicitudesPorAgente) {
+                            changedFields.maxSolicitudesPorAgente = config.maxSolicitudesPorAgente
+                        }
+                        if (config.solicitudesAutomaticas !== normalizedCurrent.solicitudesAutomaticas) {
+                            changedFields.solicitudesAutomaticas = config.solicitudesAutomaticas
+                        }
+                        if (config.maximoAgentes !== undefined && config.maximoAgentes !== normalizedCurrent.maximoAgentes) {
+                            changedFields.maximoAgentes = config.maximoAgentes
+                        }
+                        if (config.diasExclusividad !== undefined && config.diasExclusividad !== normalizedCurrent.diasExclusividad) {
+                            changedFields.diasExclusividad = config.diasExclusividad
+                        }
+                        if (config.rehusarLeadsAgentes !== undefined && config.rehusarLeadsAgentes !== normalizedCurrent.rehusarLeadsAgentes) {
+                            changedFields.rehusarLeadsAgentes = config.rehusarLeadsAgentes
+                        }
+
+                        // Si no hay cambios, no hacer nada
+                        if (Object.keys(changedFields).length === 0) {
+                            return
+                        }
+
+                        // Preparar el JSON para guardar: empezar con la configuración actual de la BD
+                        let configToSave: any = {}
+                        let diasExclusividadToSave: number = currentDiasExclusividad
+
+                        if (currentConfigJson) {
+                            // Mergear con la configuración actual de la BD (preservar todos los campos existentes)
+                            configToSave = { ...(currentConfigJson as object) }
+                        }
+
+                        // Separar diasExclusividad de los demás campos
+                        const { diasExclusividad, ...configFieldsToUpdate } = changedFields
+                        
+                        // Aplicar solo los campos que han cambiado (excluyendo diasExclusividad)
+                        Object.assign(configToSave, configFieldsToUpdate)
+                        
+                        // Manejar diasExclusividad por separado si cambió
+                        if (diasExclusividad !== undefined) {
+                            diasExclusividadToSave = diasExclusividad
                         }
 
                         const { error } = await supabase
@@ -284,6 +348,7 @@ export const useAuthStore = create<AuthState>()(
                             .upsert({
                                 empresa_id: userEmpresaId,
                                 configuraciones: configToSave,
+                                dias_exclusividad: diasExclusividadToSave,
                                 fecha_modificacion: new Date().toISOString()
                             })
 
@@ -291,7 +356,16 @@ export const useAuthStore = create<AuthState>()(
                             throw new Error(error.message)
                         }
 
-                        set({ userEmpresaConfiguracion: configToSave })
+                        // Actualizar el estado con la configuración completa
+                        const updatedConfig: EmpresaConfiguracion = {
+                            maxSolicitudesPorAgente: configToSave.maxSolicitudesPorAgente ?? normalizedCurrent.maxSolicitudesPorAgente,
+                            solicitudesAutomaticas: configToSave.solicitudesAutomaticas ?? normalizedCurrent.solicitudesAutomaticas,
+                            maximoAgentes: configToSave.maximoAgentes ?? normalizedCurrent.maximoAgentes,
+                            diasExclusividad: diasExclusividadToSave,
+                            rehusarLeadsAgentes: configToSave.rehusarLeadsAgentes ?? normalizedCurrent.rehusarLeadsAgentes
+                        }
+
+                        set({ userEmpresaConfiguracion: updatedConfig })
                     } catch (error) {
                         throw error
                     }
@@ -343,14 +417,81 @@ export const useAuthStore = create<AuthState>()(
 
                 updateEmpresaConfiguracionById: async (empresaId: number, config: EmpresaConfiguracion) => {
                     try {
-                        const { diasExclusividad, ...configJSON } = config
+                        // Obtener la configuración actual de la base de datos (una sola llamada)
+                        const { data: currentDbConfig } = await supabase
+                            .from('configuraciones_empresa')
+                            .select('configuraciones, dias_exclusividad')
+                            .eq('empresa_id', empresaId)
+                            .single()
+
+                        // Normalizar la configuración actual para comparación
+                        const currentConfigJson = currentDbConfig?.configuraciones as EmpresaConfiguracion | null
+                        const currentDiasExclusividad = currentDbConfig?.dias_exclusividad ?? 0
+                        
+                        const normalizedCurrent: EmpresaConfiguracion = currentConfigJson ? {
+                            maxSolicitudesPorAgente: currentConfigJson.maxSolicitudesPorAgente || 1,
+                            solicitudesAutomaticas: currentConfigJson.solicitudesAutomaticas || false,
+                            maximoAgentes: currentConfigJson.maximoAgentes !== undefined ? currentConfigJson.maximoAgentes : 1,
+                            diasExclusividad: currentDiasExclusividad,
+                            rehusarLeadsAgentes: currentConfigJson.rehusarLeadsAgentes || false
+                        } : {
+                            maxSolicitudesPorAgente: 1,
+                            solicitudesAutomaticas: false,
+                            maximoAgentes: 1,
+                            diasExclusividad: 0,
+                            rehusarLeadsAgentes: false
+                        }
+                        
+                        // Comparar y obtener solo los campos que han cambiado
+                        const changedFields: Partial<EmpresaConfiguracion> = {}
+                        
+                        if (config.maxSolicitudesPorAgente !== normalizedCurrent.maxSolicitudesPorAgente) {
+                            changedFields.maxSolicitudesPorAgente = config.maxSolicitudesPorAgente
+                        }
+                        if (config.solicitudesAutomaticas !== normalizedCurrent.solicitudesAutomaticas) {
+                            changedFields.solicitudesAutomaticas = config.solicitudesAutomaticas
+                        }
+                        if (config.maximoAgentes !== undefined && config.maximoAgentes !== normalizedCurrent.maximoAgentes) {
+                            changedFields.maximoAgentes = config.maximoAgentes
+                        }
+                        if (config.diasExclusividad !== undefined && config.diasExclusividad !== normalizedCurrent.diasExclusividad) {
+                            changedFields.diasExclusividad = config.diasExclusividad
+                        }
+                        if (config.rehusarLeadsAgentes !== undefined && config.rehusarLeadsAgentes !== normalizedCurrent.rehusarLeadsAgentes) {
+                            changedFields.rehusarLeadsAgentes = config.rehusarLeadsAgentes
+                        }
+
+                        // Si no hay cambios, no hacer nada
+                        if (Object.keys(changedFields).length === 0) {
+                            return
+                        }
+
+                        // Preparar el JSON para guardar: empezar con la configuración actual de la BD
+                        let configToSave: any = {}
+                        let diasExclusividadToSave: number = currentDiasExclusividad
+
+                        if (currentConfigJson) {
+                            // Mergear con la configuración actual de la BD (preservar todos los campos existentes)
+                            configToSave = { ...(currentConfigJson as object) }
+                        }
+
+                        // Separar diasExclusividad de los demás campos
+                        const { diasExclusividad, ...configFieldsToUpdate } = changedFields
+                        
+                        // Aplicar solo los campos que han cambiado (excluyendo diasExclusividad)
+                        Object.assign(configToSave, configFieldsToUpdate)
+                        
+                        // Manejar diasExclusividad por separado si cambió
+                        if (diasExclusividad !== undefined) {
+                            diasExclusividadToSave = diasExclusividad
+                        }
 
                         const { error } = await supabase
                             .from('configuraciones_empresa')
                             .upsert({
                                 empresa_id: empresaId,
-                                configuraciones: configJSON,
-                                dias_exclusividad: diasExclusividad ?? 0,
+                                configuraciones: configToSave,
+                                dias_exclusividad: diasExclusividadToSave,
                                 fecha_modificacion: new Date().toISOString()
                             })
 
