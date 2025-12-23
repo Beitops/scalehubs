@@ -26,6 +26,14 @@ const Empresas = () => {
   const [detailsCompany, setDetailsCompany] = useState<Company | null>(null)
   const [toggleLoading, setToggleLoading] = useState(false)
   
+  // Estados para baneo
+  const [isBanned, setIsBanned] = useState(false)
+  const [banInfo, setBanInfo] = useState<{ motivo: string; fecha_baneo: string } | null>(null)
+  const [banLoading, setBanLoading] = useState(false)
+  const [showBanModal, setShowBanModal] = useState(false)
+  const [banMotivo, setBanMotivo] = useState('')
+  const [banAction, setBanAction] = useState<'ban' | 'unban'>('ban')
+  
   // Filtros
   const [nameFilter, setNameFilter] = useState('')
   const [cifFilter, setCifFilter] = useState('')
@@ -48,7 +56,8 @@ const Empresas = () => {
     rehusarLeadsAgentes: false
   })
 
-  const { getEmpresaConfiguracion, updateEmpresaConfiguracionById } = useAuthStore()
+  const { getEmpresaConfiguracion, updateEmpresaConfiguracionById, user } = useAuthStore()
+  const isAdmin = user?.rol === 'administrador'
 
   // Cargar empresas
   useEffect(() => {
@@ -155,9 +164,33 @@ const Empresas = () => {
     })
   }
 
-  const handleMostrarDetalles = (company: Company) => {
+  const handleMostrarDetalles = async (company: Company) => {
     setDetailsCompany(company)
     setShowDetailsModal(true)
+    
+    // Verificar si la empresa está baneada
+    if (isAdmin) {
+      try {
+        const banned = await companyService.empresaEstaBaneada(company.id)
+        setIsBanned(banned)
+        
+        if (banned) {
+          const banData = await companyService.obtenerBaneo(company.id)
+          if (banData) {
+            setBanInfo({
+              motivo: banData.motivo,
+              fecha_baneo: banData.fecha_baneo
+            })
+          }
+        } else {
+          setBanInfo(null)
+        }
+      } catch (error) {
+        console.error('Error checking ban status:', error)
+        setIsBanned(false)
+        setBanInfo(null)
+      }
+    }
   }
 
   const handleToggleActiva = async () => {
@@ -205,6 +238,82 @@ const Empresas = () => {
       }, 4000)
     } finally {
       setToggleLoading(false)
+    }
+  }
+
+  const handleBanearClick = () => {
+    if (!detailsCompany) return
+    setBanAction(isBanned ? 'unban' : 'ban')
+    setBanMotivo('')
+    setShowBanModal(true)
+  }
+
+  const handleBanConfirm = async () => {
+    if (!detailsCompany) return
+
+    setBanLoading(true)
+    try {
+      if (banAction === 'ban') {
+        if (!banMotivo.trim()) {
+          setMessage('Debe proporcionar un motivo para el baneo')
+          setShowSuccessMessage(true)
+          setTimeout(() => setMessageVisible(true), 100)
+          setTimeout(() => {
+            setMessageVisible(false)
+            setTimeout(() => setShowSuccessMessage(false), 300)
+          }, 4000)
+          setBanLoading(false)
+          return
+        }
+
+        await companyService.banearEmpresa(detailsCompany.id, banMotivo.trim())
+        setMessage('Empresa baneada correctamente')
+      } else {
+        await companyService.desbanearEmpresa(detailsCompany.id)
+        setMessage('Empresa desbaneada correctamente')
+      }
+
+      // Recargar el estado del baneo
+      const banned = await companyService.empresaEstaBaneada(detailsCompany.id)
+      setIsBanned(banned)
+      
+      if (banned) {
+        const banData = await companyService.obtenerBaneo(detailsCompany.id)
+        if (banData) {
+          setBanInfo({
+            motivo: banData.motivo,
+            fecha_baneo: banData.fecha_baneo
+          })
+        }
+      } else {
+        setBanInfo(null)
+      }
+
+      setShowBanModal(false)
+      setBanMotivo('')
+      setShowSuccessMessage(true)
+      setTimeout(() => setMessageVisible(true), 100)
+
+      setTimeout(() => {
+        setMessageVisible(false)
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+        }, 300)
+      }, 4000)
+    } catch (error) {
+      console.error('Error banning/unbanning company:', error)
+      setMessage(error instanceof Error ? error.message : 'Error al realizar la acción')
+      setShowSuccessMessage(true)
+      setTimeout(() => setMessageVisible(true), 100)
+
+      setTimeout(() => {
+        setMessageVisible(false)
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+        }, 300)
+      }, 4000)
+    } finally {
+      setBanLoading(false)
     }
   }
 
@@ -1089,17 +1198,148 @@ const Empresas = () => {
                       : 'La empresa está inactiva y no recibirá nuevos leads'}
                   </p>
                 </div>
+
+                {/* Estado de baneo (solo para administradores) */}
+                {isAdmin && (
+                  <div className="pt-4 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-500 mb-3">
+                      Estado de baneo
+                    </label>
+                    {isBanned && banInfo ? (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-3 h-3 rounded-full bg-red-500 mt-1"></div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-red-700 mb-1">Empresa baneada</p>
+                            <p className="text-sm text-red-600 mb-2">
+                              <span className="font-medium">Motivo:</span> {banInfo.motivo}
+                            </p>
+                            <p className="text-xs text-red-500">
+                              Fecha de baneo: {new Date(banInfo.fecha_baneo).toLocaleString('es-ES')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <p className="font-semibold text-green-700">Empresa no baneada</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleBanearClick}
+                      disabled={banLoading}
+                      className={`w-full px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isBanned
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      }`}
+                    >
+                      {banLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Procesando...
+                        </span>
+                      ) : (
+                        isBanned ? 'Desbanear' : 'Banear'
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Botón cerrar */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <button
-                  onClick={() => setShowDetailsModal(false)}
+                  onClick={() => {
+                    setShowDetailsModal(false)
+                    setIsBanned(false)
+                    setBanInfo(null)
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Baneo/Desbaneo */}
+      {showBanModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[10000] p-4">
+          <div className="fixed inset-0 bg-black opacity-50" onClick={() => setShowBanModal(false)} />
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative z-10">
+            <h2 className="text-xl font-bold text-[#373643] mb-4">
+              {banAction === 'ban' ? 'Confirmar baneo de empresa' : 'Confirmar desbaneo de empresa'}
+            </h2>
+            
+            {banAction === 'ban' ? (
+              <>
+                <p className="text-gray-600 mb-4">
+                  ¿Está seguro de que desea banear la empresa <strong>{detailsCompany?.nombre}</strong>?
+                </p>
+                <div className="mb-4">
+                  <label htmlFor="banMotivo" className="block text-sm font-medium text-[#373643] mb-2">
+                    Motivo del baneo *
+                  </label>
+                  <textarea
+                    id="banMotivo"
+                    value={banMotivo}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value.length <= 100) {
+                        setBanMotivo(value)
+                      }
+                    }}
+                    maxLength={100}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent text-sm"
+                    placeholder="Ingrese el motivo del baneo (máximo 100 caracteres)"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {banMotivo.length}/100 caracteres
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-600 mb-4">
+                ¿Está seguro de que desea desbanear la empresa <strong>{detailsCompany?.nombre}</strong>?
+              </p>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBanModal(false)
+                  setBanMotivo('')
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleBanConfirm}
+                disabled={banLoading || (banAction === 'ban' && !banMotivo.trim())}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  banAction === 'ban'
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                {banLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Procesando...
+                  </span>
+                ) : (
+                  banAction === 'ban' ? 'Confirmar Baneo' : 'Confirmar Desbaneo'
+                )}
+              </button>
             </div>
           </div>
         </div>

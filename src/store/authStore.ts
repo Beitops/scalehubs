@@ -228,6 +228,56 @@ export const useAuthStore = create<AuthState>()(
                         const companyCif = empresa?.cif || ''
                         const empresaId = empresa?.id || null
                         const empresaNombre = empresa?.nombre || ''
+                        const userRol = roles.nombre
+
+                        // Verificar si la empresa está baneada (solo para usuarios no administradores)
+                        if (empresaId && userRol !== 'administrador') {
+                            const { data: isBanned, error: banCheckError } = await supabase
+                                .rpc('empresa_esta_baneada', { p_empresa_id: empresaId })
+
+                            if (banCheckError) {
+                                console.error('Error checking ban status:', banCheckError)
+                                // En caso de error, permitir el acceso para no bloquear usuarios por problemas técnicos
+                            } else if (isBanned === true) {
+                                // Obtener información del baneo para mostrar el motivo
+                                const { data: banInfo } = await supabase
+                                    .from('empresas_baneadas')
+                                    .select('motivo')
+                                    .eq('empresa_id', empresaId)
+                                    .is('fecha_expiracion', null)
+                                    .order('fecha_baneo', { ascending: false })
+                                    .limit(1)
+                                    .single()
+
+                                const motivo = banInfo?.motivo || 'No especificado'
+
+                                // Cerrar sesión
+                                await supabase.auth.signOut()
+                                
+                                // Resetear stores
+                                await resetAllStores()
+                                
+                                // Mostrar mensaje según el rol
+                                let errorMessage = ''
+                                if (userRol === 'coordinador') {
+                                    errorMessage = `Su empresa fue baneada. Motivo: ${motivo}`
+                                } else {
+                                    // Agente u otro rol
+                                    errorMessage = 'No es posible iniciar sesión en este momento. Por favor, contacte con los responsables de su empresa.'
+                                }
+
+                                set({
+                                    user: null,
+                                    isAuthenticated: false,
+                                    isLoading: false,
+                                    error: errorMessage,
+                                    userEmpresaId: null,
+                                    userEmpresaNombre: '',
+                                    userEmpresaConfiguracion: null
+                                })
+                                return
+                            }
+                        }
 
                         let empresaConfiguracion = null
                         if (empresaId) {
@@ -247,7 +297,7 @@ export const useAuthStore = create<AuthState>()(
                             nombre: profileWithEmpresa.nombre || 'Usuario',
                             email: session.user.email || '',
                             empresa: companyCif,
-                            rol: roles.nombre
+                            rol: userRol
                         }
 
                         set({

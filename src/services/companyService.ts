@@ -174,5 +174,118 @@ export const companyService = {
       console.error('Error deleting company:', error)
       return false
     }
+  },
+
+  /**
+   * Verifica si una empresa está baneada usando la función RPC
+   * @param empresaId - ID de la empresa
+   * @returns Promise con true si está baneada, false si no
+   */
+  empresaEstaBaneada: async (empresaId: number): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .rpc('empresa_esta_baneada', { p_empresa_id: empresaId })
+
+      if (error) {
+        console.error('Error checking if company is banned:', error)
+        return false
+      }
+
+      return data === true
+    } catch (error) {
+      console.error('Error checking if company is banned:', error)
+      return false
+    }
+  },
+
+  /**
+   * Obtiene la información del baneo activo de una empresa
+   * @param empresaId - ID de la empresa
+   * @returns Promise con la información del baneo o null si no está baneada
+   */
+  obtenerBaneo: async (empresaId: number): Promise<{ id: number; motivo: string; fecha_baneo: string; fecha_expiracion: string | null } | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('empresas_baneadas')
+        .select('id, motivo, fecha_baneo, fecha_expiracion')
+        .eq('empresa_id', empresaId)
+        .is('fecha_expiracion', null)
+        .order('fecha_baneo', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No hay baneo activo
+          return null
+        }
+        console.error('Error getting ban info:', error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('Error getting ban info:', error)
+      return null
+    }
+  },
+
+  /**
+   * Banea una empresa
+   * @param empresaId - ID de la empresa
+   * @param motivo - Motivo del baneo (máximo 100 caracteres)
+   * @returns Promise con el resultado
+   */
+  banearEmpresa: async (empresaId: number, motivo: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('empresas_baneadas')
+        .insert({
+          empresa_id: empresaId,
+          motivo: motivo.substring(0, 100) // Asegurar máximo 100 caracteres
+        })
+
+      if (error) {
+        console.error('Error banning company:', error)
+        throw new Error('Error al banear la empresa')
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error banning company:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Desbanea una empresa actualizando la fecha_expiracion del último baneo
+   * @param empresaId - ID de la empresa
+   * @returns Promise con el resultado
+   */
+  async desbanearEmpresa(empresaId: number): Promise<boolean> {
+    try {
+      // Obtener el último baneo activo usando la función existente
+      const baneo = await this.obtenerBaneo(empresaId)
+
+      if (!baneo) {
+        throw new Error('No se encontró un baneo activo para esta empresa')
+      }
+
+      // Actualizar la fecha_expiracion
+      const { error } = await supabase
+        .from('empresas_baneadas')
+        .update({ fecha_expiracion: new Date().toISOString() })
+        .eq('id', baneo.id)
+
+      if (error) {
+        console.error('Error unbanning company:', error)
+        throw new Error('Error al desbanear la empresa')
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error unbanning company:', error)
+      throw error
+    }
   }
 } 
