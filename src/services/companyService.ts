@@ -9,6 +9,7 @@ export interface Company {
   prioridad: number
   activa: boolean
   url_recepcion_leads?: string | null
+  has_api?: boolean
 }
 
 export const companyService = {

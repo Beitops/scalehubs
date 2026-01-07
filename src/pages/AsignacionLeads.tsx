@@ -9,6 +9,7 @@ import type { Lead } from '../services/leadsService'
 import { leadsService, type ImportLeadData } from '../services/leadsService'
 import { leadSolicitudesService, type LeadSolicitud } from '../services/leadSolicitudesService'
 import { callbellService } from '../services/callbellService'
+import { externalApiService } from '../services/externalApiService'
 import { supabase } from '../lib/supabase'
 import axios from 'axios'
 
@@ -260,15 +261,34 @@ const AsignacionLeads = () => {
     try {
       const leadIds = Array.from(selectedLeadsForBulk)
       
-      // Assign all selected leads to the company in a single database call
-      await assignLeadToCompany(leadIds, selectedCompany)
+      // Buscar la empresa seleccionada para verificar has_api
+      const selectedCompanyData = companies.find(c => c.id === selectedCompany)
       
-      refreshLeads()
-      setShowBulkAssignModal(false)
-      cancelSelectionMode()
-      setSelectedCompany(null)
-      setCompanyFilter('')
-      showNotification(`${leadIds.length} leads asignados correctamente`, 'success')
+      if (selectedCompanyData?.has_api) {
+        // Empresa con API externa: enviar por API
+        const result = await externalApiService.sendLeadsToExternalCompany(leadIds)
+        
+        if (result.success) {
+          showNotification(result.message || `${leadIds.length} leads enviados correctamente por API`, 'success')
+          refreshLeads()
+          setShowBulkAssignModal(false)
+          cancelSelectionMode()
+          setSelectedCompany(null)
+          setCompanyFilter('')
+        } else {
+          showNotification(result.error || 'Error al enviar los leads por API', 'error')
+        }
+      } else {
+        // Empresa sin API: asignación normal
+        await assignLeadToCompany(leadIds, selectedCompany)
+        
+        refreshLeads()
+        setShowBulkAssignModal(false)
+        cancelSelectionMode()
+        setSelectedCompany(null)
+        setCompanyFilter('')
+        showNotification(`${leadIds.length} leads asignados correctamente`, 'success')
+      }
     } catch (error) {
       console.error('Error assigning leads in bulk:', error)
       showNotification('Error al asignar los leads. Inténtalo de nuevo.', 'error')
@@ -386,7 +406,24 @@ const AsignacionLeads = () => {
           showNotification('Por favor selecciona una empresa', 'error')
           return
         }
-        await assignLeadToCompany(selectedLead.id, selectedCompany)
+        
+        // Buscar la empresa seleccionada para verificar has_api
+        const selectedCompanyData = companies.find(c => c.id === selectedCompany)
+        
+        if (selectedCompanyData?.has_api) {
+          // Empresa con API externa: enviar por API
+          const result = await externalApiService.sendLeadsToExternalCompany([selectedLead.id])
+          
+          if (result.success) {
+            showNotification(result.message || 'Lead enviado correctamente por API', 'success')
+          } else {
+            showNotification(result.error || 'Error al enviar el lead por API', 'error')
+            return // No continuar si falla el envío por API
+          }
+        } else {
+          // Empresa sin API: asignación normal
+          await assignLeadToCompany(selectedLead.id, selectedCompany)
+        }
       } else if (user?.rol === 'coordinador') {
         // Coordinador asigna lead a agente
         if (!selectedUser) {
@@ -1369,6 +1406,11 @@ const AsignacionLeads = () => {
                                 <div>
                                   <div className="font-medium text-[#373643]">{company.nombre}</div>
                                   <div className="text-xs text-gray-500 mt-1">CIF: {company.cif}</div>
+                                  {company.has_api && (
+                                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                                      ✓ Envío por API
+                                    </div>
+                                  )}
                                 </div>
                                 {selectedCompany === company.id && (
                                   <div className="w-6 h-6 bg-[#18cb96] rounded-full flex items-center justify-center">
