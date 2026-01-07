@@ -14,7 +14,7 @@ export const externalApiService = {
    */
   sendLeadsToExternalCompany: async (leadIds: number[]): Promise<SendLeadsResponse> => {
     try {
-      const response = await externalApiInstance.post('/leads/send', leadIds)
+      const response = await externalApiInstance.post('/leads/send', {leadIds})
       
       if (response.status === 200 || response.status === 201) {
         return {
