@@ -96,6 +96,7 @@ export interface LeadFilterOptions {
   assignedUsersById?: AssignedUsersById
   statusGetter?: (lead: Lead) => string | null | undefined
   empresaGetter?: (lead: Lead) => string | null | undefined
+  dateFieldGetter?: (lead: Lead) => string | null | undefined
 }
 
 export const filterLeads = (leads: Lead[], options: LeadFilterOptions): Lead[] => {
@@ -107,7 +108,8 @@ export const filterLeads = (leads: Lead[], options: LeadFilterOptions): Lead[] =
     assignedUserFilter,
     assignedUsersById = new Map<string, AssignedUserMapEntry>(),
     statusGetter = (lead: Lead) => lead.estado_temporal,
-    empresaGetter = (lead: Lead) => (lead.empresa_id != null ? String(lead.empresa_id) : undefined)
+    empresaGetter = (lead: Lead) => (lead.empresa_id != null ? String(lead.empresa_id) : undefined),
+    dateFieldGetter = (lead: Lead) => lead.fecha_entrada
   } = options
 
   const normalizedAssignedFilter = assignedUserFilter?.trim()
@@ -115,7 +117,8 @@ export const filterLeads = (leads: Lead[], options: LeadFilterOptions): Lead[] =
     : ''
 
   return leads.filter(lead => {
-    const matchesDate = !dateFilter || lead.fecha_entrada.startsWith(dateFilter)
+    const dateValue = dateFieldGetter(lead)
+    const matchesDate = !dateFilter || (dateValue || '').startsWith(dateFilter)
     const matchesPhone = !phoneFilter || (lead.telefono || '').includes(phoneFilter)
 
     const statusValue = statusGetter(lead)

@@ -76,18 +76,24 @@ const HistorialLeads = () => {
 
   // Filtrar solo por fecha y usuario asignado en el cliente (estado y teléfono se filtran en el servidor)
   const filteredLeads = useMemo(
-    () =>
-      filterLeads(leadsHistorial, {
+    () => {
+      // Obtener el campo de fecha correcto según el rol del usuario
+      const dateField = getDateFieldByRole(user?.rol)
+      
+      return filterLeads(leadsHistorial, {
         dateFilter,
         assignedUserFilter,
         assignedUsersById,
-        statusGetter: (lead: Lead) => lead.estado
-      }),
+        statusGetter: (lead: Lead) => lead.estado,
+        dateFieldGetter: (lead: Lead) => lead[dateField] as string | null | undefined
+      })
+    },
     [
       leadsHistorial,
       dateFilter,
       assignedUserFilter,
-      assignedUsersById
+      assignedUsersById,
+      user?.rol
     ]
   )
 
