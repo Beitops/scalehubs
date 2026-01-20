@@ -24,6 +24,7 @@ const AsignacionLeads = () => {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [companyFilter, setCompanyFilter] = useState('')
   const [userFilter, setUserFilter] = useState('')
+  const [phoneFilter, setPhoneFilter] = useState('')
   const [showSolicitudesModal, setShowSolicitudesModal] = useState(false)
   const [solicitudes, setSolicitudes] = useState<LeadSolicitud[]>([])
   const [loadingSolicitudes, setLoadingSolicitudes] = useState(false)
@@ -155,11 +156,17 @@ const AsignacionLeads = () => {
   // Get selected user name
   const selectedUserName = users.find(u => u.user_id === selectedUser)?.nombre || ''
 
-  // Calcular paginación para leads sin asignar
-  const totalPages = Math.ceil(unassignedLeads.length / itemsPerPage)
+  // Filtrar leads por teléfono
+  const filteredLeads = unassignedLeads.filter(lead => {
+    if (!phoneFilter.trim()) return true
+    return lead.telefono?.toLowerCase().includes(phoneFilter.toLowerCase().trim())
+  })
+
+  // Calcular paginación para leads sin asignar filtrados
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedLeads = unassignedLeads.slice(startIndex, endIndex)
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
 
   // Detectar si es móvil y ajustar items por página
   useEffect(() => {
@@ -177,7 +184,7 @@ const AsignacionLeads = () => {
   // Resetear página cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [companyFilter, userFilter])
+  }, [companyFilter, userFilter, phoneFilter])
 
   // Escape key handler for canceling selection mode
   useEffect(() => {
@@ -248,8 +255,8 @@ const AsignacionLeads = () => {
   }, [selectedLeadsForBulk.size])
 
   const getSelectedLeadsData = useCallback((): Lead[] => {
-    return unassignedLeads.filter(lead => selectedLeadsForBulk.has(lead.id))
-  }, [unassignedLeads, selectedLeadsForBulk])
+    return filteredLeads.filter(lead => selectedLeadsForBulk.has(lead.id))
+  }, [filteredLeads, selectedLeadsForBulk])
 
   const handleConfirmBulkAssignment = async () => {
     if (!selectedCompany || selectedLeadsForBulk.size === 0) {
@@ -951,33 +958,25 @@ const AsignacionLeads = () => {
 
         {/* Solicitudes Button - Solo para coordinadores */}
         {user?.rol === 'coordinador' && (
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium text-[#373643] mb-1">Solicitudes de Leads</h3>
-                <p className="text-sm text-gray-600">
-                  Revisa las solicitudes de leads de los agentes de tu empresa.
-                </p>
-              </div>
-              <button
-                onClick={handleLoadSolicitudes}
-                disabled={loadingSolicitudes}
-                className="px-6 py-2 text-white font-medium rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                style={{ backgroundColor: '#1e3a8a' }}
-              >
-                {loadingSolicitudes ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Cargando...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">📋</span>
-                    Ver Solicitudes
-                  </>
-                )}
-              </button>
-            </div>
+          <div className="mb-6">
+            <button
+              onClick={handleLoadSolicitudes}
+              disabled={loadingSolicitudes}
+              className="px-6 py-2 text-white font-medium rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+              style={{ backgroundColor: '#1e3a8a' }}
+            >
+              {loadingSolicitudes ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Cargando...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">📋</span>
+                  Ver Solicitudes
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -990,7 +989,9 @@ const AsignacionLeads = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Leads sin asignar</p>
-                <p className="text-2xl font-bold text-[#373643]">{unassignedLeads.length}</p>
+                <p className="text-2xl font-bold text-[#373643]">
+                  {phoneFilter.trim() ? filteredLeads.length : unassignedLeads.length}
+                </p>
               </div>
             </div>
           </div>
@@ -1026,6 +1027,36 @@ const AsignacionLeads = () => {
 
         {/* Leads Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Phone Filter */}
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <label htmlFor="phoneFilter" className="text-sm font-medium text-[#373643] whitespace-nowrap">
+                Filtrar por teléfono:
+              </label>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  id="phoneFilter"
+                  type="text"
+                  placeholder="Ingresa el número de teléfono..."
+                  value={phoneFilter}
+                  onChange={(e) => setPhoneFilter(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18cb96] focus:border-transparent"
+                />
+                {phoneFilter && (
+                  <button
+                    onClick={() => setPhoneFilter('')}
+                    className="px-2 py-2 text-gray-600 hover:text-gray-800 transition-colors flex-shrink-0"
+                    title="Limpiar filtro"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Bulk Selection Actions - Only for Admin */}
           {user?.rol === 'administrador' && isSelectionMode && (
             <div className="px-4 sm:px-6 py-3 bg-[#18cb96]/10 border-b border-[#18cb96]/20 flex items-center justify-between">
@@ -1056,18 +1087,24 @@ const AsignacionLeads = () => {
           {paginatedLeads.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl text-gray-400">✅</span>
+                <span className="text-2xl text-gray-400">
+                  {phoneFilter.trim() ? '🔍' : '✅'}
+                </span>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {user?.rol === 'administrador' 
-                  ? 'No hay leads sin empresa asignada'
-                  : 'No hay leads sin agente asignado'
+                {phoneFilter.trim() 
+                  ? 'No se encontraron leads con ese teléfono'
+                  : user?.rol === 'administrador' 
+                    ? 'No hay leads sin empresa asignada'
+                    : 'No hay leads sin agente asignado'
                 }
               </h3>
               <p className="text-gray-600">
-                {user?.rol === 'administrador' 
-                  ? 'Todos los leads activos ya tienen una empresa asignada'
-                  : 'Todos los leads de tu empresa ya tienen un agente asignado'
+                {phoneFilter.trim()
+                  ? 'Intenta con otro número de teléfono o limpia el filtro para ver todos los leads'
+                  : user?.rol === 'administrador' 
+                    ? 'Todos los leads activos ya tienen una empresa asignada'
+                    : 'Todos los leads de tu empresa ya tienen un agente asignado'
                 }
               </p>
             </div>
@@ -1266,7 +1303,10 @@ const AsignacionLeads = () => {
               <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="hidden lg:block text-xs sm:text-sm text-gray-700">
-                    Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, unassignedLeads.length)}</span> de <span className="font-medium">{unassignedLeads.length}</span> leads sin asignar
+                    Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredLeads.length)}</span> de <span className="font-medium">{filteredLeads.length}</span> leads sin asignar
+                    {phoneFilter.trim() && (
+                      <span className="text-gray-500"> (filtrados de {unassignedLeads.length} totales)</span>
+                    )}
                   </div>
                   
                   {/* Paginación */}

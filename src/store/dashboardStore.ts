@@ -15,7 +15,7 @@ interface AdminStats {
   platformDistribution: Record<string, number>
 }
 
-interface AdminLead {
+export interface AdminLead {
   id: number
   nombre_cliente: string
   telefono: string
@@ -23,6 +23,9 @@ interface AdminLead {
   fecha_asignacion?: string | null
   empresa_id?: number | null
   empresa_nombre?: string
+  estado_temporal?: string | null
+  plataforma?: string | null
+  observaciones?: string | null
 }
 
 interface CoordStats {
@@ -32,7 +35,7 @@ interface CoordStats {
   leadsInvalidos: number
 }
 
-interface CoordLead {
+export interface CoordLead {
   id: number
   nombre_cliente: string
   telefono: string
@@ -40,6 +43,9 @@ interface CoordLead {
   fecha_asignacion_usuario?: string | null
   user_id?: string | null
   usuario_nombre?: string
+  estado_temporal?: string | null
+  plataforma?: string | null
+  observaciones?: string | null
 }
 
 interface AgentStats {
@@ -49,11 +55,14 @@ interface AgentStats {
   leadsInvalidos: number
 }
 
-interface AgentLead {
+export interface AgentLead {
   id: number
   nombre_cliente: string
   telefono: string
   fecha_asignacion_usuario?: string | null
+  estado_temporal?: string | null
+  plataforma?: string | null
+  observaciones?: string | null
 }
 
 interface DashboardState {
@@ -65,6 +74,8 @@ interface DashboardState {
   coordDateFieldFilter: CoordDateFieldFilter
   selectedEmpresaIds: number[]
   selectedAgentIds: string[]
+  phoneFilter: string
+  selectedStatFilter: 'total' | 'convertido' | 'perdido' | 'sin_asignar' | 'no_valido' | null
   adminStats: AdminStats
   adminLeads: AdminLead[]
   adminLeadsPage: number
@@ -86,6 +97,8 @@ interface DashboardState {
   setTimeFilter: (filter: TimeFilter) => void
   setDateFieldFilter: (field: DateFieldFilter) => void
   setCoordDateFieldFilter: (field: CoordDateFieldFilter) => void
+  setPhoneFilter: (phone: string) => void
+  setSelectedStatFilter: (filter: 'total' | 'convertido' | 'perdido' | 'sin_asignar' | 'no_valido' | null) => void
   setSelectedEmpresaIds: (ids: number[]) => void
   setSelectedAgentIds: (ids: string[]) => void
   setCustomDateRange: (range: { startDate: string; endDate: string }) => void
@@ -143,6 +156,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   coordDateFieldFilter: 'fecha_asignacion',
   selectedEmpresaIds: [],
   selectedAgentIds: [],
+  phoneFilter: '',
+  selectedStatFilter: 'total',
   adminStats: {
     totalLeads: 0,
     leadsConvertidos: 0,
@@ -201,6 +216,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     get().loadDashboardData()
   },
 
+  setPhoneFilter: (phone: string) => {
+    set({ phoneFilter: phone, adminLeadsPage: 1, coordLeadsPage: 1, agentLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
+  setSelectedStatFilter: (filter: 'total' | 'convertido' | 'perdido' | 'sin_asignar' | 'no_valido' | null) => {
+    set({ selectedStatFilter: filter, adminLeadsPage: 1, coordLeadsPage: 1, agentLeadsPage: 1 })
+    get().loadDashboardData()
+  },
+
   setCustomDateRange: (range: { startDate: string; endDate: string }) => {
     set({ customDateRange: range, timeFilter: 'personalizado', adminLeadsPage: 1 })
     get().loadDashboardData('personalizado', range)
@@ -214,6 +239,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const filter = timeFilter || get().timeFilter
     const dateField = get().dateFieldFilter
     const empresaIds = get().selectedEmpresaIds
+    const phoneFilter = get().phoneFilter
+    const statFilter = get().selectedStatFilter
     const rangeToUse = customRange || get().customDateRange
     const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
 
@@ -222,9 +249,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       if (user?.rol === 'administrador') {
         // Para administradores, obtener estadísticas con filtro de fecha y empresas
         const empresaIdsToUse = empresaIds.length > 0 ? empresaIds : undefined
+        const phoneFilterToUse = phoneFilter.trim() || undefined
+        const statFilterToUse = statFilter === 'total' ? undefined : statFilter
         const [adminStats, adminLeadsData] = await Promise.all([
-          leadsService.getAdminDashboardStats(startDate, endDate, dateField, empresaIdsToUse),
-          leadsService.getAdminDashboardLeads(startDate, endDate, dateField, 1, 10, empresaIdsToUse)
+          leadsService.getAdminDashboardStats(startDate, endDate, dateField, empresaIdsToUse, phoneFilterToUse),
+          leadsService.getAdminDashboardLeads(startDate, endDate, dateField, 1, 10, empresaIdsToUse, phoneFilterToUse, statFilterToUse)
         ])
         
         set({ 
@@ -245,10 +274,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           const coordDateField = get().coordDateFieldFilter
           const agentIds = get().selectedAgentIds
           const agentIdsToUse = agentIds.length > 0 ? agentIds : undefined
+          const phoneFilterToUse = phoneFilter.trim() || undefined
+          // Coordinador no tiene 'sin_asignar', solo convertir a undefined si es 'total' o 'sin_asignar'
+          const statFilterToUse: 'convertido' | 'perdido' | 'no_valido' | null | undefined = 
+            (statFilter === 'total' || statFilter === 'sin_asignar') ? undefined : 
+            (statFilter === 'convertido' || statFilter === 'perdido' || statFilter === 'no_valido' ? statFilter : undefined)
           
           const [coordStats, coordLeadsData] = await Promise.all([
-            leadsService.getCoordDashboardStats(startDate, endDate, coordDateField, userEmpresaId, agentIdsToUse),
-            leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, 1, 10, userEmpresaId, agentIdsToUse)
+            leadsService.getCoordDashboardStats(startDate, endDate, coordDateField, userEmpresaId, agentIdsToUse, phoneFilterToUse),
+            leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, 1, 10, userEmpresaId, agentIdsToUse, phoneFilterToUse, statFilterToUse)
           ])
           
           
@@ -265,9 +299,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           return
         } else if (user?.rol === 'agente') {
           // Agente: vista simplificada con solo sus leads asignados, filtrados por fecha_asignacion_usuario
+          const phoneFilterToUse = phoneFilter.trim() || undefined
+          // Agente no tiene 'sin_asignar', solo convertir a undefined si es 'total' o 'sin_asignar'
+          const statFilterToUse: 'convertido' | 'perdido' | 'no_valido' | null | undefined = 
+            (statFilter === 'total' || statFilter === 'sin_asignar') ? undefined : 
+            (statFilter === 'convertido' || statFilter === 'perdido' || statFilter === 'no_valido' ? statFilter : undefined)
           const [agentStats, agentLeadsData] = await Promise.all([
-            leadsService.getAgentDashboardStats(startDate, endDate, userEmpresaId, user.id),
-            leadsService.getAgentDashboardLeads(startDate, endDate, 1, 10, userEmpresaId, user.id)
+            leadsService.getAgentDashboardStats(startDate, endDate, userEmpresaId, user.id, phoneFilterToUse),
+            leadsService.getAgentDashboardLeads(startDate, endDate, 1, 10, userEmpresaId, user.id, phoneFilterToUse, statFilterToUse)
           ])
           
           set({ 
@@ -312,12 +351,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const filter = get().timeFilter
     const dateField = get().dateFieldFilter
     const empresaIds = get().selectedEmpresaIds
+    const phoneFilter = get().phoneFilter
+    const statFilter = get().selectedStatFilter
     const rangeToUse = get().customDateRange
     const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
 
     try {
       const empresaIdsToUse = empresaIds.length > 0 ? empresaIds : undefined
-      const adminLeadsData = await leadsService.getAdminDashboardLeads(startDate, endDate, dateField, page, 10, empresaIdsToUse)
+      const phoneFilterToUse = phoneFilter.trim() || undefined
+      const statFilterToUse = statFilter === 'total' ? undefined : statFilter
+      const adminLeadsData = await leadsService.getAdminDashboardLeads(startDate, endDate, dateField, page, 10, empresaIdsToUse, phoneFilterToUse, statFilterToUse)
       
       set({ 
         adminLeads: adminLeadsData.leads,
@@ -336,12 +379,19 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const filter = get().timeFilter
     const coordDateField = get().coordDateFieldFilter
     const agentIds = get().selectedAgentIds
+    const phoneFilter = get().phoneFilter
+    const statFilter = get().selectedStatFilter
     const rangeToUse = get().customDateRange
     const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
 
     try {
       const agentIdsToUse = agentIds.length > 0 ? agentIds : undefined
-      const coordLeadsData = await leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, page, 10, userEmpresaId, agentIdsToUse)
+      const phoneFilterToUse = phoneFilter.trim() || undefined
+      // Coordinador no tiene 'sin_asignar', solo convertir a undefined si es 'total' o 'sin_asignar'
+      const statFilterToUse: 'convertido' | 'perdido' | 'no_valido' | null | undefined = 
+        (statFilter === 'total' || statFilter === 'sin_asignar') ? undefined : 
+        (statFilter === 'convertido' || statFilter === 'perdido' || statFilter === 'no_valido' ? statFilter : undefined)
+      const coordLeadsData = await leadsService.getCoordDashboardLeads(startDate, endDate, coordDateField, page, 10, userEmpresaId, agentIdsToUse, phoneFilterToUse, statFilterToUse)
       
       set({ 
         coordLeads: coordLeadsData.leads,
@@ -358,11 +408,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     if (!user || user.rol !== 'agente' || !userEmpresaId) return
 
     const filter = get().timeFilter
+    const phoneFilter = get().phoneFilter
+    const statFilter = get().selectedStatFilter
     const rangeToUse = get().customDateRange
     const { startDate, endDate } = getDateRange(filter, rangeToUse || undefined)
 
     try {
-      const agentLeadsData = await leadsService.getAgentDashboardLeads(startDate, endDate, page, 10, userEmpresaId, user.id)
+      const phoneFilterToUse = phoneFilter.trim() || undefined
+      // Agente no tiene 'sin_asignar', solo convertir a undefined si es 'total' o 'sin_asignar'
+      const statFilterToUse: 'convertido' | 'perdido' | 'no_valido' | null | undefined = 
+        (statFilter === 'total' || statFilter === 'sin_asignar') ? undefined : 
+        (statFilter === 'convertido' || statFilter === 'perdido' || statFilter === 'no_valido' ? statFilter : undefined)
+      const agentLeadsData = await leadsService.getAgentDashboardLeads(startDate, endDate, page, 10, userEmpresaId, user.id, phoneFilterToUse, statFilterToUse)
       
       set({ 
         agentLeads: agentLeadsData.leads,

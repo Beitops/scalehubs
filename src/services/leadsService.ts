@@ -899,7 +899,8 @@ class LeadsService {
     startDate: string, 
     endDate: string, 
     dateField: 'fecha_entrada' | 'fecha_asignacion' = 'fecha_entrada',
-    empresaIds?: number[]
+    empresaIds?: number[],
+    phoneFilter?: string
   ): Promise<{
     totalLeads: number
     leadsConvertidos: number
@@ -929,6 +930,11 @@ class LeadsService {
       // Aplicar filtro de empresas si se especifica
       if (empresaIds && empresaIds.length > 0) {
         query = query.in('empresa_id', empresaIds)
+      }
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
       }
 
       const { data: leads, error } = await query
@@ -975,7 +981,9 @@ class LeadsService {
     dateField: 'fecha_entrada' | 'fecha_asignacion' = 'fecha_entrada',
     page: number = 1,
     limit: number = 10,
-    empresaIds?: number[]
+    empresaIds?: number[],
+    phoneFilter?: string,
+    statFilter?: 'convertido' | 'perdido' | 'sin_asignar' | 'no_valido' | null
   ): Promise<{ leads: Lead[], totalCount: number }> {
     try {
       // Obtener leads paginados con conteo total en una sola query
@@ -988,6 +996,9 @@ class LeadsService {
           fecha_entrada,
           fecha_asignacion,
           empresa_id,
+          estado_temporal,
+          plataforma,
+          observaciones,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
@@ -1010,6 +1021,20 @@ class LeadsService {
       // Aplicar filtro de empresas si se especifica
       if (empresaIds && empresaIds.length > 0) {
         query = query.in('empresa_id', empresaIds)
+      }
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+      }
+
+      // Aplicar filtro de estado si se especifica
+      if (statFilter) {
+        if (statFilter === 'sin_asignar') {
+          query = query.is('empresa_id', null)
+        } else {
+          query = query.eq('estado', statFilter)
+        }
       }
 
       // Aplicar paginación
@@ -1045,7 +1070,8 @@ class LeadsService {
     endDate: string, 
     dateField: 'fecha_asignacion' | 'fecha_asignacion_usuario' = 'fecha_asignacion',
     empresaId: number,
-    agentIds?: string[]
+    agentIds?: string[],
+    phoneFilter?: string
   ): Promise<{
     totalLeads: number
     leadsConvertidos: number
@@ -1075,6 +1101,11 @@ class LeadsService {
       // Aplicar filtro de agentes si se especifica
       if (agentIds && agentIds.length > 0) {
         query = query.in('user_id', agentIds)
+      }
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
       }
 
       const { data: leads, error } = await query
@@ -1112,8 +1143,10 @@ class LeadsService {
     page: number = 1,
     limit: number = 10,
     empresaId: number,
-    agentIds?: string[]
-  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion?: string | null; fecha_asignacion_usuario?: string | null; user_id?: string | null; usuario_nombre?: string }[], totalCount: number }> {
+    agentIds?: string[],
+    phoneFilter?: string,
+    statFilter?: 'convertido' | 'perdido' | 'no_valido' | null
+  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion?: string | null; fecha_asignacion_usuario?: string | null; user_id?: string | null; usuario_nombre?: string; estado_temporal?: string | null; plataforma?: string | null; observaciones?: string | null }[], totalCount: number }> {
     try {
       // Obtener leads paginados con conteo total
       let query = supabase
@@ -1125,6 +1158,9 @@ class LeadsService {
           fecha_asignacion,
           fecha_asignacion_usuario,
           user_id,
+          estado_temporal,
+          plataforma,
+          observaciones,
           profiles!leads_user_id_fkey (
             user_id,
             nombre
@@ -1149,6 +1185,16 @@ class LeadsService {
       // Aplicar filtro de agentes si se especifica
       if (agentIds && agentIds.length > 0) {
         query = query.in('user_id', agentIds)
+      }
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+      }
+
+      // Aplicar filtro de estado si se especifica
+      if (statFilter) {
+        query = query.eq('estado', statFilter)
       }
 
       // Aplicar paginación
@@ -1183,7 +1229,8 @@ class LeadsService {
     startDate: string, 
     endDate: string, 
     empresaId: number,
-    userId: string
+    userId: string,
+    phoneFilter?: string
   ): Promise<{
     totalLeads: number
     leadsConvertidos: number
@@ -1192,7 +1239,7 @@ class LeadsService {
   }> {
     try {
       // Obtener todos los leads del agente en el rango de fechas
-      const { data: leads, error } = await supabase
+      let query = supabase
         .from('leads')
         .select('id, estado')
         .eq('empresa_id', empresaId)
@@ -1200,6 +1247,13 @@ class LeadsService {
         .not('fecha_asignacion_usuario', 'is', null)
         .gte('fecha_asignacion_usuario', startDate)
         .lte('fecha_asignacion_usuario', endDate)
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+      }
+
+      const { data: leads, error } = await query
 
       if (error) {
         console.error('Error fetching agent dashboard stats:', error)
@@ -1233,25 +1287,45 @@ class LeadsService {
     page: number = 1,
     limit: number = 10,
     empresaId: number,
-    userId: string
-  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion_usuario?: string | null }[], totalCount: number }> {
+    userId: string,
+    phoneFilter?: string,
+    statFilter?: 'convertido' | 'perdido' | 'no_valido' | null
+  ): Promise<{ leads: { id: number; nombre_cliente: string; telefono: string; fecha_asignacion_usuario?: string | null; estado_temporal?: string | null; plataforma?: string | null; observaciones?: string | null }[], totalCount: number }> {
     try {
       // Obtener leads paginados del agente
-      const { data, count, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
           id,
           nombre_cliente,
           telefono,
-          fecha_asignacion_usuario
+          fecha_asignacion_usuario,
+          estado_temporal,
+          plataforma,
+          observaciones
         `, { count: 'exact' })
         .eq('empresa_id', empresaId)
         .eq('user_id', userId)
         .not('fecha_asignacion_usuario', 'is', null)
         .gte('fecha_asignacion_usuario', startDate)
         .lte('fecha_asignacion_usuario', endDate)
+
+      // Aplicar filtro de teléfono si se especifica
+      if (phoneFilter && phoneFilter.trim()) {
+        query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+      }
+
+      // Aplicar filtro de estado si se especifica
+      if (statFilter) {
+        query = query.eq('estado', statFilter)
+      }
+
+      // Aplicar orden y paginación
+      query = query
         .order('fecha_asignacion_usuario', { ascending: false })
         .range((page - 1) * limit, page * limit - 1)
+
+      const { data, count, error } = await query
 
       if (error) {
         console.error('Error fetching agent dashboard leads:', error)

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useDashboardStore } from '../store/dashboardStore'
+import type { AdminLead, CoordLead, AgentLead } from '../store/dashboardStore'
 import { companyService, type Company } from '../services/companyService'
 import { getUsersByCompany } from '../services/userService'
 import { leadsService } from '../services/leadsService'
 import { formatEstado } from '../utils/estadoConverter'
+import { platformConverter } from '../utils/platformConverter'
 import type { DatabaseProfile } from '../types/database'
 
 // Tipos para los leads de exportación
@@ -60,6 +62,8 @@ const Dashboard = () => {
     coordDateFieldFilter,
     selectedEmpresaIds,
     selectedAgentIds,
+    phoneFilter,
+    selectedStatFilter,
     customDateRange,
     loadDashboardData, 
     loadAdminLeadsPage,
@@ -70,6 +74,8 @@ const Dashboard = () => {
     setCoordDateFieldFilter,
     setSelectedEmpresaIds,
     setSelectedAgentIds,
+    setPhoneFilter,
+    setSelectedStatFilter,
     setCustomDateRange,
     isInitialized 
   } = useDashboardStore()
@@ -99,6 +105,14 @@ const Dashboard = () => {
   const [exportLeads, setExportLeads] = useState<AdminExportLead[] | CoordExportLead[]>([])
   const [exportLoading, setExportLoading] = useState(false)
 
+  // Estado para el modal de detalles del lead
+  const [showLeadModal, setShowLeadModal] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<AdminLead | CoordLead | AgentLead | null>(null)
+  const [isModalAnimating, setIsModalAnimating] = useState(false)
+
+  // Estado para el filtro de teléfono con debounce
+  const [phoneInput, setPhoneInput] = useState(phoneFilter)
+
   // Cargar datos del dashboard cuando el componente se monte
   useEffect(() => {
     if (!user) return
@@ -120,6 +134,22 @@ const Dashboard = () => {
       isReady = false
     }
   }, [user, loadDashboardData])
+
+  // Debounce para el filtro de teléfono
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (phoneInput !== phoneFilter) {
+        setPhoneFilter(phoneInput)
+      }
+    }, 1000) // Esperar 1 segundo sin escribir
+
+    return () => clearTimeout(timer)
+  }, [phoneInput, phoneFilter, setPhoneFilter])
+
+  // Sincronizar el input con el store cuando cambia desde fuera
+  useEffect(() => {
+    setPhoneInput(phoneFilter)
+  }, [phoneFilter])
 
 
   // Obtener el texto del período de tiempo actual
@@ -483,6 +513,68 @@ const Dashboard = () => {
   
   // Verificar si es agente
   const isAgent = user?.rol === 'agente'
+
+  // Handler para abrir el modal de detalles del lead
+  const handleOpenLeadModal = (lead: AdminLead | CoordLead | AgentLead) => {
+    setSelectedLead(lead)
+    setIsModalAnimating(true)
+    setShowLeadModal(true)
+    // Forzar reflow para que la animación se ejecute
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsModalAnimating(false)
+      })
+    })
+  }
+
+  // Handler para cerrar el modal
+  const handleCloseLeadModal = () => {
+    setIsModalAnimating(true)
+    // Esperar a que termine la animación antes de ocultar
+    setTimeout(() => {
+      setShowLeadModal(false)
+      setSelectedLead(null)
+      setIsModalAnimating(false)
+    }, 200)
+  }
+
+  // Listener para cerrar el modal con Esc
+  useEffect(() => {
+    if (!showLeadModal) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalAnimating(true)
+        // Esperar a que termine la animación antes de ocultar
+        setTimeout(() => {
+          setShowLeadModal(false)
+          setSelectedLead(null)
+          setIsModalAnimating(false)
+        }, 200)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    // Prevenir scroll del body cuando el modal está abierto
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'unset'
+    }
+  }, [showLeadModal])
+
+  // Formatear fecha para mostrar en el modal
+  const formatDateForModal = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
   
   // Cards de estadísticas para administrador
   const adminStatsCards = isAdmin ? [
@@ -490,31 +582,36 @@ const Dashboard = () => {
       title: 'Total Leads',
       value: adminStats.totalLeads.toString(),
       icon: '📊',
-      color: 'bg-blue-500'
+      color: 'bg-blue-500',
+      filter: 'total' as const
     },
     {
       title: 'Leads Convertidos',
       value: adminStats.leadsConvertidos.toString(),
       icon: '✅',
-      color: 'bg-[#18cb96]'
+      color: 'bg-[#18cb96]',
+      filter: 'convertido' as const
     },
     {
       title: 'Leads Perdidos',
       value: adminStats.leadsPerdidos.toString(),
       icon: '❌',
-      color: 'bg-white'
+      color: 'bg-white',
+      filter: 'perdido' as const
     },
     {
       title: 'Leads Sin Asignar',
       value: adminStats.leadsSinAsignar.toString(),
       icon: '⏳',
-      color: 'bg-amber-500'
+      color: 'bg-amber-500',
+      filter: 'sin_asignar' as const
     },
     {
       title: 'Leads Inválidos',
       value: adminStats.leadsInvalidos.toString(),
       icon: '⚠️',
-      color: 'bg-gray-500'
+      color: 'bg-gray-500',
+      filter: 'no_valido' as const
     }
   ] : []
 
@@ -524,25 +621,29 @@ const Dashboard = () => {
       title: 'Total Leads',
       value: coordStats.totalLeads.toString(),
       icon: '📊',
-      color: 'bg-blue-500'
+      color: 'bg-blue-500',
+      filter: 'total' as const
     },
     {
       title: 'Leads Convertidos',
       value: coordStats.leadsConvertidos.toString(),
       icon: '✅',
-      color: 'bg-[#18cb96]'
+      color: 'bg-[#18cb96]',
+      filter: 'convertido' as const
     },
     {
       title: 'Leads Perdidos',
       value: coordStats.leadsPerdidos.toString(),
       icon: '❌',
-      color: 'bg-white'
+      color: 'bg-white',
+      filter: 'perdido' as const
     },
     {
       title: 'Leads Inválidos',
       value: coordStats.leadsInvalidos.toString(),
       icon: '⚠️',
-      color: 'bg-gray-500'
+      color: 'bg-gray-500',
+      filter: 'no_valido' as const
     }
   ] : []
 
@@ -552,25 +653,29 @@ const Dashboard = () => {
       title: 'Total Leads',
       value: agentStats.totalLeads.toString(),
       icon: '📊',
-      color: 'bg-blue-500'
+      color: 'bg-blue-500',
+      filter: 'total' as const
     },
     {
       title: 'Leads Convertidos',
       value: agentStats.leadsConvertidos.toString(),
       icon: '✅',
-      color: 'bg-[#18cb96]'
+      color: 'bg-[#18cb96]',
+      filter: 'convertido' as const
     },
     {
       title: 'Leads Perdidos',
       value: agentStats.leadsPerdidos.toString(),
       icon: '❌',
-      color: 'bg-white'
+      color: 'bg-white',
+      filter: 'perdido' as const
     },
     {
       title: 'Leads Inválidos',
       value: agentStats.leadsInvalidos.toString(),
       icon: '⚠️',
-      color: 'bg-gray-500'
+      color: 'bg-gray-500',
+      filter: 'no_valido' as const
     }
   ] : []
 
@@ -731,8 +836,33 @@ const Dashboard = () => {
               </span>
             </div>
 
-            {/* Spacer para empujar el botón Empresa a la derecha */}
+            {/* Spacer para empujar los botones a la derecha */}
             <div className="flex-1"></div>
+
+            {/* Filtro de teléfono */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="📞 Teléfono"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-[#18cb96] focus:border-transparent w-32 sm:w-40 transition-colors"
+              />
+              {phoneInput && (
+                <button
+                  onClick={() => {
+                    setPhoneInput('')
+                    setPhoneFilter('')
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Limpiar filtro"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
 
             {/* Botón de filtro por Empresa */}
             <button
@@ -892,8 +1022,33 @@ const Dashboard = () => {
               </span>
             </div>
 
-            {/* Spacer para empujar el botón Agente a la derecha */}
+            {/* Spacer para empujar los botones a la derecha */}
             <div className="flex-1"></div>
+
+            {/* Filtro de teléfono */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="📞 Teléfono"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-[#18cb96] focus:border-transparent w-32 sm:w-40 transition-colors"
+              />
+              {phoneInput && (
+                <button
+                  onClick={() => {
+                    setPhoneInput('')
+                    setPhoneFilter('')
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Limpiar filtro"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
 
             {/* Botón de filtro por Agente */}
             <button
@@ -1015,6 +1170,34 @@ const Dashboard = () => {
                 {getTimeRangeText()}
               </span>
             </div>
+
+            {/* Spacer para empujar el filtro a la derecha */}
+            <div className="flex-1"></div>
+
+            {/* Filtro de teléfono */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="📞 Teléfono"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-[#18cb96] focus:border-transparent w-32 sm:w-40 transition-colors"
+              />
+              {phoneInput && (
+                <button
+                  onClick={() => {
+                    setPhoneInput('')
+                    setPhoneFilter('')
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Limpiar filtro"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1025,7 +1208,12 @@ const Dashboard = () => {
           {adminStatsCards.map((stat, index) => (
             <div 
               key={index} 
-              className="bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
+              onClick={() => setSelectedStatFilter(stat.filter)}
+              className={`bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 cursor-pointer group ${
+                selectedStatFilter === stat.filter
+                  ? 'border-[#18cb96] shadow-lg scale-[1.02]'
+                  : 'border-transparent hover:border-[#18cb96]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -1047,7 +1235,12 @@ const Dashboard = () => {
           {coordStatsCards.map((stat, index) => (
             <div 
               key={index} 
-              className="bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
+              onClick={() => setSelectedStatFilter(stat.filter)}
+              className={`bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 cursor-pointer group ${
+                selectedStatFilter === stat.filter
+                  ? 'border-[#18cb96] shadow-lg scale-[1.02]'
+                  : 'border-transparent hover:border-[#18cb96]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -1069,7 +1262,12 @@ const Dashboard = () => {
           {agentStatsCards.map((stat, index) => (
             <div 
               key={index} 
-              className="bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-[#18cb96] border-2 border-transparent cursor-pointer group"
+              onClick={() => setSelectedStatFilter(stat.filter)}
+              className={`bg-white rounded-lg shadow-md p-2.5 sm:p-4 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 cursor-pointer group ${
+                selectedStatFilter === stat.filter
+                  ? 'border-[#18cb96] shadow-lg scale-[1.02]'
+                  : 'border-transparent hover:border-[#18cb96]'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -1109,7 +1307,8 @@ const Dashboard = () => {
                 {agentLeads.map((lead) => (
                   <div 
                     key={lead.id} 
-                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow"
+                    onClick={() => handleOpenLeadModal(lead)}
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1 min-w-0">
@@ -1135,6 +1334,18 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
+                    {lead.estado_temporal && (
+                      <div className="mt-1.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                          lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                          lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                          lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {formatEstado(lead.estado_temporal)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1153,13 +1364,17 @@ const Dashboard = () => {
                       <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
                         Fecha Asignación
                       </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Estado
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {agentLeads.map((lead) => (
                       <tr 
                         key={lead.id} 
-                        className="hover:bg-[#18cb96]/5 transition-colors group"
+                        onClick={() => handleOpenLeadModal(lead)}
+                        className="hover:bg-[#18cb96]/5 transition-colors group cursor-pointer"
                       >
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#373643] font-medium group-hover:text-[#18cb96] transition-colors">
                           {lead.nombre_cliente}
@@ -1175,6 +1390,20 @@ const Dashboard = () => {
                             hour: '2-digit',
                             minute: '2-digit'
                           }) : '-'}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          {lead.estado_temporal ? (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                              lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                              lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {formatEstado(lead.estado_temporal)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-[10px]">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1282,7 +1511,8 @@ const Dashboard = () => {
                 {coordLeads.map((lead) => (
                   <div 
                     key={lead.id} 
-                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow"
+                    onClick={() => handleOpenLeadModal(lead)}
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1 min-w-0">
@@ -1319,6 +1549,18 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
+                    {lead.estado_temporal && (
+                      <div className="mt-1.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                          lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                          lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                          lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {formatEstado(lead.estado_temporal)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1343,13 +1585,17 @@ const Dashboard = () => {
                       <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
                         F. Agente
                       </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Estado
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {coordLeads.map((lead) => (
                       <tr 
                         key={lead.id} 
-                        className="hover:bg-[#18cb96]/5 transition-colors group"
+                        onClick={() => handleOpenLeadModal(lead)}
+                        className="hover:bg-[#18cb96]/5 transition-colors group cursor-pointer"
                       >
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#373643] font-medium group-hover:text-[#18cb96] transition-colors">
                           {lead.nombre_cliente}
@@ -1379,6 +1625,20 @@ const Dashboard = () => {
                             hour: '2-digit',
                             minute: '2-digit'
                           }) : '-'}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          {lead.estado_temporal ? (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                              lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                              lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {formatEstado(lead.estado_temporal)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-[10px]">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1453,7 +1713,8 @@ const Dashboard = () => {
                 {adminLeads.map((lead) => (
                   <div 
                     key={lead.id} 
-                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow"
+                    onClick={() => handleOpenLeadModal(lead)}
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border-l-4 border-[#18cb96] shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1 min-w-0">
@@ -1490,6 +1751,13 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
+                    {lead.estado_temporal && (
+                      <div className="mt-1.5">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#18cb96]/10 text-[#18cb96]">
+                          {formatEstado(lead.estado_temporal)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1514,13 +1782,17 @@ const Dashboard = () => {
                       <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
                         F. Asignación
                       </th>
+                      <th scope="col" className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#18cb96] uppercase tracking-wider">
+                        Estado
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {adminLeads.map((lead) => (
                       <tr 
                         key={lead.id} 
-                        className="hover:bg-[#18cb96]/5 transition-colors group"
+                        onClick={() => handleOpenLeadModal(lead)}
+                        className="hover:bg-[#18cb96]/5 transition-colors group cursor-pointer"
                       >
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-[#373643] font-medium group-hover:text-[#18cb96] transition-colors">
                           {lead.nombre_cliente}
@@ -1550,6 +1822,20 @@ const Dashboard = () => {
                             hour: '2-digit',
                             minute: '2-digit'
                           }) : '-'}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          {lead.estado_temporal ? (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              lead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                              lead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                              lead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {formatEstado(lead.estado_temporal)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-[10px]">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2006,6 +2292,153 @@ const Dashboard = () => {
               >
                 <span>📥</span>
                 Exportar CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de detalles del lead */}
+      {showLeadModal && selectedLead && (
+        <div 
+          className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-opacity duration-200 ${
+            isModalAnimating ? 'opacity-0' : 'opacity-100'
+          }`}
+          onClick={handleCloseLeadModal}
+        >
+          <div 
+            className={`bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col transition-all duration-200 ${
+              isModalAnimating 
+                ? 'opacity-0 scale-95 translate-y-4' 
+                : 'opacity-100 scale-100 translate-y-0'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-[#373643] flex items-center gap-2">
+                  <span>📋</span>
+                  Detalles del Lead
+                </h3>
+                <button
+                  onClick={handleCloseLeadModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Contenido del modal */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="space-y-4">
+                {/* Nombre del cliente */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Nombre del Cliente</label>
+                  <p className="text-sm sm:text-base font-semibold text-[#373643]">{selectedLead.nombre_cliente}</p>
+                </div>
+
+                {/* Teléfono */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Teléfono</label>
+                  <p className="text-sm sm:text-base text-gray-700 font-mono">{selectedLead.telefono}</p>
+                </div>
+
+                {/* Campos específicos por rol */}
+                {isAdmin && 'empresa_nombre' in selectedLead && (
+                  <>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Empresa</label>
+                      <p className="text-sm sm:text-base text-gray-700">{selectedLead.empresa_nombre || 'Sin asignar'}</p>
+                    </div>
+                    {'fecha_entrada' in selectedLead && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Fecha de Entrada</label>
+                        <p className="text-sm sm:text-base text-gray-700">{formatDateForModal(selectedLead.fecha_entrada)}</p>
+                      </div>
+                    )}
+                    {'fecha_asignacion' in selectedLead && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Fecha de Asignación</label>
+                        <p className="text-sm sm:text-base text-gray-700">{formatDateForModal(selectedLead.fecha_asignacion)}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {isCoord && 'usuario_nombre' in selectedLead && (
+                  <>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Agente</label>
+                      <p className="text-sm sm:text-base text-gray-700">{selectedLead.usuario_nombre || 'Sin asignar'}</p>
+                    </div>
+                    {'fecha_asignacion' in selectedLead && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Fecha de Asignación</label>
+                        <p className="text-sm sm:text-base text-gray-700">{formatDateForModal(selectedLead.fecha_asignacion)}</p>
+                      </div>
+                    )}
+                    {'fecha_asignacion_usuario' in selectedLead && (
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Fecha de Asignación al Agente</label>
+                        <p className="text-sm sm:text-base text-gray-700">{formatDateForModal(selectedLead.fecha_asignacion_usuario)}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {isAgent && 'fecha_asignacion_usuario' in selectedLead && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Fecha de Asignación</label>
+                    <p className="text-sm sm:text-base text-gray-700">{formatDateForModal(selectedLead.fecha_asignacion_usuario)}</p>
+                  </div>
+                )}
+
+                {/* Estado temporal */}
+                {selectedLead.estado_temporal && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Estado</label>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs sm:text-sm font-medium ${
+                      selectedLead.estado_temporal === 'convertido' ? 'bg-green-100 text-green-700' :
+                      selectedLead.estado_temporal === 'no_cerrado' ? 'bg-red-100 text-red-700' :
+                      selectedLead.estado_temporal === 'no_valido' ? 'bg-gray-100 text-gray-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {formatEstado(selectedLead.estado_temporal)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Plataforma */}
+                {selectedLead.plataforma && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Plataforma</label>
+                    <p className="text-sm sm:text-base text-gray-700">{platformConverter(selectedLead.plataforma)}</p>
+                  </div>
+                )}
+
+                {/* Observaciones */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 mb-1">Observaciones</label>
+                  <div className="bg-gray-50 rounded-lg p-3 min-h-[80px]">
+                    <p className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
+                      {selectedLead.observaciones || 'Sin observaciones'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer del modal */}
+            <div className="p-4 sm:p-6 border-t border-gray-200">
+              <button
+                onClick={handleCloseLeadModal}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-[#18cb96] rounded-lg hover:bg-[#15b585] transition-colors"
+              >
+                Cerrar
               </button>
             </div>
           </div>
