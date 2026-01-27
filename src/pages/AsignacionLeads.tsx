@@ -1375,6 +1375,7 @@ const AsignacionLeads = () => {
                   <div><strong>Teléfono:</strong> {selectedLead.telefono}</div>
                   <div><strong>Plataforma:</strong> {selectedLead.plataforma_lead}</div>
                   <div><strong>Fecha:</strong> {new Date(selectedLead.fecha_entrada).toLocaleDateString('es-ES')}</div>
+                  <div><strong>Edad:</strong> {selectedLead.edad != null ? selectedLead.edad : 'Sin información'}</div>
                 </div>
               </div>
 

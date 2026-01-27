@@ -25,6 +25,7 @@ export interface Lead {
   user_id?: string
   usuario_nombre?: string
   calidad?: number
+  edad?: number | null
 }
 
 
@@ -385,6 +386,7 @@ class LeadsService {
           user_id,
           observaciones,
           calidad,
+          edad,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
@@ -441,6 +443,7 @@ class LeadsService {
           user_id,
           observaciones,
           calidad,
+          edad,
           empresas!leads_empresa_id_fkey (
             id,
             nombre
