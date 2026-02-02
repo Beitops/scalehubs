@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useLeadsStore } from '../store/leadsStore'
@@ -6,22 +6,23 @@ import { useLeadsStore } from '../store/leadsStore'
 const LeadsLayout = () => {
   const { user, userEmpresaNombre } = useAuthStore()
   const { loadInitialLeads } = useLeadsStore()
+  const location = useLocation()
 
-  // Cargar leads activos cuando el componente se monte (últimos 7 días por defecto)
+  // Cargar leads activos cuando el componente se monte (últimos 7 días por defecto).
+  // No cargar en /leads/activos: esa página usa paginación en servidor y carga su propia página.
   useEffect(() => {
     if (!user) return
+    if (location.pathname.endsWith('/activos')) return
 
     let isReady = true
     const loadData = async () => {
       if (isReady) {
         try {
-          // Calcular fechas por defecto (últimos 7 días)
           const endDate = new Date()
           const startDate = new Date()
           startDate.setDate(startDate.getDate() - 7)
           const startDateISO = startDate.toISOString()
           const endDateISO = endDate.toISOString()
-          
           await loadInitialLeads(startDateISO, endDateISO)
         } catch (error) {
           console.error('Error loading data:', error)
@@ -34,7 +35,7 @@ const LeadsLayout = () => {
     return () => {
       isReady = false
     }
-  }, [user, loadInitialLeads])
+  }, [user, loadInitialLeads, location.pathname])
 
   return (
     <>

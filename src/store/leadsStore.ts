@@ -1,10 +1,11 @@
 import { create } from 'zustand'
-import { leadsService, type Lead} from '../services/leadsService'
+import { leadsService, type Lead, type ActiveLeadsPageOptions } from '../services/leadsService'
 import { useAuthStore } from './authStore'
 
 interface LeadsState {
   leadsHistorial: Lead[]
   activeLeads: Lead[]
+  activeLeadsTotalCount: number
   unassignedLeads: Lead[]
   loading: boolean
   error: string | null
@@ -20,6 +21,7 @@ interface LeadsState {
   cancelLeadStatus: (leadId: number) => Promise<void>
   loadLeads: (empresaId?: number, startDate?: string, endDate?: string, dateField?: string) => Promise<void>
   loadLeadsByUser: (empresaId: number, userId: string, startDate?: string, endDate?: string, dateField?: string) => Promise<void>
+  loadActiveLeadsPage: (options: ActiveLeadsPageOptions) => Promise<void>
   loadHistorialLeads: (empresaId?: number, estado?: string, page?: number, limit?: number, phoneFilter?: string) => Promise<void>
   loadInitialLeads: (startDate?: string, endDate?: string) => Promise<void>
   getLeadsInDateRange: (startDate: string, endDate: string, empresaId?: number, estados?: string | string[]) => Promise<Lead[]>
@@ -38,6 +40,7 @@ interface LeadsState {
 export const useLeadsStore = create<LeadsState>((set, get) => ({
   leadsHistorial: [],
   activeLeads: [],
+  activeLeadsTotalCount: 0,
   unassignedLeads: [],
   loading: false,
   error: null,
@@ -155,6 +158,33 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       set({ 
         error: error instanceof Error ? error.message : 'Error al cargar los leads del usuario',
         loading: false 
+      })
+    }
+  },
+
+  loadActiveLeadsPage: async (options: ActiveLeadsPageOptions) => {
+    const { user, userEmpresaId } = useAuthStore.getState()
+    if (!user) return
+
+    set({ loading: true, error: null })
+    try {
+      const role = user.rol as 'administrador' | 'coordinador' | 'agente'
+      const empresaId = user.rol === 'administrador' ? undefined : userEmpresaId ?? undefined
+      const userId = user.rol === 'agente' ? user.id : undefined
+
+      const { leads, totalCount } = await leadsService.getActiveLeadsPage(
+        role,
+        empresaId ?? undefined,
+        userId,
+        options
+      )
+
+      set({ activeLeads: leads, activeLeadsTotalCount: totalCount, loading: false })
+    } catch (error) {
+      console.error('Error loading active leads page:', error)
+      set({
+        error: error instanceof Error ? error.message : 'Error al cargar los leads',
+        loading: false
       })
     }
   },
@@ -330,6 +360,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     set({ 
       leadsHistorial: [],
       activeLeads: [],
+      activeLeadsTotalCount: 0,
       unassignedLeads: [],
       historialTotalCount: 0,
       historialCurrentPage: 1,

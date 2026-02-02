@@ -69,6 +69,23 @@ export interface LeadDevolucion extends Lead {
   devolucion_id?: number
 }
 
+export interface ActiveLeadsPageOptions {
+  startDate: string
+  endDate: string
+  dateField: DateFieldType
+  page: number
+  limit: number
+  phoneFilter?: string
+  statusFilter?: string
+  empresaFilter?: string
+  assignedUserId?: string
+}
+
+export interface ActiveLeadsPageResult {
+  leads: Lead[]
+  totalCount: number
+}
+
 class LeadsService {
   async getLeadsByCompany(empresaId: number, estado?: string, page?: number, limit?: number, startDate?: string, endDate?: string, dateField: DateFieldType = 'fecha_entrada'): Promise<Lead[]> {
     try {
@@ -215,6 +232,164 @@ class LeadsService {
       })) || []
     } catch (error) {
       console.error('Error in getAllLeads:', error)
+      throw error
+    }
+  }
+
+  /** Paginación y filtros en servidor para página Leads (admin: todos; coordinador: por empresa; agente: por usuario) */
+  async getActiveLeadsPage(
+    role: 'administrador' | 'coordinador' | 'agente',
+    empresaId: number | undefined,
+    userId: string | undefined,
+    options: ActiveLeadsPageOptions
+  ): Promise<ActiveLeadsPageResult> {
+    const {
+      startDate,
+      endDate,
+      dateField,
+      page,
+      limit,
+      phoneFilter,
+      statusFilter,
+      empresaFilter,
+      assignedUserId
+    } = options
+
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    const selectWithCount = `
+      *,
+      empresas!leads_empresa_id_fkey (
+        id,
+        nombre
+      ),
+      profiles!leads_user_id_fkey (
+        user_id,
+        nombre
+      )
+    `
+
+    try {
+      if (role === 'administrador') {
+        let query = supabase
+          .from('leads')
+          .select(selectWithCount, { count: 'exact' })
+          .eq('estado', 'activo')
+          .order(dateField, { ascending: false })
+
+        if (startDate && endDate) {
+          query = query.gte(dateField, startDate).lte(dateField, endDate)
+        }
+        if (phoneFilter?.trim()) {
+          query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+        }
+        if (statusFilter) {
+          query = query.eq('estado_temporal', statusFilter)
+        }
+        if (empresaFilter) {
+          query = query.eq('empresa_id', empresaFilter)
+        }
+
+        query = query.range(from, to)
+        const { data, error, count } = await query
+
+        if (error) {
+          console.error('Error fetching active leads page (admin):', error)
+          throw error
+        }
+
+        const leads = (data as any[])?.map(lead => ({
+          ...lead,
+          empresa_nombre: lead.empresas?.nombre,
+          usuario_nombre: lead.profiles?.nombre,
+          plataforma_lead: platformConverter(lead.plataforma || ''),
+          calidad: lead.calidad || 1
+        })) || []
+
+        return { leads, totalCount: count ?? 0 }
+      }
+
+      if (role === 'coordinador' && empresaId) {
+        let query = supabase
+          .from('leads')
+          .select(selectWithCount, { count: 'exact' })
+          .eq('empresa_id', empresaId)
+          .eq('estado', 'activo')
+          .order(dateField, { ascending: false })
+
+        if (startDate && endDate) {
+          query = query.gte(dateField, startDate).lte(dateField, endDate)
+        }
+        if (phoneFilter?.trim()) {
+          query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+        }
+        if (statusFilter) {
+          query = query.eq('estado_temporal', statusFilter)
+        }
+        if (assignedUserId) {
+          query = query.eq('user_id', assignedUserId)
+        }
+
+        query = query.range(from, to)
+        const { data, error, count } = await query
+
+        if (error) {
+          console.error('Error fetching active leads page (coord):', error)
+          throw error
+        }
+
+        const leads = (data as any[])?.map(lead => ({
+          ...lead,
+          empresa_nombre: lead.empresas?.nombre,
+          usuario_nombre: lead.profiles?.nombre,
+          plataforma_lead: platformConverter(lead.plataforma || ''),
+          calidad: lead.calidad || 1
+        })) || []
+
+        return { leads, totalCount: count ?? 0 }
+      }
+
+      if (role === 'agente' && empresaId && userId) {
+        let query = supabase
+          .from('leads')
+          .select(selectWithCount, { count: 'exact' })
+          .eq('empresa_id', empresaId)
+          .eq('user_id', userId)
+          .eq('estado', 'activo')
+          .order(dateField, { ascending: false })
+
+        if (startDate && endDate) {
+          query = query.gte(dateField, startDate).lte(dateField, endDate)
+        }
+        if (phoneFilter?.trim()) {
+          query = query.ilike('telefono', `%${phoneFilter.trim()}%`)
+        }
+        if (statusFilter) {
+          query = query.eq('estado_temporal', statusFilter)
+        }
+
+        query = query.range(from, to)
+        const { data, error, count } = await query
+
+        if (error) {
+          console.error('Error fetching active leads page (agente):', error)
+          throw error
+        }
+
+        const leads = (data as any[])?.map(lead => ({
+          ...lead,
+          empresa_nombre: lead.empresas?.nombre,
+          usuario_nombre: lead.profiles?.nombre,
+          plataforma_lead: platformConverter(lead.plataforma || ''),
+          calidad: lead.calidad || 1
+        })) || []
+
+        return { leads, totalCount: count ?? 0 }
+      }
+
+      return { leads: [], totalCount: 0 }
+    } catch (error) {
+      console.error('Error in getActiveLeadsPage:', error)
       throw error
     }
   }

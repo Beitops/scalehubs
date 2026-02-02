@@ -11,11 +11,7 @@ import { companyService } from '../services/companyService'
 import { callbellService } from '../services/callbellService'
 import { supabase } from '../lib/supabase'
 import type { AssignedUserProfile } from '../services/LeadsFilterService'
-import {
-  createAssignedUsersById,
-  fetchAssignedUsers,
-  filterLeads
-} from '../services/LeadsFilterService'
+import { fetchAssignedUsers } from '../services/LeadsFilterService'
 import { getDateFieldByRole } from '../utils/dateFieldByRole'
 
 interface ActionMenuItem {
@@ -216,9 +212,11 @@ const Leads = () => {
   const [dateRange, setDateRange] = useState(getDefaultDateRange())
   const [appliedDateRange, setAppliedDateRange] = useState(getDefaultDateRange())
   const [phoneFilter, setPhoneFilter] = useState('')
+  const [phoneFilterDebounced, setPhoneFilterDebounced] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [empresaFilter, setEmpresaFilter] = useState('')
   const [assignedUserFilter, setAssignedUserFilter] = useState('')
+  const [assignedUserId, setAssignedUserId] = useState<string>('')
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [observations, setObservations] = useState('')
@@ -245,12 +243,13 @@ const Leads = () => {
   
   const { user, userEmpresaId, userEmpresaNombre, userEmpresaConfiguracion } = useAuthStore()
   const {
-    loading, 
-    error, 
-    refreshLeads, 
-    updateLeadStatus, 
+    loading,
+    error,
+    loadActiveLeadsPage,
+    updateLeadStatus,
     updateLeadObservations,
     activeLeads,
+    activeLeadsTotalCount,
     updateActiveLeadLocally,
     removeActiveLeadLocally,
   } = useLeadsStore()
@@ -276,12 +275,15 @@ const Leads = () => {
       const mobile = window.innerWidth < 1024 // lg breakpoint
       setItemsPerPage(mobile ? 6 : 10)
     }
-    
     checkIsMobile()
     window.addEventListener('resize', checkIsMobile)
-    
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
+
+  // Al cambiar el tamaño de página, volver a la primera página
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [itemsPerPage])
 
   useEffect(() => {
     if (user?.rol === 'coordinador' && userEmpresaId) {
@@ -298,10 +300,13 @@ const Leads = () => {
     }
   }, [user?.rol])
 
-  const assignedUsersById = useMemo(
-    () => createAssignedUsersById(assignedUsers),
-    [assignedUsers]
-  )
+  // Debounce del filtro de teléfono: 1 segundo después de que el usuario deje de escribir
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPhoneFilterDebounced(phoneFilter)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [phoneFilter])
 
   // Filtrar usuarios para el dropdown basado en el texto de búsqueda
   const filteredAssignedUsers = useMemo(() => {
@@ -315,59 +320,77 @@ const Leads = () => {
     })
   }, [assignedUsers, userSearchText])
 
-  const filteredLeads = useMemo(() => {
-    // Los leads ya vienen filtrados por fecha del backend, solo aplicar otros filtros
-    const filtered = filterLeads(activeLeads, {
-      phoneFilter,
-      statusFilter,
-      empresaFilter,
-      assignedUserFilter,
-      assignedUsersById,
-      statusGetter: (lead: Lead) => lead.estado_temporal
-    })
-
-    // Usar util para determinar el campo de ordenamiento según el rol
+  // Cargar página actual desde el servidor (paginación y filtros en servidor)
+  const fetchCurrentPage = useCallback(async () => {
+    if (!user) return
+    const startDateISO = appliedDateRange.startDate ? `${appliedDateRange.startDate}T00:00:00.000Z` : ''
+    const endDateISO = appliedDateRange.endDate ? `${appliedDateRange.endDate}T23:59:59.999Z` : ''
     const dateField = getDateFieldByRole(user?.rol)
-    
-    // Ordenar por el campo de fecha correspondiente al rol
-    return [...filtered].sort((a, b) => {
-      const fechaA = a[dateField] ? new Date(a[dateField] as string).getTime() : 0
-      const fechaB = b[dateField] ? new Date(b[dateField] as string).getTime() : 0
-      return fechaB - fechaA
+    await loadActiveLeadsPage({
+      startDate: startDateISO,
+      endDate: endDateISO,
+      dateField,
+      page: currentPage,
+      limit: itemsPerPage,
+      phoneFilter: phoneFilterDebounced || undefined,
+      statusFilter: statusFilter || undefined,
+      empresaFilter: empresaFilter || undefined,
+      assignedUserId: assignedUserId || undefined
     })
   }, [
-    activeLeads,
-    phoneFilter,
+    user,
+    appliedDateRange.startDate,
+    appliedDateRange.endDate,
+    currentPage,
+    itemsPerPage,
+    phoneFilterDebounced,
     statusFilter,
     empresaFilter,
-    assignedUserFilter,
-    assignedUsersById,
-    user?.rol
+    assignedUserId,
+    loadActiveLeadsPage
   ])
 
-  // Calcular paginación
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
+  useEffect(() => {
+    if (!user) return
+    fetchCurrentPage()
+  }, [user, fetchCurrentPage])
 
-  // Resetear página cuando cambien los filtros
+  // Resetear a página 1 cuando cambien filtros (excepto página)
   useEffect(() => {
     setCurrentPage(1)
-  }, [phoneFilter, statusFilter, empresaFilter, assignedUserFilter])
+  }, [phoneFilterDebounced, statusFilter, empresaFilter, assignedUserId])
+
+  // Al cambiar página, recargar (fetchCurrentPage ya depende de currentPage)
+  // - ya cubierto por fetchCurrentPage en el useEffect anterior
+
+  // Paginación calculada desde el total del servidor
+  const totalPages = Math.max(1, Math.ceil(activeLeadsTotalCount / itemsPerPage))
+  const startIndex = activeLeadsTotalCount === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
+  const endIndex = Math.min(currentPage * itemsPerPage, activeLeadsTotalCount)
+
+  // Leads mostrados son exactamente la página actual del servidor (sin slice en cliente)
+  const paginatedLeads = activeLeads
 
   // Función para aplicar el filtro de fecha manualmente
   const handleApplyDateFilter = async () => {
     if (!user) return
-    
+    setAppliedDateRange({ ...dateRange })
+    setCurrentPage(1)
+    const startDateISO = dateRange.startDate ? `${dateRange.startDate}T00:00:00.000Z` : ''
+    const endDateISO = dateRange.endDate ? `${dateRange.endDate}T23:59:59.999Z` : ''
+    const dateField = getDateFieldByRole(user?.rol)
     try {
-      const startDateISO = dateRange.startDate ? `${dateRange.startDate}T00:00:00.000Z` : undefined
-      const endDateISO = dateRange.endDate ? `${dateRange.endDate}T23:59:59.999Z` : undefined
-      
-      setCurrentPage(1)
-      await refreshLeads(startDateISO, endDateISO)
-      // Actualizar el rango aplicado solo después del fetch exitoso
-      setAppliedDateRange({ ...dateRange })
+      await loadActiveLeadsPage({
+        startDate: startDateISO,
+        endDate: endDateISO,
+        dateField,
+        page: 1,
+        limit: itemsPerPage,
+        phoneFilter: phoneFilterDebounced || undefined,
+        statusFilter: statusFilter || undefined,
+        empresaFilter: empresaFilter || undefined,
+        assignedUserId: assignedUserId || undefined
+      })
     } catch (error) {
       console.error('Error loading leads with date range:', error)
     }
@@ -392,9 +415,7 @@ const Leads = () => {
         setShowDetailsModal(false)
         setSelectedLead(null)
         setObservations('')
-        
-        // Recargar leads para actualizar la vista
-        await refreshLeads()
+        await fetchCurrentPage()
       } catch (error) {
         console.error('Error updating observations:', error)
       }
@@ -432,6 +453,7 @@ const Leads = () => {
       if (user?.rol === 'agente' && user.id === lead.user_id) {
         removeActiveLeadLocally(lead.id)
         showNotification('Lead rehusado correctamente. Ya no aparece en tu lista.', 'success')
+        fetchCurrentPage()
       } else {
         // Si es un coordinador, solo actualizar el estado del lead
         updateActiveLeadLocally(lead.id, { 
@@ -445,7 +467,7 @@ const Leads = () => {
       console.error('Error rehusing lead:', error)
       showNotification(error instanceof Error ? error.message : 'Error al rehusar el lead', 'error')
     }
-  }, [user, userEmpresaConfiguracion, updateActiveLeadLocally, removeActiveLeadLocally, showNotification])
+  }, [user, userEmpresaConfiguracion, updateActiveLeadLocally, removeActiveLeadLocally, showNotification, fetchCurrentPage])
 
   const getActionMenuItems = useCallback((lead: Lead): ActionMenuItem[] => {
     // Si es administrador, mostrar "Ver detalles" y "Archivos adjuntos"
@@ -629,9 +651,7 @@ const Leads = () => {
           }
 
           showNotification('¡Lead asignado automáticamente! Ya tienes un nuevo lead para trabajar.', 'success')
-
-          // Recargar leads para mostrar el nuevo lead
-          await refreshLeads()
+          await fetchCurrentPage()
         }
       } else {
         // Asignación manual - crear solicitud normal
@@ -1057,6 +1077,7 @@ const Leads = () => {
                           type="button"
                           onClick={() => {
                             setAssignedUserFilter('')
+                            setAssignedUserId('')
                             setUserSearchText('')
                             setShowUserDropdown(false)
                           }}
@@ -1078,6 +1099,7 @@ const Leads = () => {
                                 key={userProfile.user_id}
                                 onClick={() => {
                                   setAssignedUserFilter(displayName)
+                                  setAssignedUserId(userProfile.user_id)
                                   setUserSearchText('')
                                   setShowUserDropdown(false)
                                 }}
@@ -1207,7 +1229,7 @@ const Leads = () => {
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="hidden lg:block text-xs sm:text-sm text-gray-700">
-                Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredLeads.length)}</span> de <span className="font-medium">{filteredLeads.length}</span> leads
+                Mostrando <span className="font-medium">{startIndex}-{endIndex}</span> de <span className="font-medium">{activeLeadsTotalCount}</span> leads
                 {user?.rol !== 'administrador' && (
                   <span className="ml-2 text-[#18cb96]">(filtrados por empresa)</span>
                 )}
