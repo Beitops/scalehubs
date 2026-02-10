@@ -92,7 +92,7 @@ export const useAuthStore = create<AuthState>()(
                     set({ isLoading: true, error: null })
 
                     try {
-                        const { error } = await supabase.auth.signInWithPassword({
+                        const { data, error } = await supabase.auth.signInWithPassword({
                             email,
                             password
                         })
@@ -100,6 +100,28 @@ export const useAuthStore = create<AuthState>()(
                         if (error) {
                             throw new Error(error.message)
                         }
+
+                        // Comprobar si el usuario está baneado (is_ban)
+                        if (data?.user?.id) {
+                            const { data: profile, error: profileError } = await supabase
+                                .from('profiles')
+                                .select('is_ban')
+                                .eq('user_id', data.user.id)
+                                .single()
+
+                            if (!profileError && profile?.is_ban === true) {
+                                // Cerrar sesión inmediatamente
+                                await supabase.auth.signOut()
+                                set({
+                                    user: null,
+                                    isAuthenticated: false,
+                                    isLoading: false,
+                                    error: 'No es posible entrar con esta cuenta'
+                                })
+                                return
+                            }
+                        }
+
                         // onAuthStateChange manejará el resto
                     } catch (error) {
                         set({
