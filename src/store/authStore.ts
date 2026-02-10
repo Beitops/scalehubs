@@ -235,6 +235,22 @@ export const useAuthStore = create<AuthState>()(
                             return
                         }
 
+                        // Comprobar si el usuario está baneado (is_ban)
+                        if (profileWithEmpresa?.is_ban === true) {
+                            await supabase.auth.signOut()
+                            await resetAllStores()
+                            set({
+                                user: null,
+                                isAuthenticated: false,
+                                isLoading: false,
+                                error: 'No es posible entrar con esta cuenta',
+                                userEmpresaId: null,
+                                userEmpresaNombre: '',
+                                userEmpresaConfiguracion: null
+                            })
+                            return
+                        }
+
                         const { data: roles, error: rolesError } = await supabase
                             .from('roles')
                             .select('nombre')
